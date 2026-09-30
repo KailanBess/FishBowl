@@ -79,6 +79,8 @@ linux/uninstall-linux.sh    # removes it again; your library is kept
 
 Or run it from source with `dotnet run --project FishBowl.Avalonia`.
 
+To keep an installed copy current, run `linux/auto-update.sh enable` from a git checkout. A daily systemd user timer then pulls the checkout's upstream branch and reinstalls FishBowl when it has changed (`linux/auto-update.sh run` checks immediately; `disable` turns it off). It only fast-forwards, so a checkout with local edits is left alone.
+
 On Linux:
 
 - An emulator can be a native program (e.g. /usr/bin/dolphin-emu), an AppImage, a Flatpak (its exports/bin launcher or .desktop entry), a shell script, or a .desktop entry. Emulators > Find installed detects Flatpaks, packages on your PATH, and AppImages in the emulator folder, ~/Applications, ~/AppImages and ~/Downloads.
@@ -99,3 +101,5 @@ csc /target:winexe /win32icon:FishBowl.ico /resource:FishBowl.png /resource:Fish
 ```
 
 The Linux/cross-platform front end is FishBowl.Avalonia (.NET 10), which compiles the same two shared files.
+
+`dotnet run --project tests/FishBowl.Tests` runs the shared-logic checks (preset recognition, folder routing, settings JSON, archive safety, backup/restore, running-state detection) against temporary fixtures. GitHub Actions (.github/workflows/build.yml) builds FishBowl.exe with csc.exe on Windows and the Linux app plus these checks on every push and pull request, so a change that breaks either version shows up as a failed check. The Windows job's FishBowl.exe is available as a download on each run.
