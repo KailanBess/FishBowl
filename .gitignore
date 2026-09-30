@@ -12,3 +12,7 @@ FishBowl Installer.exe
 *.tmp
 *.bak
 *.recovery-*.json
+
+# .NET build output (FishBowl.Avalonia)
+bin/
+obj/

@@ -65,3 +65,37 @@ The image, icon, executable filename, and Launch FishBowl.bat are unchanged. The
 Profiles remain in %LOCALAPPDATA%\FishBowl\library.json, or FishBowlData beside the executable when portable.flag is present. Existing profiles, including Azahar Plus, are retained. Legacy game records remain stored for compatibility but have no import or launch interface in FishBowl. Settings saves are atomic and retain library.json.bak; unreadable settings are preserved in a recovery copy.
 
 Preset and information sources are listed in Presets.md, Information Sources.md and Folder Routing.md. Project links open in your browser. FishBowl opens official download pages; it does not automatically download or replace emulator builds. ZIP import extracts a user-selected package into a new folder. Folder detection only reads emulator settings. Explicit backup restoration writes the matching configuration/save files after review; games are never added to the hub.
+
+## Linux
+
+FishBowl also runs on Linux. The Linux version (FishBowl.Avalonia) uses the same library format, presets, folder routing, backups and management tools as the Windows build, with a cross-platform Avalonia interface.
+
+Install for your user (needs the .NET 10 SDK to build, e.g. `sudo pacman -S dotnet-sdk` on Arch):
+
+```sh
+linux/install-linux.sh      # builds a self-contained FishBowl into ~/.local/lib/fishbowl and adds a menu entry
+linux/uninstall-linux.sh    # removes it again; your library is kept
+```
+
+Or run it from source with `dotnet run --project FishBowl.Avalonia`.
+
+On Linux:
+
+- An emulator can be a native program (e.g. /usr/bin/dolphin-emu), an AppImage, a Flatpak (its exports/bin launcher or .desktop entry), a shell script, or a .desktop entry. Emulators > Find installed detects Flatpaks, packages on your PATH, and AppImages in the emulator folder, ~/Applications, ~/AppImages and ~/Downloads.
+- Setup assistant can import an AppImage (copied into its own folder and marked executable) as well as a ZIP. Extract tar.gz/tar.xz/7z packages with your usual tool.
+- Folder routing follows each emulator's Linux layout: XDG folders such as ~/.config/PCSX2 and ~/.local/share/dolphin-emu, the Flatpak sandbox under ~/.var/app/<app ID>, and portable markers beside the program. See Folder Routing.md.
+- Installed versions come from Flatpak metadata, the distribution package (pacman, dpkg or rpm), or the AppImage file name.
+- Running status reads /proc, including Flatpak and AppImage processes. Opening an emulator that is already running focuses its window on Hyprland, Sway and X11.
+- Settings, activity log and portable mode work as on Windows; the library lives in ~/.local/share/FishBowl/library.json. Tools > Add FishBowl to the application menu creates a menu entry.
+- Emulator artwork comes from the emulator's .desktop entry or Flatpak icon; a custom image can still be chosen.
+- Windows-only emulators (Altirra, WinUAE, Xenia) can be added with Custom through a Wine launcher script.
+
+## Building from source
+
+The shared logic lives in FishBowl.Core.cs (data model, presets, folder routing, backups, updates) and FishBowl.Platform.cs (Windows/Linux differences). Both stay C# 5 compatible so the Windows build still compiles with the .NET Framework csc.exe:
+
+```bat
+csc /target:winexe /win32icon:FishBowl.ico /resource:FishBowl.png /resource:FishBowl.ico /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /out:FishBowl.exe FishBowl.cs FishBowl.Core.cs FishBowl.Platform.cs
+```
+
+The Linux/cross-platform front end is FishBowl.Avalonia (.NET 10), which compiles the same two shared files.
