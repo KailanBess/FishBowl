@@ -169,17 +169,19 @@ namespace EmulatorHub
 
         private Control BuildPrimaryActions()
         {
-            var bar = new StackPanel { Orientation = Orientation.Horizontal, Background = p.TopBrush, Height = 48 };
-            bar.Children.Add(new Border { Width = 8 });
+            // Wraps instead of clipping: tiling window managers can size the window below its minimum width.
+            var bar = new WrapPanel { Orientation = Orientation.Horizontal, Background = p.TopBrush, Margin = new Thickness(0), MinHeight = 48 };
+            bar.Children.Add(new Border { Width = 8, Height = 48 });
             bar.Children.Add(Ui.Action("Add emulator", AddEmulator, true));
             Ui.SetAction(editButton, "Edit emulator"); Wire(editButton, EditEmulator); bar.Children.Add(editButton);
             Ui.SetAction(removeButton, "Remove"); Wire(removeButton, RemoveEmulator); bar.Children.Add(removeButton);
             Ui.SetAction(managementButton, "Manage"); Wire(managementButton, () => ShowEmulatorManager("Setup checks")); bar.Children.Add(managementButton);
-            foreach (var b in new[] { editButton, removeButton, managementButton }) { b.Padding = new Thickness(12, 6); b.Margin = new Thickness(0, 0, 8, 0); b.MinHeight = 34; b.CornerRadius = new CornerRadius(6); b.VerticalAlignment = VerticalAlignment.Center; }
-            favoritesOnly.Content = "Favorites only"; favoritesOnly.Foreground = p.InkBrush; favoritesOnly.Margin = new Thickness(16, 0, 12, 0); favoritesOnly.VerticalAlignment = VerticalAlignment.Center;
+            var add = bar.Children.OfType<Button>().First(); add.Margin = new Thickness(0, 7, 8, 7);
+            foreach (var b in new[] { editButton, removeButton, managementButton }) { b.Padding = new Thickness(12, 6); b.Margin = new Thickness(0, 7, 8, 7); b.MinHeight = 34; b.CornerRadius = new CornerRadius(6); b.VerticalAlignment = VerticalAlignment.Center; }
+            favoritesOnly.Content = "Favorites only"; favoritesOnly.Foreground = p.InkBrush; favoritesOnly.Margin = new Thickness(16, 7, 12, 7); favoritesOnly.VerticalAlignment = VerticalAlignment.Center;
             favoritesOnly.IsCheckedChanged += delegate { RefreshHub(); };
             bar.Children.Add(favoritesOnly);
-            platformFilter.Width = 240; platformFilter.VerticalAlignment = VerticalAlignment.Center;
+            platformFilter.Width = 240; platformFilter.VerticalAlignment = VerticalAlignment.Center; platformFilter.Margin = new Thickness(8, 7, 8, 7);
             platformFilter.SelectionChanged += delegate { if (!loadingFilters) RefreshHub(); };
             bar.Children.Add(platformFilter);
             return bar;
@@ -637,7 +639,7 @@ namespace EmulatorHub
             Height = size; BorderThickness = new Thickness(0, 1);
             var grid = new Grid { ColumnDefinitions = Columns() };
             marker = new Border { Width = 4, HorizontalAlignment = HorizontalAlignment.Left, Background = new SolidColorBrush(Palette.Rgb(255, 164, 82)), IsVisible = false };
-            var first = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0), VerticalAlignment = VerticalAlignment.Center, Spacing = 12 };
+            var first = new DockPanel { Margin = new Thickness(8, 0), VerticalAlignment = VerticalAlignment.Center };
             if (theme.ShowEmulatorIcons)
             {
                 var accent = p.Swatches[index % p.Swatches.Length];
@@ -646,14 +648,15 @@ namespace EmulatorHub
                 highlight = new Border { CornerRadius = new CornerRadius(5), Margin = new Thickness(2), IsVisible = false };
                 tile = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(radius), Background = new SolidColorBrush(Palette.Alpha(18, accent)), BorderBrush = new SolidColorBrush(Palette.Alpha(58, accent)), BorderThickness = new Thickness(1), Child = new Grid { Children = { highlight, art } } };
                 art.HorizontalAlignment = HorizontalAlignment.Center; art.VerticalAlignment = VerticalAlignment.Center;
-                first.Children.Add(tile);
+                tile.Margin = new Thickness(0, 0, 12, 0); DockPanel.SetDock(tile, Dock.Left); first.Children.Add(tile);
             }
             name = Cell((profile.Favorite ? "★ " : "") + (profile.Name ?? "Emulator")); name.Margin = new Thickness(0);
             first.Children.Add(name);
             grid.Children.Add(first);
-            var statusPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(9, 0), VerticalAlignment = VerticalAlignment.Center };
-            dot = new Ellipse { Width = 6, Height = 6, VerticalAlignment = VerticalAlignment.Center };
-            statusText = Cell(""); statusText.Margin = new Thickness(0);
+            // A Grid (not a StackPanel) so the status text is width-limited and trims instead of overlapping the next column.
+            var statusPanel = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), Margin = new Thickness(9, 0), VerticalAlignment = VerticalAlignment.Center };
+            dot = new Ellipse { Width = 6, Height = 6, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+            statusText = Cell(""); statusText.Margin = new Thickness(0); Grid.SetColumn(statusText, 1);
             statusPanel.Children.Add(dot); statusPanel.Children.Add(statusText);
             Grid.SetColumn(statusPanel, 1); grid.Children.Add(statusPanel);
             var platform = Cell(EmulatorReference.PlatformFor(profile)); Grid.SetColumn(platform, 2); grid.Children.Add(platform);
