@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=FishBowl
+GenericName=Emulator Hub
+Comment=Your emulators, together
+Exec="@EXEC@"
+Icon=fishbowl
+Terminal=false
+Categories=Game;Emulator;
+Keywords=emulator;retro;games;
+StartupWMClass=FishBowl

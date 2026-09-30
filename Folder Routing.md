@@ -41,7 +41,29 @@ Old SaveFolder entries remain as “Previous save shortcut (unclassified).” Us
 | mGBA | Roaming or portable.ini configuration root; explicit game-save, state and screenshot paths. |
 | MAME | Global mame.ini directory settings, including its INI search folders; NVRAM and states. |
 
-Every Windows emulator remains supported as a launcher. Other emulators, custom builds, shortcuts/scripts with storage arguments, and per-game overrides may require a manual choice. FishBowl cannot infer a universal folder layout from every executable. Selecting a preset does not enable save states in an emulator that lacks them.
+## Linux routing
+
+On Linux the same rules read each emulator's Linux storage. A Flatpak (launched through its exports/bin launcher or .desktop entry) uses its sandbox folders under ~/.var/app/<app ID>/config, /data and /cache; native programs and AppImages use the XDG folders ($XDG_CONFIG_HOME, default ~/.config; $XDG_DATA_HOME, default ~/.local/share). Portable markers beside the program are honoured as on Windows. `~`, `$HOME` and other environment variables in emulator settings are expanded.
+
+| Emulator | Linux storage used |
+| --- | --- |
+| Azahar Plus | Portable user folder, else ~/.config/azahar-emu (qt-config.ini) and ~/.local/share/azahar-emu (sdmc, nand, states, log). |
+| DeSmuME | ~/.config/desmume for configuration; save folders are chosen manually. |
+| Dolphin | portable.txt, $DOLPHIN_EMU_USERPATH, legacy ~/.dolphin-emu, else ~/.config/dolphin-emu (Dolphin.ini) with GC, Wii, StateSaves, ScreenShots and Logs in ~/.local/share/dolphin-emu. |
+| Cemu | Portable folder, else ~/.config/Cemu (settings.xml) and ~/.local/share/Cemu (mlc01, screenshots, log). |
+| Vita3K | config.yml beside the program, in ~/.config/Vita3K or ~/.local/share/Vita3K/Vita3K; pref-path decides save storage. |
+| Eden | Portable user folder, else ~/.config/eden (qt-config.ini) and ~/.local/share/eden (nand, log). |
+| Ryujinx | Portable folder, else ~/.config/Ryujinx. |
+| PCSX2 | Portable markers, else ~/.config/PCSX2. |
+| DuckStation | portable.txt, else ~/.local/share/duckstation. |
+| melonDS | melonDS.toml beside the program, else ~/.config/melonDS. |
+| PPSSPP | memstick/installed.txt beside the program, else ~/.config/ppsspp. |
+| RetroArch | retroarch.cfg beside the program, else ~/.config/retroarch. |
+| RPCS3 | $RPCS3_CONFIG_DIR, else ~/.config/rpcs3; logs in ~/.cache/rpcs3. |
+| mGBA | portable.ini, else ~/.config/mgba. |
+| MAME | mame.ini beside the program, else ~/.mame (the Flatpak's persisted ~/.mame). |
+
+Every emulator remains supported as a launcher. Other emulators, custom builds, shortcuts/scripts with storage arguments, and per-game overrides may require a manual choice. FishBowl cannot infer a universal folder layout from every executable. Selecting a preset does not enable save states in an emulator that lacks them.
 
 The detector only reads configuration. It does not edit emulator settings, move/copy/delete saves, scan game libraries, or write to console storage. Notes and controller notes remain your own information rather than altering emulator settings.
 

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Cross-platform FishBowl front end (Linux first). Shares FishBowl.Core.cs and FishBowl.Platform.cs with the Windows build. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>FishBowl</AssemblyName>
+    <RootNamespace>EmulatorHub</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ApplicationIcon>../FishBowl.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <!-- Windows-only calls in the shared files are guarded at run time; HttpWebRequest keeps parity with the csc.exe build. -->
+    <NoWarn>$(NoWarn);CA1416;SYSLIB0014;CS0618</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../FishBowl.Core.cs" Link="Shared/FishBowl.Core.cs" />
+    <Compile Include="../FishBowl.Platform.cs" Link="Shared/FishBowl.Platform.cs" />
+    <EmbeddedResource Include="../FishBowl.png" LogicalName="FishBowl.png" />
+    <EmbeddedResource Include="../FishBowl.ico" LogicalName="FishBowl.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+  </ItemGroup>
+</Project>
