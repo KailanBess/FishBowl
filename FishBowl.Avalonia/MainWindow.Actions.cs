@@ -305,7 +305,7 @@ namespace EmulatorHub
         {
             var info = new ProcessStartInfo(Environment.ProcessPath) { WorkingDirectory = AppContext.BaseDirectory, UseShellExecute = false };
             argument = null;
-            if (Path.GetFileNameWithoutExtension(Environment.ProcessPath) == "dotnet") { argument = typeof(MainWindow).Assembly.Location; info.ArgumentList.Add(argument); }
+            if (Path.GetFileNameWithoutExtension(Environment.ProcessPath) == "dotnet") { argument = Path.Combine(AppContext.BaseDirectory, "FishBowl.dll"); info.ArgumentList.Add(argument); }
             return info;
         }
 
