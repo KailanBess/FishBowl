@@ -1,0 +1,14 @@
+# Personal FishBowl library data and local preferences
+FishBowlData/
+portable.flag
+
+# Local installer packaging scratch files
+FishBowl Installer.sed
+FishBowl Installer.exe
+
+# Editor and temporary files
+*.user
+*.suo
+*.tmp
+*.bak
+*.recovery-*.json
