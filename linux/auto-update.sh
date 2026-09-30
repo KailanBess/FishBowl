@@ -12,6 +12,12 @@ self=${XDG_BIN_HOME:-$HOME/.local/bin}/fishbowl-auto-update
 units=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
 stamp=${XDG_DATA_HOME:-$HOME/.local/share}/FishBowl/installed-commit
 
+# Installs this script as $self with the checkout path built in, so manual runs of the copy work too.
+install_self() {
+    mkdir -p "$(dirname "$self")"
+    sed "s|^repo=.*|repo=\${FISHBOWL_REPO:-$repo}|" "$1" > "$self.tmp" && chmod +x "$self.tmp" && mv "$self.tmp" "$self"
+}
+
 notify() { command -v notify-send >/dev/null 2>&1 && notify-send -a FishBowl -i fishbowl "FishBowl" "$1" || true; echo "$1"; }
 
 run() {
@@ -25,15 +31,15 @@ run() {
     if [ "$(cat "$stamp" 2>/dev/null || true)" = "$head" ]; then echo "FishBowl is up to date ($(git log -1 --format=%h))."; exit 0; fi
     "$repo/linux/install-linux.sh"
     mkdir -p "$(dirname "$stamp")"; echo "$head" > "$stamp"
-    [ -f "$repo/linux/auto-update.sh" ] && [ -f "$self" ] && cp "$repo/linux/auto-update.sh" "$self"
+    [ -f "$repo/linux/auto-update.sh" ] && [ -f "$self" ] && install_self "$repo/linux/auto-update.sh"
     notify "FishBowl updated to $(git log -1 --format='%h: %s')"
 }
 
 case "${1:-run}" in
     run) run ;;
     enable)
-        mkdir -p "$units" "$(dirname "$self")"
-        [ "$0" -ef "$self" ] || cp "$0" "$self"; chmod +x "$self"
+        mkdir -p "$units"
+        install_self "$0"
         cat > "$units/fishbowl-update.service" <<UNIT
 [Unit]
 Description=Update FishBowl from $repo
