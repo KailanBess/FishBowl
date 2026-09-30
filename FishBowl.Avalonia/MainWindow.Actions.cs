@@ -300,16 +300,25 @@ namespace EmulatorHub
             Store.Save(library); filterBox.Text = ""; RefreshHub(); SetStatus("Imported FishBowl settings. Reopen FishBowl to apply the theme.");
         }
 
+        // How to start this copy of FishBowl again: the published executable, or the dotnet host plus FishBowl.dll.
+        private static ProcessStartInfo SelfStart(out string argument)
+        {
+            var info = new ProcessStartInfo(Environment.ProcessPath) { WorkingDirectory = AppContext.BaseDirectory, UseShellExecute = false };
+            argument = null;
+            if (Path.GetFileNameWithoutExtension(Environment.ProcessPath) == "dotnet") { argument = typeof(MainWindow).Assembly.Location; info.ArgumentList.Add(argument); }
+            return info;
+        }
+
         private async Task CreateShortcut()
         {
-            var app = Environment.ProcessPath;
+            string argument; var app = SelfStart(out argument).FileName;
             var icon = Path.Combine(AppContext.BaseDirectory, "FishBowl.png");
             if (!File.Exists(icon))
             {
                 icon = Path.Combine(Store.DataDirectory, "FishBowl.png"); Directory.CreateDirectory(Store.DataDirectory);
                 using (var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("FishBowl.png")) using (var output = File.Create(icon)) stream.CopyTo(output);
             }
-            try { await Ui.Message(this, Platform.CreateAppShortcut(app, icon)); }
+            try { await Ui.Message(this, Platform.CreateAppShortcut(app, icon, argument)); }
             catch (Exception error) { await Ui.Message(this, "FishBowl could not create the shortcut.\n\n" + error.Message); }
         }
 
@@ -326,7 +335,7 @@ namespace EmulatorHub
             {
                 Store.Log("Restarting to apply settings.");
                 SaveProfileNotes(); SaveWindowLayout();
-                using (Process.Start(new ProcessStartInfo(Environment.ProcessPath) { WorkingDirectory = AppContext.BaseDirectory, UseShellExecute = false })) { }
+                string argument; using (Process.Start(SelfStart(out argument))) { }
                 Close();
             }
             else if (restartRequired) await Ui.Message(this, "Settings saved. Restart FishBowl whenever you are ready to apply them.");

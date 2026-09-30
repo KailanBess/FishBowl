@@ -391,7 +391,9 @@ namespace EmulatorHub
 
         // Windows: a desktop .lnk. Linux: an application-menu entry (desktop icons are not universal there).
         public static string ShortcutActionLabel { get { return IsWindows ? "Create desktop shortcut" : "Add FishBowl to the application menu"; } }
-        public static string CreateAppShortcut(string appPath, string iconPath)
+        public static string CreateAppShortcut(string appPath, string iconPath) { return CreateAppShortcut(appPath, iconPath, null); }
+        // argument: an extra first argument, e.g. FishBowl.dll when the app runs through the dotnet host.
+        public static string CreateAppShortcut(string appPath, string iconPath, string argument)
         {
             if (IsWindows)
             {
@@ -409,7 +411,8 @@ namespace EmulatorHub
             }
             var applications = Path.Combine(DataHome, "applications"); Directory.CreateDirectory(applications);
             var file = Path.Combine(applications, "fishbowl.desktop");
-            var quoted = "\"" + appPath.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("$", "\\$").Replace("`", "\\`") + "\"";
+            Func<string, string> quote = value => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("$", "\\$").Replace("`", "\\`") + "\"";
+            var quoted = quote(appPath) + (String.IsNullOrEmpty(argument) ? "" : " " + quote(argument));
             File.WriteAllText(file, "[Desktop Entry]\nType=Application\nName=FishBowl\nGenericName=Emulator Hub\nComment=Your emulators, together\nExec=" + quoted + "\nPath=" + Path.GetDirectoryName(appPath) + "\nIcon=" + (File.Exists(iconPath) ? iconPath : "applications-games") + "\nTerminal=false\nCategories=Game;Emulator;\nStartupWMClass=FishBowl\n");
             Run("update-desktop-database", applications);
             return "FishBowl was added to your application menu.\n\n" + file;

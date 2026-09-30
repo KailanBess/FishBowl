@@ -70,12 +70,14 @@ namespace EmulatorHub
             RefreshHub();
             ConfigureGameFolderWatchers();
             SetStatus("Double-click an emulator to open it. Manage games inside the emulator.");
-            AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+            // Bubble, so open menus and drop-downs handle Escape/Enter before the hub shortcuts.
+            AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Bubble);
             runtimeTimer.Tick += delegate { RefreshRuntimeStatus(); }; runtimeTimer.Start();
             notesTimer.Tick += async delegate { await Ui.Run(this, () => { SaveProfileNotes(); return Task.CompletedTask; }); };
             gameFolderTimer.Tick += async delegate { gameFolderTimer.Stop(); await Ui.Run(this, () => { SyncWatchedGameFolders(); return Task.CompletedTask; }); };
             Opened += async delegate
             {
+                KeepOnScreen();
                 foreach (var warning in pendingWarnings.ToArray()) await Ui.Message(this, warning);
                 pendingWarnings.Clear();
                 if (library.Theme.ShowStartupAssistant) await ShowFirstRunGuide();
@@ -597,6 +599,15 @@ namespace EmulatorHub
                 WindowState = values[4] == 1 ? WindowState.Maximized : WindowState.Normal;
             }
             catch (Exception error) { Store.Log("Window layout could not be restored: " + error.Message); }
+        }
+        // A saved position can point at a monitor that is no longer connected; recentre on the primary screen.
+        private void KeepOnScreen()
+        {
+            if (WindowState != WindowState.Normal || Screens.All.Count == 0) return;
+            var bounds = new PixelRect(Position, PixelSize.FromSize(new Size(Width, Height), DesktopScaling));
+            if (Screens.All.Any(s => s.WorkingArea.Intersects(bounds))) return;
+            var area = (Screens.Primary ?? Screens.All[0]).WorkingArea;
+            Position = new PixelPoint(area.X + Math.Max(0, (area.Width - bounds.Width) / 2), area.Y + Math.Max(0, (area.Height - bounds.Height) / 2));
         }
         private void SaveWindowLayout()
         {

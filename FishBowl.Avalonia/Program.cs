@@ -25,6 +25,14 @@ namespace EmulatorHub
 
         public override void OnFrameworkInitializationCompleted()
         {
+            // Like Application.ThreadException in the Windows build: log, tell the user, keep running.
+            Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (sender, e) =>
+            {
+                e.Handled = true;
+                Store.Log("Interface action failed: " + e.Exception);
+                var owner = (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+                Avalonia.Threading.Dispatcher.UIThread.Post(async () => await Ui.Message(owner, "FishBowl could not complete this action.\n\n" + e.Exception.Message));
+            };
             var desktop = ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
             if (desktop != null)
             {
