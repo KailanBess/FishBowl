@@ -1,0 +1,16 @@
+{
+  "name": "fishbowl-livekit-token-service",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "livekit-server-sdk": "^2.19.1"
+  }
+}
