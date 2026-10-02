@@ -1,0 +1,39 @@
+# Builds both versions of FishBowl on every push and pull request, so a change to the shared files
+# (FishBowl.Core.cs, FishBowl.Platform.cs) that breaks either Windows or Linux shows up as a failed check.
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows (csc.exe, C# 5)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build FishBowl.exe with the .NET Framework compiler
+        shell: cmd
+        run: >
+          C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /target:winexe
+          /win32icon:FishBowl.ico /resource:FishBowl.png /resource:FishBowl.ico
+          /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll
+          /out:FishBowl.exe FishBowl.cs FishBowl.Core.cs FishBowl.Platform.cs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: FishBowl-windows
+          path: FishBowl.exe
+
+  linux:
+    name: Linux (Avalonia + core tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Build the Linux app
+        run: dotnet build FishBowl.Avalonia/FishBowl.Avalonia.csproj -c Release
+      - name: Run core tests
+        run: dotnet run --project tests/FishBowl.Tests -c Release
