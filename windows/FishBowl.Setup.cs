@@ -10,12 +10,12 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
-[assembly: AssemblyTitle("FishBowl")]
-[assembly: AssemblyFileVersion("1.24.0.0")]
-[assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.24.0.0")]
+[assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
+[assembly: AssemblyFileVersion("1.25.8.0")]
+[assembly: CompilationRelaxations(8)]
+[assembly: AssemblyTitle("FishBowl")]
+[assembly: AssemblyVersion("1.25.8.0")]
 namespace FishBowlSetup
 {
 	internal static class Program
@@ -94,8 +94,8 @@ namespace FishBowlSetup
 		}
 
 		[ComImport]
-		[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 		[Guid("42F85136-DB7E-439C-85F1-E4075D135FC8")]
+		[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 		private interface IFileDialog
 		{
 			[PreserveSig]
@@ -238,7 +238,7 @@ namespace FishBowlSetup
 			};
 			Label value2 = new Label
 			{
-				Text = "FishBowl Setup 1.1",
+				Text = "FishBowl Setup 1.25.8",
 				Font = new Font("Segoe UI", 10f),
 				ForeColor = Color.FromArgb(157, 184, 225),
 				AutoSize = true,
@@ -346,8 +346,9 @@ namespace FishBowlSetup
 			Button button = browse;
 			TextBox textBox = installPath;
 			bool flag4 = (desktopShortcut.Visible = flag);
-			flag4 = (textBox.Visible = flag4);
-			button.Visible = flag4;
+			bool flag5 = flag4;
+			flag4 = (textBox.Visible = flag5);
+			flag5 = (button.Visible = flag4);
 			progress.Visible = installer.IsBusy;
 			cancel.Visible = !installed;
 			if (page == 0)
@@ -424,8 +425,9 @@ namespace FishBowlSetup
 				Button button = browse;
 				TextBox textBox = installPath;
 				bool flag2 = (desktopShortcut.Visible = false);
-				flag2 = (textBox.Visible = flag2);
-				button.Visible = flag2;
+				bool flag3 = flag2;
+				flag2 = (textBox.Visible = flag3);
+				flag3 = (button.Visible = flag2);
 				progress.Visible = true;
 				ShowPage();
 				installer.RunWorkerAsync(new InstallOptions
@@ -444,7 +446,8 @@ namespace FishBowlSetup
 			int num = Math.Max(1, files.Length);
 			int num2 = 0;
 			string[] array = files;
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				string text2 = text.Substring(baseDirectory.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 				if (!ShouldSkip(text2))
@@ -470,7 +473,7 @@ namespace FishBowlSetup
 			using (RegistryKey registryKey = Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FishBowl"))
 			{
 				registryKey.SetValue("DisplayName", "FishBowl");
-				registryKey.SetValue("DisplayVersion", "1.24");
+				registryKey.SetValue("DisplayVersion", "1.25.8");
 				registryKey.SetValue("Publisher", "FishBowl");
 				registryKey.SetValue("DisplayIcon", value);
 				registryKey.SetValue("UninstallString", "\"" + Path.Combine(installOptions.Destination, "Uninstall FishBowl.bat") + "\"");
@@ -502,7 +505,8 @@ namespace FishBowlSetup
 			}
 			string[] array = new string[5] { "FishBowl.exe", "FishBowl.ico", "Uninstall FishBowl.bat", "Uninstall FishBowl.ps1", "README.md" };
 			string[] array2 = array;
-			foreach (string value in array2)
+			string[] array3 = array2;
+			foreach (string value in array3)
 			{
 				if (relative.Equals(value, StringComparison.OrdinalIgnoreCase))
 				{
