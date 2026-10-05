@@ -1,0 +1,28 @@
+# Report-only check for text that doesn't fit its control in the Windows app, at 100/150/200% text size.
+# Download the "overflow-audit" artifact for the report and screenshots.
+name: Text overflow audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ['windows/**', '.github/workflows/overflow-audit.yml']
+  pull_request:
+    paths: ['windows/**']
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build FishBowl
+        shell: pwsh
+        run: ./windows/Build.ps1
+      - name: Audit text overflow
+        shell: pwsh
+        run: '& "./windows/Run Overflow Audit.ps1"'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: overflow-audit
+          path: windows/overflow-audit/

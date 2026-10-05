@@ -19,3 +19,6 @@ obj/
 
 # Rebuild Windows binaries from windows/; distribute them through Releases/artifacts.
 /windows/*.exe
+
+# Overflow audit output
+windows/overflow-audit/
