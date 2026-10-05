@@ -1,13 +1,17 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Media;
 using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -23,20 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
+[assembly: AssemblyFileVersion("1.25.8.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
-[assembly: AssemblyDescription("Emulators, games and saves, organized together")]
 [assembly: CompilationRelaxations(8)]
-	[assembly: AssemblyFileVersion("1.24.0.0")]
-[assembly: AssemblyVersion("1.24.0.0")]
+[assembly: AssemblyDescription("Emulators, games and saves, organized together")]
+[assembly: AssemblyVersion("1.25.8.0")]
 namespace EmulatorHub
 {
-	public partial class MainForm : Form
+	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.24";
-        private const string FishBowlTitleVersion = "1.1";
+		private const string FishBowlVersion = "1.25.8";
+
+		private const string FishBowlTitleVersion = "1.25.8";
 
 		private Icon ownedAppIcon;
 
@@ -254,6 +259,26 @@ namespace EmulatorHub
 
 		private bool enhancementsInitialized;
 
+		private bool commandSearchOpen;
+
+		private RecoveryMarker recovery;
+
+		private System.Windows.Forms.Timer hubCaptureTimer;
+
+		private bool captureRunning;
+
+		private CancellationTokenSource hubCaptureCancellation;
+
+		private bool releaseWatchRunning;
+
+		private CancellationTokenSource releaseWatchCancellation;
+
+		private NotifyIcon releaseWatchIcon;
+
+		private IdleInput immersionInput;
+
+		private System.Windows.Forms.Timer immersionIdle;
+
 		private string DisplayFont
 		{
 			get
@@ -270,6 +295,14 @@ namespace EmulatorHub
 			}
 		}
 
+		public bool HubBusy
+		{
+			get
+			{
+				return backgroundLibraryScanRunning || automaticCopyRunning || captureRunning || releaseWatchRunning;
+			}
+		}
+
 		public MainForm()
 			: this(false)
 		{
@@ -278,10 +311,11 @@ namespace EmulatorHub
 		public MainForm(bool isolatedPreview)
 		{
 			MainForm mainForm = this;
-            DoubleBuffered=false;SetStyle(ControlStyles.OptimizedDoubleBuffer,false);
+			DoubleBuffered = true;
+			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl " + FishBowlTitleVersion;
+			Text = "FishBowl 1.25.8";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -314,13 +348,16 @@ namespace EmulatorHub
 			RefreshHub();
 			ApplyVisualScale();
 			InitializeEnhancements(isolatedPreview);
-            InitializeHub(isolatedPreview);
-            FishBowlPalette.StyleWindow(this);
-            Polish.Accessibility(this);
-            CosmeticRuntime.Apply(this);
-			var userRuntime = new UserToolRuntime(this, library);
-            Disposed += delegate { userRuntime.Dispose(); };
-            ConfigureGameFolderWatchers();
+			InitializeHub(isolatedPreview);
+			FishBowlPalette.StyleWindow(this);
+			Polish.Accessibility(this);
+			CosmeticRuntime.Apply(this);
+			UserToolRuntime userRuntime = new UserToolRuntime(this, library);
+			base.Disposed += delegate
+			{
+				userRuntime.Dispose();
+			};
+			ConfigureGameFolderWatchers();
 			ConfigureScheduledLibraryScan();
 			base.Shown += delegate
 			{
@@ -351,33 +388,39 @@ namespace EmulatorHub
 			};
 			base.Shown += delegate
 			{
-                BeginInvoke(new Action(delegate {
-                if (IsDisposed || Disposing) return;
-                Update();
-                if (!isolatedPreview) OfferStartupRecovery();
-				if (!string.IsNullOrWhiteSpace(mainForm.library.Theme.LastSeenBuild) && mainForm.library.Theme.LastSeenBuild != FishBowlVersion && !isolatedPreview)
+				mainForm.BeginInvoke((Action)delegate
 				{
-					mainForm.ShowWhatsNew();
-				}
-				mainForm.library.Theme.LastSeenBuild = FishBowlVersion;
-				Store.Save(mainForm.library);
-				if (!isolatedPreview && mainForm.library.Theme.ShowStartupAssistant)
-				{
-					mainForm.ShowFirstRunGuide();
-				}
-				if (!isolatedPreview && mainForm.library.Theme.ShowGameStorageAssistant)
-				{
-					mainForm.ShowGameStoragePrompt();
-				}
-				if (!isolatedPreview && mainForm.library.Theme.ShowRequirementsStorageAssistant)
-				{
-					mainForm.ShowRequirementsStoragePrompt();
-				}
-				if (!isolatedPreview && mainForm.library.Theme.CheckHealthOnStartup)
-				{
-					mainForm.ShowNotifications();
-				}
-                }));
+					if (!mainForm.IsDisposed && !mainForm.Disposing)
+					{
+						mainForm.Update();
+						if (!isolatedPreview)
+						{
+							mainForm.OfferStartupRecovery();
+						}
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.25.8" && !isolatedPreview)
+						{
+							ShowWhatsNew();
+						}
+						library.Theme.LastSeenBuild = "1.25.8";
+						Store.Save(library);
+						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
+						{
+							ShowFirstRunGuide();
+						}
+						if (!isolatedPreview && library.Theme.ShowGameStorageAssistant)
+						{
+							ShowGameStoragePrompt();
+						}
+						if (!isolatedPreview && library.Theme.ShowRequirementsStorageAssistant)
+						{
+							ShowRequirementsStoragePrompt();
+						}
+						if (!isolatedPreview && library.Theme.CheckHealthOnStartup)
+						{
+							ShowNotifications();
+						}
+					}
+				});
 			};
 			base.FormClosing += delegate(object sender, FormClosingEventArgs e)
 			{
@@ -450,7 +493,7 @@ namespace EmulatorHub
 					logo.Dispose();
 				}
 			};
-			panel2.Name="FishBowlHeader";
+			panel2.Name = "FishBowlHeader";
 			panel2.Controls.Add(pictureBox2);
 			panel2.Controls.Add(new Label
 			{
@@ -470,7 +513,6 @@ namespace EmulatorHub
 			});
 			tableLayoutPanel2.Controls.Add(panel2, 0, 1);
 			primaryToolbar = BuildPrimaryActions();
-			// Emulator actions belong to the Emulators page, keeping the workspace bounds fixed.
 			int num = ((library.Theme.ListDensity == "Compact") ? 40 : ((library.Theme.ListDensity == "Comfortable") ? 56 : 48));
 			emulatorImages.ImageSize = new Size(num, num);
 			emulatorImages.ColorDepth = ColorDepth.Depth32Bit;
@@ -484,9 +526,9 @@ namespace EmulatorHub
 			emulatorList.OwnerDraw = true;
 			emulatorList.DrawColumnHeader += delegate(object sender, DrawListViewColumnHeaderEventArgs e)
 			{
-				using (SolidBrush brush4 = new SolidBrush(surface))
+				using (SolidBrush brush5 = new SolidBrush(surface))
 				{
-					e.Graphics.FillRectangle(brush4, e.Bounds);
+					e.Graphics.FillRectangle(brush5, e.Bounds);
 				}
 				FishBowlText.DrawText(e.Graphics, e.Header.Text, emulatorList.Font, Rectangle.Inflate(e.Bounds, -8, 0), subtle, TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
 			};
@@ -497,18 +539,21 @@ namespace EmulatorHub
 			{
 				e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 				bool selected = e.Item.Selected;
-                e.Graphics.SmoothingMode=SmoothingMode.None;
-                using(var background=new SolidBrush(bottom))e.Graphics.FillRectangle(background,e.Bounds);
-                e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-				int alpha = ((library.Theme.SelectionContrast == "Soft") ? 58 : ((library.Theme.SelectionContrast == "Strong") ? 132 : 88));
-				Color color = (selected ? CosmeticRuntime.Optional(CosmeticRuntime.Current.SelectionColor,Color.FromArgb(alpha, blue.R, blue.G, blue.B)) : ((library.Theme.AlternateRowShading && e.Item.Index % 2 != 0) ? Color.FromArgb(20, surface) : bottom));
-				using (SolidBrush brush = new SolidBrush(color))
+				e.Graphics.SmoothingMode = SmoothingMode.None;
+				using (SolidBrush brush = new SolidBrush(bottom))
 				{
 					e.Graphics.FillRectangle(brush, e.Bounds);
 				}
+				e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+				int alpha = ((library.Theme.SelectionContrast == "Soft") ? 58 : ((library.Theme.SelectionContrast == "Strong") ? 132 : 88));
+				Color color = (selected ? CosmeticRuntime.Optional(CosmeticRuntime.Current.SelectionColor, Color.FromArgb(alpha, blue.R, blue.G, blue.B)) : ((library.Theme.AlternateRowShading && e.Item.Index % 2 != 0) ? Color.FromArgb(20, surface) : bottom));
+				using (SolidBrush brush2 = new SolidBrush(color))
+				{
+					e.Graphics.FillRectangle(brush2, e.Bounds);
+				}
 				if (selected)
 				{
-					using (Pen pen = new Pen(CosmeticRuntime.Focus(bottom),Math.Max(1,CosmeticRuntime.Current.FocusWidth)))
+					using (Pen pen = new Pen(CosmeticRuntime.Focus(bottom), Math.Max(1, CosmeticRuntime.Current.FocusWidth)))
 					{
 						e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Top, e.Bounds.Right - 1, e.Bounds.Top);
 						e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right - 1, e.Bounds.Bottom - 1);
@@ -519,9 +564,9 @@ namespace EmulatorHub
 					}
 					if (e.ColumnIndex == 0)
 					{
-						using (SolidBrush brush2 = new SolidBrush(CosmeticRuntime.Focus(bottom)))
+						using (SolidBrush brush3 = new SolidBrush(CosmeticRuntime.Focus(bottom)))
 						{
-							e.Graphics.FillRectangle(brush2, e.Bounds.Left, e.Bounds.Top, 4, e.Bounds.Height);
+							e.Graphics.FillRectangle(brush3, e.Bounds.Left, e.Bounds.Top, 4, e.Bounds.Height);
 						}
 					}
 				}
@@ -534,36 +579,39 @@ namespace EmulatorHub
 					int num2 = ((library.Theme.IconTileShape == "Square") ? 2 : ((library.Theme.IconTileShape == "Circular") ? 20 : 7));
 					using (GraphicsPath path = FishBowlVisuals.Round(box, num2))
 					{
-						using (SolidBrush brush3 = new SolidBrush(Color.FromArgb(18, baseColor)))
+						using (SolidBrush brush4 = new SolidBrush(Color.FromArgb(18, baseColor)))
 						{
 							using (Pen pen2 = new Pen(Color.FromArgb(58, baseColor)))
 							{
-								e.Graphics.FillPath(brush3, path);
+								e.Graphics.FillPath(brush4, path);
 								e.Graphics.DrawPath(pen2, path);
 							}
 						}
 					}
-					if (library.Theme.EnableMotion && (selected || e.Item.Tag as string == hoveredEmulatorId))
+					if (library.Theme.EnableMotion && (selected || e.Item.Tag as string== hoveredEmulatorId))
 					{
 						FishBowlHighlights.Draw(e.Graphics, Rectangle.Inflate(rect, 2, 2), color, selected);
 					}
 					e.Graphics.DrawImage(emulatorImageSources[e.Item.ImageIndex], rect);
 					bounds = new Rectangle(e.Bounds.Left + 58, e.Bounds.Top, Math.Max(0, e.Bounds.Width - 66), e.Bounds.Height);
 				}
-				Color foreColor = (selected ? Color.White : ink);
+				Color foreground = (selected ? Color.White : ink);
 				if (e.ColumnIndex == 1)
 				{
-                    if (CosmeticRuntime.Badge(e.Graphics,bounds,e.SubItem.Text,emulatorList.Font)) return;
-					Color color2 = ((!(e.SubItem.Text == "Ready") && !(e.SubItem.Text == "Running")) ? ((e.SubItem.Text == "Missing program") ? Color.FromArgb(246, 183, 105) : subtle) : ((bottom.GetBrightness() < 0.65f) ? Color.FromArgb(118, 211, 161) : Color.FromArgb(35, 126, 82)));
-					color2 = FishBowlPalette.EnsureReadable(CosmeticRuntime.Status(e.SubItem.Text,color2),bottom);
-                    using (SolidBrush brush = new SolidBrush(color2))
+					if (CosmeticRuntime.Badge(e.Graphics, bounds, e.SubItem.Text, emulatorList.Font))
 					{
-						e.Graphics.FillEllipse(brush, bounds.Left + 1, e.Bounds.Top + (e.Bounds.Height - 6) / 2, 6, 6);
+						return;
+					}
+					Color fallback = ((e.SubItem.Text == "Ready" || e.SubItem.Text == "Running") ? ((bottom.GetBrightness() < 0.65f) ? Color.FromArgb(118, 211, 161) : Color.FromArgb(35, 126, 82)) : ((e.SubItem.Text == "Missing program") ? Color.FromArgb(246, 183, 105) : subtle));
+					fallback = FishBowlPalette.EnsureReadable(CosmeticRuntime.Status(e.SubItem.Text, fallback), bottom);
+					using (SolidBrush brush2 = new SolidBrush(fallback))
+					{
+						e.Graphics.FillEllipse(brush2, bounds.Left + 1, e.Bounds.Top + (e.Bounds.Height - 6) / 2, 6, 6);
 					}
 					bounds = new Rectangle(bounds.Left + 14, bounds.Top, Math.Max(0, bounds.Width - 14), bounds.Height);
-					foreColor = (selected ? Color.White : color2);
+					foreground = (selected ? Color.White : fallback);
 				}
-				FishBowlText.DrawText(e.Graphics, e.SubItem.Text, emulatorList.Font, bounds, FishBowlPalette.EnsureReadable(foreColor,selected ? CosmeticRuntime.Selection : bottom), TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
+				FishBowlText.DrawText(e.Graphics, e.SubItem.Text, emulatorList.Font, bounds, FishBowlPalette.EnsureReadable(foreground, selected ? CosmeticRuntime.Selection : bottom), TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
 			};
 			emulatorList.MouseMove += delegate(object sender, MouseEventArgs e)
 			{
@@ -733,13 +781,14 @@ namespace EmulatorHub
 			workspaceFooter = aquariumFooter2;
 			UpdateWorkspaceChrome();
 			Control[] array = new Control[3] { this, emulatorList, panel2 };
-			foreach (Control control in array)
+			Control[] array2 = array;
+			foreach (Control control in array2)
 			{
 				control.AllowDrop = true;
 				control.DragEnter += delegate(object sender, DragEventArgs e)
 				{
-					string[] array2 = e.Data.GetData(DataFormats.FileDrop) as string[];
-					e.Effect = ((array2 != null && array2.Any((string p) => EmulatorReference.IsLaunchFile(p))) ? DragDropEffects.Copy : DragDropEffects.None);
+					string[] array3 = e.Data.GetData(DataFormats.FileDrop) as string[];
+					e.Effect = ((array3 != null && array3.Any((string p) => EmulatorReference.IsLaunchFile(p))) ? DragDropEffects.Copy : DragDropEffects.None);
 				};
 				control.DragDrop += delegate(object sender, DragEventArgs e)
 				{
@@ -922,16 +971,50 @@ namespace EmulatorHub
 		private void UpdateInformationPanel()
 		{
 			EmulatorProfile emulatorProfile = CurrentEmulator();
-            bool flag = !library.Theme.ShowInformationPanel;
-            var host=emulatorInformation==null?null:emulatorInformation.Parent;
-            bool switchPane=emulatorInformation!=null&&emulatorInformation.Visible!=(emulatorProfile!=null);
-            if(host!=null)host.SuspendLayout();
-            try {
-                if(emulatorProfile==null){if(emulatorInformation!=null)emulatorInformation.Visible=false;if(emulatorHome!=null){emulatorHome.Reload(false);emulatorHome.Visible=true;}}
-                else {if(emulatorHome!=null)emulatorHome.Visible=false;if(emulatorInformation!=null)emulatorInformation.Visible=true;}
-            }finally{if(host!=null)host.ResumeLayout(true);}
-            if(switchPane&&host!=null)host.Invalidate(true);
-
+			bool flag = !library.Theme.ShowInformationPanel;
+			Control control = ((emulatorInformation == null) ? null : emulatorInformation.Parent);
+			bool flag2 = emulatorInformation != null && emulatorInformation.Visible != (emulatorProfile != null);
+			if (control != null)
+			{
+				control.SuspendLayout();
+			}
+			try
+			{
+				if (emulatorProfile == null)
+				{
+					if (emulatorInformation != null)
+					{
+						emulatorInformation.Visible = false;
+					}
+					if (emulatorHome != null)
+					{
+						emulatorHome.Reload(false);
+						emulatorHome.Visible = true;
+					}
+				}
+				else
+				{
+					if (emulatorHome != null)
+					{
+						emulatorHome.Visible = false;
+					}
+					if (emulatorInformation != null)
+					{
+						emulatorInformation.Visible = true;
+					}
+				}
+			}
+			finally
+			{
+				if (control != null)
+				{
+					control.ResumeLayout(true);
+				}
+			}
+			if (flag2 && control != null)
+			{
+				control.Invalidate(true);
+			}
 			if (emulatorSplit != null && emulatorSplit.Panel2Collapsed != flag)
 			{
 				emulatorSplit.Panel2Collapsed = flag;
@@ -952,9 +1035,10 @@ namespace EmulatorHub
 			}
 			Button button = favoriteButton;
 			Button button2 = informationButton;
-			bool flag3 = (notesBox.Enabled = emulatorProfile != null);
-			flag3 = (button2.Enabled = flag3);
-			button.Enabled = flag3;
+			bool flag4 = (notesBox.Enabled = emulatorProfile != null);
+			bool flag5 = flag4;
+			flag4 = (button2.Enabled = flag5);
+			flag5 = (button.Enabled = flag4);
 			infoTitle.Text = ((emulatorProfile == null) ? "Emulator information" : emulatorProfile.Name);
 			string text2 = ((emulatorProfile == null) ? "" : (string.IsNullOrWhiteSpace(emulatorProfile.ManualVersion) ? "Checking version..." : (emulatorProfile.ManualVersion + " (entered manually)")));
 			infoVersion.Text = ((emulatorProfile == null) ? "" : ("Installed version: " + text2));
@@ -966,8 +1050,9 @@ namespace EmulatorHub
 				TextBox textBox = setupText;
 				TextBox textBox2 = controllersText;
 				string text4 = (helpText.Text = "Select an emulator first.");
-				text4 = (textBox2.Text = text4);
-				textBox.Text = text4;
+				string text5 = text4;
+				text4 = (textBox2.Text = text5);
+				text5 = (textBox.Text = text4);
 				foreach (Tuple<Button, Func<EmulatorReference, string>> referenceButton in referenceButtons)
 				{
 					referenceButton.Item1.Enabled = false;
@@ -1278,12 +1363,13 @@ namespace EmulatorHub
 				flowLayoutPanel.WrapContents = true;
 				FlowLayoutPanel flowLayoutPanel2 = flowLayoutPanel;
 				string[] array = new string[2] { "InGameSaveFolder|Use as in-game saves", "SaveStateFolder|Use as save states" };
-				foreach (string text in array)
+				string[] array2 = array;
+				foreach (string text in array2)
 				{
-					string[] array2 = text.Split('|');
-					string destination = array2[0];
+					string[] array3 = text.Split('|');
+					string destination = array3[0];
 					FishBowlActionButton fishBowlActionButton3 = new FishBowlActionButton();
-					fishBowlActionButton3.Text = array2[1];
+					fishBowlActionButton3.Text = array3[1];
 					fishBowlActionButton3.AutoSize = true;
 					fishBowlActionButton3.Height = 30;
 					fishBowlActionButton3.FlatStyle = FlatStyle.Flat;
@@ -1443,7 +1529,7 @@ namespace EmulatorHub
 		{
 			FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel();
 			flowLayoutPanel.Dock = DockStyle.Fill;
-            flowLayoutPanel.Name = "FishBowlToolbar";
+			flowLayoutPanel.Name = "FishBowlToolbar";
 			flowLayoutPanel.BackColor = top;
 			flowLayoutPanel.Padding = new Padding(8, 5, 8, 5);
 			flowLayoutPanel.WrapContents = false;
@@ -1461,7 +1547,6 @@ namespace EmulatorHub
 			ConfigureButton(communityButton, "Community", OpenCommunity, surface);
 			flowLayoutPanel2.Controls.Add(fishBowlActionButton);
 			flowLayoutPanel2.Controls.Add(editButton);
-
 			flowLayoutPanel2.Controls.Add(managementButton);
 			fishBowlActionButton2.Dispose();
 			favoritesOnly.Text = "Favorites only";
@@ -1754,7 +1839,8 @@ namespace EmulatorHub
 			toolStripMenuItem10.DropDownItems.Add(MenuAction("Refresh emulators", "refresh", RefreshHub));
 			ToolStripMenuItem toolStripMenuItem11 = new ToolStripMenuItem("Quick filter");
 			string[] array = new string[4] { "All", "Running", "Needs attention", "Recently added" };
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				string saved = text;
 				toolStripMenuItem11.DropDownItems.Add(MenuAction(saved, "search", delegate
@@ -1787,12 +1873,13 @@ namespace EmulatorHub
 			toolStripMenuItem13.DropDownItems.Add(MenuAction("FishBowl Discord community", "globe", OpenCommunity));
 			AddEnhancementMenu(toolStripMenuItem3, toolStripMenuItem10, toolStripMenuItem2);
 			toolStripMenuItem3.DropDownItems.Add(toolStripMenuItem12);
-            toolStripMenuItem13.DropDownItems.Add(linksMenu);
-            CompactMenus.Arrange(toolStripMenuItem2,toolStripMenuItem3,toolStripMenuItem8,toolStripMenuItem10);
-            toolStripMenuItem3.DropDownItems.Add(MenuAction("User tools...", "settings", ShowUserTools));
-            toolStripMenuItem3.DropDownItems.Add(MenuAction("Library extensions...", "library", ShowHubExtensions));
-            ToolStripMenuItem[] array2 = new ToolStripMenuItem[6] { toolStripMenuItem, toolStripMenuItem8, toolStripMenuItem2, toolStripMenuItem3, toolStripMenuItem10, toolStripMenuItem13 };
-			foreach (ToolStripMenuItem toolStripMenuItem14 in array2)
+			toolStripMenuItem13.DropDownItems.Add(linksMenu);
+			CompactMenus.Arrange(toolStripMenuItem2, toolStripMenuItem3, toolStripMenuItem8, toolStripMenuItem10);
+			toolStripMenuItem3.DropDownItems.Add(MenuAction("User tools...", "settings", ShowUserTools));
+			toolStripMenuItem3.DropDownItems.Add(MenuAction("Library extensions...", "library", ShowHubExtensions));
+			ToolStripMenuItem[] array3 = new ToolStripMenuItem[6] { toolStripMenuItem, toolStripMenuItem8, toolStripMenuItem2, toolStripMenuItem3, toolStripMenuItem10, toolStripMenuItem13 };
+			ToolStripMenuItem[] array4 = array3;
+			foreach (ToolStripMenuItem toolStripMenuItem14 in array4)
 			{
 				StyleMenuGroup(toolStripMenuItem14);
 				menuStrip2.Items.Add(toolStripMenuItem14);
@@ -2460,17 +2547,17 @@ namespace EmulatorHub
 			List<string> list = (from item in library.Emulators
 				orderby item.Name
 				select item.Name + " | " + EmulatorReference.PlatformFor(item) + " | " + string.Join(", ", item.Extensions ?? new List<string>())).ToList();
-			object rows;
+			object obj;
 			if (!list.Any())
 			{
 				IEnumerable<string> enumerable = new string[1] { "Add an emulator to see its supported game formats." };
-				rows = enumerable;
+				obj = enumerable;
 			}
 			else
 			{
-				rows = list;
+				obj = list;
 			}
-			using (ResultsDialog resultsDialog = new ResultsDialog("Emulator Format Presets", (IEnumerable<string>)rows))
+			using (ResultsDialog resultsDialog = new ResultsDialog("Emulator Format Presets", (IEnumerable<string>)obj))
 			{
 				resultsDialog.ShowDialog(this);
 			}
@@ -2674,7 +2761,7 @@ namespace EmulatorHub
 			}
 			foreach (ListViewItem item in emulatorList.Items)
 			{
-				if (item.Tag as string == id)
+				if (item.Tag as string== id)
 				{
 					emulatorList.Invalidate(item.Bounds);
 					break;
@@ -2762,9 +2849,9 @@ namespace EmulatorHub
 					select p).ToList();
 				foreach (EmulatorProfile item in list)
 				{
-					Image current = CachedEmulatorImage(item);
-					emulatorImageSources.Add(current);
-					emulatorImages.Images.Add(current);
+					Image image = CachedEmulatorImage(item);
+					emulatorImageSources.Add(image);
+					emulatorImages.Images.Add(image);
 					ListViewItem listViewItem = new ListViewItem((item.Favorite ? "★ " : "") + (item.Name ?? "Emulator"), emulatorImages.Images.Count - 1);
 					listViewItem.Tag = item.Id;
 					ListViewItem listViewItem2 = listViewItem;
@@ -2784,7 +2871,7 @@ namespace EmulatorHub
 				}
 				foreach (ListViewItem item2 in emulatorList.Items)
 				{
-					item2.Selected = item2.Tag as string == selectedEmulatorId;
+					item2.Selected = item2.Tag as string== selectedEmulatorId;
 				}
 				emptyState.Visible = list.Count == 0;
 				if (list.Count == 0)
@@ -3035,71 +3122,79 @@ namespace EmulatorHub
 
 		private void ImportLibrary()
 		{
-            if (UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning) throw new IOException("Finish emulator sessions and background jobs before replacing settings.");
+			if (UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning)
+			{
+				throw new IOException("Finish emulator sessions and background jobs before replacing settings.");
+			}
 			OpenFileDialog openFileDialog = new OpenFileDialog();
 			openFileDialog.Title = "Import FishBowl settings";
 			openFileDialog.Filter = "JSON files (*.json)|*.json";
 			using (OpenFileDialog openFileDialog2 = openFileDialog)
 			{
-				if (openFileDialog2.ShowDialog(this) == DialogResult.OK)
+				if (openFileDialog2.ShowDialog(this) != DialogResult.OK)
 				{
-					LibraryData libraryData = Json.Deserialize<LibraryData>(File.ReadAllText(openFileDialog2.FileName));
-					if (libraryData == null || libraryData.Emulators == null)
+					return;
+				}
+				LibraryData libraryData = Json.Deserialize<LibraryData>(File.ReadAllText(openFileDialog2.FileName));
+				if (libraryData == null || libraryData.Emulators == null)
+				{
+					throw new InvalidDataException("That file does not contain FishBowl emulator settings.");
+				}
+				if (Polish.Review(this, "Review settings import", Polish.ImportSummary(library, libraryData)))
+				{
+					if (UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning)
 					{
-						throw new InvalidDataException("That file does not contain FishBowl emulator settings.");
+						throw new IOException("Finish emulator sessions and background jobs before replacing settings.");
 					}
-					if (Polish.Review(this, "Review settings import", Polish.ImportSummary(library, libraryData)))
+					Store.Save(library);
+					string text = Store.CreateRestorePoint(library, "Before settings import");
+					File.Copy(Store.FileName, Store.FileName + ".before-import.json", true);
+					library.Emulators = libraryData.Emulators;
+					library.Games = libraryData.Games ?? new List<GameEntry>();
+					library.Collections = libraryData.Collections ?? new List<GameCollection>();
+					library.Links = libraryData.Links ?? new List<WebsiteLink>();
+					library.ControllerProfiles = libraryData.ControllerProfiles ?? new List<ControllerProfile>();
+					library.WorkspaceItems = libraryData.WorkspaceItems ?? new List<WorkspaceItem>();
+					library.RequirementSnapshots = libraryData.RequirementSnapshots ?? new List<RequirementFileSnapshot>();
+					library.Theme = libraryData.Theme ?? new ThemeSettings
 					{
-                        if (UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning) throw new IOException("Finish emulator sessions and background jobs before replacing settings.");
-						Store.Save(library);
-						string text = Store.CreateRestorePoint(library, "Before settings import");
-						File.Copy(Store.FileName, Store.FileName + ".before-import.json", true);
-						library.Emulators = libraryData.Emulators;
-						library.Games = libraryData.Games ?? new List<GameEntry>();
-						library.Collections = libraryData.Collections ?? new List<GameCollection>();
-						library.Links = libraryData.Links ?? new List<WebsiteLink>();
-						library.ControllerProfiles = libraryData.ControllerProfiles ?? new List<ControllerProfile>();
-						library.WorkspaceItems = libraryData.WorkspaceItems ?? new List<WorkspaceItem>();
-						library.RequirementSnapshots = libraryData.RequirementSnapshots ?? new List<RequirementFileSnapshot>();
-						library.Theme = libraryData.Theme ?? new ThemeSettings
-						{
-							Name = "Twilight",
-							AutoBackupDays = 7
-						};
-						library.Multiplayer = libraryData.Multiplayer ?? new MultiplayerSettings
-						{
-							InviteOnly = true,
-							RelayProvider = "LiveKit Cloud",
-							UpdateChannel = "Stable",
-							CheckForHubUpdates = true
-						};
-						library.Cosmetics = libraryData.Cosmetics;
-                        library.Enhancements = libraryData.Enhancements;
-                        library.PlaySessions = libraryData.PlaySessions;
-                        library.GameScreenshots = libraryData.GameScreenshots;
-                        library.PlayQueue = libraryData.PlayQueue;
-                        library.SmartLists = libraryData.SmartLists;
-                        library.UserTools = libraryData.UserTools;
-                    library.Hub = libraryData.Hub;
-                        NextData.Ensure(library); LibraryAdditions.Ensure(library);
-                        library.BackupFolder = libraryData.BackupFolder;
-						library.EmulatorRootDirectory = libraryData.EmulatorRootDirectory;
-						library.GameLibraryRoot = libraryData.GameLibraryRoot;
-						library.RequirementsLibraryRoot = libraryData.RequirementsLibraryRoot;
-						library.Experience = libraryData.Experience;
-						library.SaveSnapshots = libraryData.SaveSnapshots;
-						library.SaveReviews = libraryData.SaveReviews;
-						library.OrganizationHistory = libraryData.OrganizationHistory;
-						ExperienceData.Ensure(library);
-						selectedEmulatorId = null;
-						ConfigureSaveNotifications();
-						homeSurface.Reload();
-						embeddedLibrary.ReloadLibrary();
-						Store.Save(library);
-						filterBox.Clear();
-						RefreshHub();
-						SetStatus("Imported FishBowl settings. Restore point saved at " + text + ". Reopen FishBowl to apply the theme.");
-					}
+						Name = "Twilight",
+						AutoBackupDays = 7
+					};
+					library.Multiplayer = libraryData.Multiplayer ?? new MultiplayerSettings
+					{
+						InviteOnly = true,
+						RelayProvider = "LiveKit Cloud",
+						UpdateChannel = "Stable",
+						CheckForHubUpdates = true
+					};
+					library.Cosmetics = libraryData.Cosmetics;
+					library.Enhancements = libraryData.Enhancements;
+					library.PlaySessions = libraryData.PlaySessions;
+					library.GameScreenshots = libraryData.GameScreenshots;
+					library.PlayQueue = libraryData.PlayQueue;
+					library.SmartLists = libraryData.SmartLists;
+					library.UserTools = libraryData.UserTools;
+					library.Hub = libraryData.Hub;
+					NextData.Ensure(library);
+					LibraryAdditions.Ensure(library);
+					library.BackupFolder = libraryData.BackupFolder;
+					library.EmulatorRootDirectory = libraryData.EmulatorRootDirectory;
+					library.GameLibraryRoot = libraryData.GameLibraryRoot;
+					library.RequirementsLibraryRoot = libraryData.RequirementsLibraryRoot;
+					library.Experience = libraryData.Experience;
+					library.SaveSnapshots = libraryData.SaveSnapshots;
+					library.SaveReviews = libraryData.SaveReviews;
+					library.OrganizationHistory = libraryData.OrganizationHistory;
+					ExperienceData.Ensure(library);
+					selectedEmulatorId = null;
+					ConfigureSaveNotifications();
+					homeSurface.Reload();
+					embeddedLibrary.ReloadLibrary();
+					Store.Save(library);
+					filterBox.Clear();
+					RefreshHub();
+					SetStatus("Imported FishBowl settings. Restore point saved at " + text + ". Reopen FishBowl to apply the theme.");
 				}
 			}
 		}
@@ -3234,17 +3329,17 @@ namespace EmulatorHub
 				bool flag = (emulatorReference.Requirements ?? "").IndexOf("firmware", StringComparison.OrdinalIgnoreCase) >= 0 || (emulatorReference.Requirements ?? "").IndexOf("bios", StringComparison.OrdinalIgnoreCase) >= 0 || (emulatorReference.Requirements ?? "").IndexOf("key", StringComparison.OrdinalIgnoreCase) >= 0;
 				list.Add(item.Name.ToUpperInvariant() + "\n" + (flag ? "Review emulator setup: " : "No system-file reminder found: ") + (string.IsNullOrWhiteSpace(item.FirmwareFolder) ? "No emulator folder recorded in FishBowl." : "Emulator folder recorded.") + "\n" + (emulatorReference.Requirements ?? "See the emulator's official guide."));
 			}
-			object rows;
+			object obj;
 			if (!list.Any())
 			{
 				IEnumerable<string> enumerable = new string[1] { "Add an emulator to see its setup checklist." };
-				rows = enumerable;
+				obj = enumerable;
 			}
 			else
 			{
-				rows = list;
+				obj = list;
 			}
-			using (ResultsDialog resultsDialog = new ResultsDialog("FishBowl Setup Workspace", (IEnumerable<string>)rows))
+			using (ResultsDialog resultsDialog = new ResultsDialog("FishBowl Setup Workspace", (IEnumerable<string>)obj))
 			{
 				resultsDialog.ShowDialog(this);
 			}
@@ -3252,7 +3347,10 @@ namespace EmulatorHub
 
 		private void ShowLibraryRestorePoints()
 		{
-            if (UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning) throw new IOException("Finish emulator sessions and background jobs before replacing settings.");
+			if (UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning)
+			{
+				throw new IOException("Finish emulator sessions and background jobs before replacing settings.");
+			}
 			using (LibraryRestorePointsDialog libraryRestorePointsDialog = new LibraryRestorePointsDialog())
 			{
 				if (libraryRestorePointsDialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(libraryRestorePointsDialog.SelectedFile))
@@ -3281,7 +3379,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog(FishBowlTitleVersion))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.25.8"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3289,7 +3387,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog(FishBowlTitleVersion))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.25.8"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3297,7 +3395,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, FishBowlVersion))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.25.8"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3365,7 +3463,7 @@ namespace EmulatorHub
 					fileSystemWatcher.IncludeSubdirectories = true;
 					fileSystemWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName;
 					fileSystemWatcher.EnableRaisingEvents = true;
-					FileSystemWatcher current = fileSystemWatcher;
+					FileSystemWatcher fileSystemWatcher2 = fileSystemWatcher;
 					FileSystemEventHandler value = delegate
 					{
 						if (!base.IsDisposed && base.IsHandleCreated)
@@ -3377,9 +3475,9 @@ namespace EmulatorHub
 							});
 						}
 					};
-					current.Created += value;
-					current.Deleted += value;
-					current.Renamed += delegate
+					fileSystemWatcher2.Created += value;
+					fileSystemWatcher2.Deleted += value;
+					fileSystemWatcher2.Renamed += delegate
 					{
 						if (!base.IsDisposed && base.IsHandleCreated)
 						{
@@ -3390,7 +3488,7 @@ namespace EmulatorHub
 							});
 						}
 					};
-					gameFolderWatchers.Add(current);
+					gameFolderWatchers.Add(fileSystemWatcher2);
 				}
 				catch (Exception ex)
 				{
@@ -3422,48 +3520,55 @@ namespace EmulatorHub
 
 		private void OnKeyDown(object sender, KeyEventArgs e)
 		{
-            if(e.Control && e.KeyCode==Keys.K) {ShowGlobalSearch();e.SuppressKeyPress=true;return;}
-			if (RunConfiguredShortcut(e))
+			if (e.Control && e.KeyCode == Keys.K)
 			{
-				return;
-			}
-			if (e.Control && e.KeyCode == Keys.F)
-			{
-				if (workspaceNavigation.SelectedIndex == 1)
-				{
-					filterBox.Focus();
-				}
-				else
-				{
-					workspaceNavigation.SelectedIndex = 2;
-					embeddedLibrary.FocusSearch();
-				}
+				ShowGlobalSearch();
 				e.SuppressKeyPress = true;
 			}
-			else if (e.KeyCode == Keys.Escape)
+			else
 			{
-				if (fullScreen)
+				if (RunConfiguredShortcut(e))
 				{
-					ToggleFullScreen();
+					return;
 				}
-				else if (workspaceNavigation.SelectedIndex == 2)
+				if (e.Control && e.KeyCode == Keys.F)
 				{
-					embeddedLibrary.ClearSearch();
+					if (workspaceNavigation.SelectedIndex == 1)
+					{
+						filterBox.Focus();
+					}
+					else
+					{
+						workspaceNavigation.SelectedIndex = 2;
+						embeddedLibrary.FocusSearch();
+					}
+					e.SuppressKeyPress = true;
 				}
-				else if (filterBox.TextLength > 0)
+				else if (e.KeyCode == Keys.Escape)
 				{
-					filterBox.Clear();
+					if (fullScreen)
+					{
+						ToggleFullScreen();
+					}
+					else if (workspaceNavigation.SelectedIndex == 2)
+					{
+						embeddedLibrary.ClearSearch();
+					}
+					else if (filterBox.TextLength > 0)
+					{
+						filterBox.Clear();
+					}
+					else
+					{
+						ClearEmulatorSelection();
+					}
+					e.SuppressKeyPress = true;
 				}
-				else
+				else if (e.KeyCode == Keys.Return && emulatorList.ContainsFocus)
 				{
-					ClearEmulatorSelection();
+					RunUiAction(OpenSelectedEmulator);
+					e.SuppressKeyPress = true;
 				}
-				e.SuppressKeyPress = true;
-			}
-			else if (e.KeyCode == Keys.Return && emulatorList.ContainsFocus)
-			{
-				RunUiAction(OpenSelectedEmulator);
-				e.SuppressKeyPress = true;
 			}
 		}
 
@@ -3489,18 +3594,20 @@ namespace EmulatorHub
 				}
 				emulatorIconCache.Clear();
 				emulatorImageSources.Clear();
-				base.Icon = null;
-				if (ownedAppIcon != null)
-				{
-					ownedAppIcon.Dispose();
-				}
 			}
 			base.Dispose(disposing);
+			if (disposing && ownedAppIcon != null)
+			{
+				ownedAppIcon.Dispose(); ownedAppIcon = null;
+			}
 		}
 
 		private void RunUiAction(Action action)
 		{
-            if (UserTools.Guest) return;
+			if (UserTools.Guest)
+			{
+				return;
+			}
 			try
 			{
 				action();
@@ -3517,7 +3624,7 @@ namespace EmulatorHub
 			ToolStripMenuItem item = new ToolStripMenuItem(text)
 			{
 				Image = MakeUiIcon(icon),
-                Tag = "CosmeticIcon:"+icon,
+				Tag = "CosmeticIcon:" + icon,
 				ImageScaling = ToolStripItemImageScaling.SizeToFit
 			};
 			item.Click += delegate
@@ -3640,61 +3747,61 @@ namespace EmulatorHub
 				pink = Color.FromArgb(200, 113, 116);
 				break;
 			case "Deep Ocean":
-                ink = Color.FromArgb(233,247,255);
-                top = Color.FromArgb(8,27,39);
-                bottom = Color.FromArgb(5,17,27);
-                surface = Color.FromArgb(16,46,61);
-                subtle = Color.FromArgb(177,209,226);
-                break;
+				ink = Color.FromArgb(233, 247, 255);
+				top = Color.FromArgb(8, 27, 39);
+				bottom = Color.FromArgb(5, 17, 27);
+				surface = Color.FromArgb(16, 46, 61);
+				subtle = Color.FromArgb(177, 209, 226);
+				break;
 			case "Aurora":
-                ink = Color.FromArgb(236,250,248);
-                top = Color.FromArgb(18,33,36);
-                bottom = Color.FromArgb(11,23,28);
-                surface = Color.FromArgb(29,54,55);
-                subtle = Color.FromArgb(178,218,211);
-                break;
+				ink = Color.FromArgb(236, 250, 248);
+				top = Color.FromArgb(18, 33, 36);
+				bottom = Color.FromArgb(11, 23, 28);
+				surface = Color.FromArgb(29, 54, 55);
+				subtle = Color.FromArgb(178, 218, 211);
+				break;
 			case "Slate":
-                ink = Color.FromArgb(242,245,249);
-                top = Color.FromArgb(30,38,48);
-                bottom = Color.FromArgb(21,28,36);
-                surface = Color.FromArgb(44,55,68);
-                subtle = Color.FromArgb(187,200,217);
-                break;
+				ink = Color.FromArgb(242, 245, 249);
+				top = Color.FromArgb(30, 38, 48);
+				bottom = Color.FromArgb(21, 28, 36);
+				surface = Color.FromArgb(44, 55, 68);
+				subtle = Color.FromArgb(187, 200, 217);
+				break;
 			case "Plum":
-                ink = Color.FromArgb(252,240,255);
-                top = Color.FromArgb(43,25,49);
-                bottom = Color.FromArgb(29,18,36);
-                surface = Color.FromArgb(65,40,73);
-                subtle = Color.FromArgb(222,190,232);
-                break;
+				ink = Color.FromArgb(252, 240, 255);
+				top = Color.FromArgb(43, 25, 49);
+				bottom = Color.FromArgb(29, 18, 36);
+				surface = Color.FromArgb(65, 40, 73);
+				subtle = Color.FromArgb(222, 190, 232);
+				break;
 			case "Sand":
-                ink = Color.FromArgb(52,43,32);
-                top = Color.FromArgb(246,239,223);
-                bottom = Color.FromArgb(233,221,197);
-                surface = Color.FromArgb(255,250,237);
-                subtle = Color.FromArgb(108,88,64);
-                break;
+				ink = Color.FromArgb(52, 43, 32);
+				top = Color.FromArgb(246, 239, 223);
+				bottom = Color.FromArgb(233, 221, 197);
+				surface = Color.FromArgb(255, 250, 237);
+				subtle = Color.FromArgb(108, 88, 64);
+				break;
 			case "Paper":
-                ink = Color.FromArgb(38,45,51);
-                top = Color.FromArgb(248,250,250);
-                bottom = Color.FromArgb(232,238,239);
-                surface = Color.FromArgb(255,255,255);
-                subtle = Color.FromArgb(89,105,113);
-                break;
+				ink = Color.FromArgb(38, 45, 51);
+				top = Color.FromArgb(248, 250, 250);
+				bottom = Color.FromArgb(232, 238, 239);
+				surface = Color.FromArgb(255, 255, 255);
+				subtle = Color.FromArgb(89, 105, 113);
+				break;
 			case "Nordic":
-                ink = Color.FromArgb(30,49,56);
-                top = Color.FromArgb(231,244,246);
-                bottom = Color.FromArgb(210,229,232);
-                surface = Color.FromArgb(248,254,254);
-                subtle = Color.FromArgb(75,105,114);
-                break;
+				ink = Color.FromArgb(30, 49, 56);
+				top = Color.FromArgb(231, 244, 246);
+				bottom = Color.FromArgb(210, 229, 232);
+				surface = Color.FromArgb(248, 254, 254);
+				subtle = Color.FromArgb(75, 105, 114);
+				break;
 			case "Copper":
-                ink = Color.FromArgb(255,245,234);
-                top = Color.FromArgb(44,31,25);
-                bottom = Color.FromArgb(29,21,19);
-                surface = Color.FromArgb(67,46,35);
-                subtle = Color.FromArgb(230,199,169);
-                break;
+				ink = Color.FromArgb(255, 245, 234);
+				top = Color.FromArgb(44, 31, 25);
+				bottom = Color.FromArgb(29, 21, 19);
+				surface = Color.FromArgb(67, 46, 35);
+				subtle = Color.FromArgb(230, 199, 169);
+				break;
 			default:
 				ink = Color.FromArgb(239, 239, 243);
 				top = Color.FromArgb(31, 32, 37);
@@ -3737,8 +3844,13 @@ namespace EmulatorHub
 				break;
 			}
 			ApplyCosmeticPalette();
-            if (SystemInformation.HighContrast) { ink=subtle=SystemColors.WindowText; top=bottom=surface=SystemColors.Window; blue=pink=SystemColors.Highlight; }
-            swatches = new Color[3]
+			if (SystemInformation.HighContrast)
+			{
+				ink = (subtle = SystemColors.WindowText);
+				top = (bottom = (surface = SystemColors.Window));
+				blue = (pink = SystemColors.Highlight);
+			}
+			swatches = new Color[3]
 			{
 				blue,
 				pink,
@@ -3759,31 +3871,43 @@ namespace EmulatorHub
 
 		private void ToggleFullScreen()
 		{
-            SuspendLayout();if(workspaceShell!=null)workspaceShell.SuspendLayout();
-            try{
-			if (!fullScreen)
+			SuspendLayout();
+			if (workspaceShell != null)
 			{
-				savedBorderStyle = base.FormBorderStyle;
-				savedWindowState = base.WindowState;
-				savedBounds = base.Bounds;
-				savedNormalBounds = ((base.WindowState == FormWindowState.Normal) ? base.Bounds : base.RestoreBounds);
-				base.FormBorderStyle = FormBorderStyle.None;
-				base.WindowState = FormWindowState.Normal;
-				base.Bounds = Screen.FromControl(this).Bounds;
-				fullScreen = true;
-				SetStatus("Full-screen mode. Press F11 to return.");
+				workspaceShell.SuspendLayout();
 			}
-			else
+			try
 			{
-				base.FormBorderStyle = savedBorderStyle;
-				base.WindowState = FormWindowState.Normal;
-				base.Bounds = savedBounds;
-				base.WindowState = savedWindowState;
-				fullScreen = false;
-				SetStatus("Returned to the standard window.");
+				if (!fullScreen)
+				{
+					savedBorderStyle = base.FormBorderStyle;
+					savedWindowState = base.WindowState;
+					savedBounds = base.Bounds;
+					savedNormalBounds = ((base.WindowState == FormWindowState.Normal) ? base.Bounds : base.RestoreBounds);
+					base.FormBorderStyle = FormBorderStyle.None;
+					base.WindowState = FormWindowState.Normal;
+					base.Bounds = Screen.FromControl(this).Bounds;
+					fullScreen = true;
+					SetStatus("Full-screen mode. Press F11 to return.");
+				}
+				else
+				{
+					base.FormBorderStyle = savedBorderStyle;
+					base.WindowState = FormWindowState.Normal;
+					base.Bounds = savedBounds;
+					base.WindowState = savedWindowState;
+					fullScreen = false;
+					SetStatus("Returned to the standard window.");
+				}
 			}
-            }finally{if(workspaceShell!=null)workspaceShell.ResumeLayout(true);ResumeLayout(true);}
-
+			finally
+			{
+				if (workspaceShell != null)
+				{
+					workspaceShell.ResumeLayout(true);
+				}
+				ResumeLayout(true);
+			}
 		}
 
 		private void RestoreWindowLayout()
@@ -3873,14 +3997,16 @@ namespace EmulatorHub
 		{
 			HashSet<string> liveKeys = new HashSet<string>(library.Emulators.Select(EmulatorIconKey));
 			string[] array = emulatorIconCache.Keys.Where((string k) => !liveKeys.Contains(k)).ToArray();
-			foreach (string key in array)
+			string[] array2 = array;
+			foreach (string key in array2)
 			{
 				emulatorIconCache[key].Dispose();
 				emulatorIconCache.Remove(key);
 			}
 			HashSet<string> livePrograms = new HashSet<string>(library.Emulators.Select((EmulatorProfile p) => p.Executable ?? ""));
 			array = versionCache.Keys.Where((string k) => !livePrograms.Contains(k)).ToArray();
-			foreach (string key in array)
+			array2 = array;
+			foreach (string key in array2)
 			{
 				versionCache.Remove(key);
 			}
@@ -4308,7 +4434,8 @@ namespace EmulatorHub
 			{
 				Dictionary<string, List<string>> dictionary = new Dictionary<string, List<string>>();
 				EmulatorProfile[] array = profiles;
-				foreach (EmulatorProfile emulatorProfile in array)
+				EmulatorProfile[] array2 = array;
+				foreach (EmulatorProfile emulatorProfile in array2)
 				{
 					try
 					{
@@ -4538,7 +4665,8 @@ namespace EmulatorHub
 			{
 				List<SaveSnapshot> list = new List<SaveSnapshot>();
 				string[] array = sources;
-				foreach (string source in array)
+				string[] array2 = array;
+				foreach (string source in array2)
 				{
 					list.Add(SaveHistory.Capture(clone, game, source, "In-game saves", true, CancellationToken.None));
 				}
@@ -4622,7 +4750,8 @@ namespace EmulatorHub
 			try
 			{
 				SaveReviewItem[] array = library.SaveReviews.ToArray();
-				foreach (SaveReviewItem review in array)
+				SaveReviewItem[] array2 = array;
+				foreach (SaveReviewItem review in array2)
 				{
 					List<string> list = (review.Files ?? new List<string>()).Where((string path) => File.Exists(path) || Directory.Exists(path)).ToList();
 					if (list.Count == 0)
@@ -4699,7 +4828,9 @@ namespace EmulatorHub
 			{
 				Dock = DockStyle.Fill,
 				AccessibleName = "FishBowl workspace navigation",
-                LegacyHeaders = true, RoomyHeaders = true, Font = new Font(DisplayFont,12f,FontStyle.Bold)
+				LegacyHeaders = true,
+				RoomyHeaders = true,
+				Font = new Font(DisplayFont, 12f, FontStyle.Bold)
 			};
 			TabPage tabPage = new TabPage("Home");
 			tabPage.BackColor = bottom;
@@ -4713,7 +4844,23 @@ namespace EmulatorHub
 			workspaceNavigation.TabPages.AddRange(new TabPage[3] { tabPage2, tabPage4, tabPage6 });
 			homeSurface = new HomeSurface(library, HomeAction);
 			tabPage2.Controls.Add(homeSurface);
-			var emulatorPage=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty,Padding=Padding.Empty,BackColor=bottom};emulatorPage.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));emulatorPage.RowStyles.Add(new RowStyle(SizeType.AutoSize));emulatorPage.RowStyles.Add(new RowStyle(SizeType.Percent,100));primaryToolbar.AutoSize=true;primaryToolbar.Dock=DockStyle.Fill;emulatorPanel.Dock=DockStyle.Fill;emulatorPage.Controls.Add(primaryToolbar,0,0);emulatorPage.Controls.Add(emulatorPanel,0,1);tabPage4.Controls.Add(emulatorPage);
+			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
+			tableLayoutPanel.Dock = DockStyle.Fill;
+			tableLayoutPanel.ColumnCount = 1;
+			tableLayoutPanel.RowCount = 2;
+			tableLayoutPanel.Margin = Padding.Empty;
+			tableLayoutPanel.Padding = Padding.Empty;
+			tableLayoutPanel.BackColor = bottom;
+			TableLayoutPanel tableLayoutPanel2 = tableLayoutPanel;
+			tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+			primaryToolbar.AutoSize = true;
+			primaryToolbar.Dock = DockStyle.Fill;
+			emulatorPanel.Dock = DockStyle.Fill;
+			tableLayoutPanel2.Controls.Add(primaryToolbar, 0, 0);
+			tableLayoutPanel2.Controls.Add(emulatorPanel, 0, 1);
+			tabPage4.Controls.Add(tableLayoutPanel2);
 			emulatorHome = new HomeSurface(library, HomeAction);
 			emulatorSplit.Panel2.Controls.Add(emulatorHome);
 			emulatorHome.Visible = CurrentEmulator() == null;
@@ -4732,7 +4879,9 @@ namespace EmulatorHub
 			};
 			workspaceNavigation.SelectedIndexChanged += delegate
 			{
-                BeginWorkspaceTransition();int homeBefore=homeSurface.ContentRevision,emulatorBefore=emulatorHome.ContentRevision;
+				BeginWorkspaceTransition();
+				int contentRevision = homeSurface.ContentRevision;
+				int contentRevision2 = emulatorHome.ContentRevision;
 				try
 				{
 					UpdateWorkspaceChrome();
@@ -4748,8 +4897,14 @@ namespace EmulatorHub
 					{
 						embeddedLibrary.ReloadOnVisit();
 					}
-					if(homeBefore!=homeSurface.ContentRevision||emulatorBefore!=emulatorHome.ContentRevision)ApplyTextOptions();
-					if(homeBefore!=homeSurface.ContentRevision||emulatorBefore!=emulatorHome.ContentRevision)RestoreWorkspace(workspaceNavigation.SelectedIndex);
+					if (contentRevision != homeSurface.ContentRevision || contentRevision2 != emulatorHome.ContentRevision)
+					{
+						ApplyTextOptions();
+					}
+					if (contentRevision != homeSurface.ContentRevision || contentRevision2 != emulatorHome.ContentRevision)
+					{
+						RestoreWorkspace(workspaceNavigation.SelectedIndex);
+					}
 				}
 				finally
 				{
@@ -4848,7 +5003,7 @@ namespace EmulatorHub
 				}
 				if (workspaceShell != null)
 				{
-					workspaceShell.RowStyles[2].Height = 0;
+					workspaceShell.RowStyles[2].Height = 0f;
 				}
 				if (workspaceFooter != null)
 				{
@@ -4875,7 +5030,6 @@ namespace EmulatorHub
 				{
 					workspaceShell.SuspendLayout();
 				}
-
 			}
 		}
 
@@ -4896,7 +5050,6 @@ namespace EmulatorHub
 			finally
 			{
 				workspaceTransition = false;
-
 			}
 		}
 
@@ -4925,7 +5078,9 @@ namespace EmulatorHub
 						int num = 0;
 						foreach (GameEntry game in task.Result)
 						{
-							if (!library.Games.Any((GameEntry g) => string.Equals(g.Path, game.Path, StringComparison.OrdinalIgnoreCase)))
+							List<GameEntry> games = library.Games;
+							Func<GameEntry, bool> predicate = (GameEntry g) => string.Equals(g.Path, game.Path, StringComparison.OrdinalIgnoreCase);
+							if (!games.Any(predicate))
 							{
 								library.Games.Add(game);
 								num++;
@@ -5011,7 +5166,8 @@ namespace EmulatorHub
 					}
 				};
 				ComboBox[] array = new ComboBox[4] { theme, accent, icon, font };
-				foreach (ComboBox comboBox in array)
+				ComboBox[] array2 = array;
+				foreach (ComboBox comboBox in array2)
 				{
 					comboBox.SelectedIndexChanged += delegate
 					{
@@ -5031,7 +5187,7 @@ namespace EmulatorHub
 					apply();
 				};
 				dialog.Action("Cosmetic styles", ShowCosmetics);
-                dialog.Action("Apply", delegate
+				dialog.Action("Apply", delegate
 				{
 					apply();
 					Store.Save(library);
@@ -5122,7 +5278,8 @@ namespace EmulatorHub
 				FishBowlPalette.IconAccent
 			};
 			Form[] array3 = Application.OpenForms.Cast<Form>().ToArray();
-			foreach (Form form in array3)
+			Form[] array4 = array3;
+			foreach (Form form in array4)
 			{
 				form.SuspendLayout();
 				try
@@ -5175,7 +5332,7 @@ namespace EmulatorHub
 						}
 						ownedAppIcon = form.Icon;
 					}
-					else if (icon != null && icon == form.Icon)
+					else if (icon != null && icon != form.Icon)
 					{
 					}
 				}
@@ -5188,9 +5345,12 @@ namespace EmulatorHub
 			homeSurface.Reload();
 			emulatorHome.Reload();
 			embeddedLibrary.ReloadLibrary();
-            FishBowlPalette.StyleOpenWindows();
+			FishBowlPalette.StyleOpenWindows();
 			ApplyTextOptions();
-            foreach (Form open in Application.OpenForms) CosmeticRuntime.Apply(open);
+			foreach (Form openForm in Application.OpenForms)
+			{
+				CosmeticRuntime.Apply(openForm);
+			}
 			foreach (PictureBox item3 in from p in NextUi.Descendants(this).OfType<PictureBox>()
 				where p.Parent != null && p.Parent.Controls.OfType<Label>().Any((Label l) => l.Text == "FishBowl")
 				select p)
@@ -5214,7 +5374,8 @@ namespace EmulatorHub
 			enhancementsInitialized = true;
 			NextData.Ensure(library);
 			FlowLayoutPanel[] array = NextUi.Descendants(this).OfType<FlowLayoutPanel>().ToArray();
-			foreach (FlowLayoutPanel bar in array)
+			FlowLayoutPanel[] array2 = array;
+			foreach (FlowLayoutPanel bar in array2)
 			{
 				NextUi.Responsive(bar);
 			}
@@ -5258,10 +5419,22 @@ namespace EmulatorHub
 
 		private void AddEnhancementMenu(ToolStripMenuItem tools, ToolStripMenuItem view, ToolStripMenuItem libraries)
 		{
-            libraries.DropDownItems.Add(MenuAction("Smart lists...", "search", delegate { LibraryAdditions.SmartLists(this, library); }));
-            libraries.DropDownItems.Add(MenuAction("Play queue...", "play", delegate { LibraryAdditions.Queue(this, library, null); }));
-            libraries.DropDownItems.Add(MenuAction("Surprise me...", "play", delegate { LibraryAdditions.Surprise(this, library); }));
-            libraries.DropDownItems.Add(MenuAction("Export library CSV...", "storage", delegate { LibraryAdditions.Export(this, library.Games); }));
+			libraries.DropDownItems.Add(MenuAction("Smart lists...", "search", delegate
+			{
+				LibraryAdditions.SmartLists(this, library);
+			}));
+			libraries.DropDownItems.Add(MenuAction("Play queue...", "play", delegate
+			{
+				LibraryAdditions.Queue(this, library, null);
+			}));
+			libraries.DropDownItems.Add(MenuAction("Surprise me...", "play", delegate
+			{
+				LibraryAdditions.Surprise(this, library);
+			}));
+			libraries.DropDownItems.Add(MenuAction("Export library CSV...", "storage", delegate
+			{
+				LibraryAdditions.Export(this, library.Games);
+			}));
 			tools.DropDownItems.Add(MenuAction("Search everything...", "search", ShowGlobalSearch));
 			tools.DropDownItems.Add(MenuAction("Keyboard shortcuts...", "settings", delegate
 			{
@@ -5272,7 +5445,7 @@ namespace EmulatorHub
 				FishBowlUpdater.Show(this, library);
 			}));
 			view.DropDownItems.Add(MenuAction("Live appearance and accessibility...", "settings", ShowLiveAppearance));
-            view.DropDownItems.Add(MenuAction("Cosmetic styles...", "settings", ShowCosmetics));
+			view.DropDownItems.Add(MenuAction("Cosmetic styles...", "settings", ShowCosmetics));
 			view.DropDownItems.Add(MenuAction("Controller launcher...", "controller", ShowControllerLauncher));
 			view.DropDownItems.Add(MenuAction("Reopen last game", "play", ReopenLastGame));
 			libraries.DropDownItems.Add(MenuAction("Session journal and charts...", "info", delegate
@@ -5303,107 +5476,117 @@ namespace EmulatorHub
 			}));
 		}
 
-		private bool commandSearchOpen;
 		private void ShowGlobalSearch()
 		{
-            if(commandSearchOpen)return;
-            commandSearchOpen=true;
-            try {
-			List<SearchResult> list = new List<SearchResult>();
-			foreach (GameEntry game in library.Games)
+			if (commandSearchOpen)
 			{
-				GameEntry selected2 = game;
-				list.Add(new SearchResult
-				{
-					Caption = "Game: " + game.Title,
-					Open = delegate
-					{
-						using (GameExperienceDialog gameExperienceDialog = new GameExperienceDialog(library, selected2))
-						{
-							gameExperienceDialog.ShowDialog(this);
-						}
-					}
-				});
+				return;
 			}
-			foreach (EmulatorProfile emulator in library.Emulators)
+			commandSearchOpen = true;
+			try
 			{
-				EmulatorProfile selected = emulator;
-				list.Add(new SearchResult
+				List<SearchResult> list = new List<SearchResult>();
+				foreach (GameEntry game in library.Games)
 				{
-					Caption = "Emulator: " + emulator.Name,
-					Open = delegate
-					{
-						workspaceNavigation.SelectedIndex = 1;
-						selectedEmulatorId = selected.Id;
-						RefreshHub();
-					}
-				});
-			}
-			foreach (GameCollection collection in library.Collections)
-			{
-				string name = collection.Name;
-				list.Add(new SearchResult
-				{
-					Caption = "Collection: " + name,
-					Open = delegate
-					{
-						workspaceNavigation.SelectedIndex = 2;
-						embeddedLibrary.OpenCollection(name);
-					}
-				});
-			}
-			Dictionary<string, Action> dictionary = new Dictionary<string, Action>();
-			dictionary.Add("Settings", ShowSettings);
-			dictionary.Add("Appearance and accessibility", ShowLiveAppearance);
-			dictionary.Add("Home", ShowHomeDashboard);
-			dictionary.Add("Library", ShowGameLibrary);
-			dictionary.Add("Controller launcher", ShowControllerLauncher);
-			dictionary.Add("Session journal", delegate
-			{
-				NextTools.Sessions(this, library);
-			});
-			dictionary.Add("Backup planner", delegate
-			{
-				NextTools.BackupPlanner(this, library);
-			});
-			dictionary.Add("Legal content help", ShowLegalContentGuide);
-			dictionary.Add("Setup help", ShowFirstRunGuide);
-			dictionary.Add("Keyboard shortcuts", delegate
-			{
-				NextUi.Shortcuts(this, library, UpdateShortcutHints);
-			});
-			foreach (KeyValuePair<string, Action> item in dictionary)
-			{
-				list.Add(new SearchResult
-				{
-					Caption = "Action: " + item.Key,
-					Open = item.Value
-				});
-			}
-			foreach (MenuStrip item2 in NextUi.Descendants(this).OfType<MenuStrip>())
-			{
-				foreach (ToolStripMenuItem item3 in from i in MenuItems(item2.Items)
-					where i.DropDownItems.Count == 0 && i.Enabled && !i.Text.StartsWith("Search everything")
-					select i)
-				{
-					ToolStripMenuItem captured = item3;
+					GameEntry selected2 = game;
 					list.Add(new SearchResult
 					{
-						Caption = "Menu: " + item3.Text.Replace("&", ""),
+						Caption = "Game: " + game.Title,
 						Open = delegate
 						{
-							captured.PerformClick();
+							using (GameExperienceDialog gameExperienceDialog = new GameExperienceDialog(library, selected2))
+							{
+								gameExperienceDialog.ShowDialog(this);
+							}
 						}
 					});
 				}
+				foreach (EmulatorProfile emulator in library.Emulators)
+				{
+					EmulatorProfile selected = emulator;
+					list.Add(new SearchResult
+					{
+						Caption = "Emulator: " + emulator.Name,
+						Open = delegate
+						{
+							workspaceNavigation.SelectedIndex = 1;
+							selectedEmulatorId = selected.Id;
+							RefreshHub();
+						}
+					});
+				}
+				foreach (GameCollection collection in library.Collections)
+				{
+					string name = collection.Name;
+					list.Add(new SearchResult
+					{
+						Caption = "Collection: " + name,
+						Open = delegate
+						{
+							workspaceNavigation.SelectedIndex = 2;
+							embeddedLibrary.OpenCollection(name);
+						}
+					});
+				}
+				Dictionary<string, Action> dictionary = new Dictionary<string, Action>();
+				dictionary.Add("Settings", ShowSettings);
+				dictionary.Add("Appearance and accessibility", ShowLiveAppearance);
+				dictionary.Add("Home", ShowHomeDashboard);
+				dictionary.Add("Library", ShowGameLibrary);
+				dictionary.Add("Controller launcher", ShowControllerLauncher);
+				dictionary.Add("Session journal", delegate
+				{
+					NextTools.Sessions(this, library);
+				});
+				dictionary.Add("Backup planner", delegate
+				{
+					NextTools.BackupPlanner(this, library);
+				});
+				dictionary.Add("Legal content help", ShowLegalContentGuide);
+				dictionary.Add("Setup help", ShowFirstRunGuide);
+				dictionary.Add("Keyboard shortcuts", delegate
+				{
+					NextUi.Shortcuts(this, library, UpdateShortcutHints);
+				});
+				foreach (KeyValuePair<string, Action> item in dictionary)
+				{
+					list.Add(new SearchResult
+					{
+						Caption = "Action: " + item.Key,
+						Open = item.Value
+					});
+				}
+				foreach (MenuStrip item2 in NextUi.Descendants(this).OfType<MenuStrip>())
+				{
+					foreach (ToolStripMenuItem item3 in from i in MenuItems(item2.Items)
+						where i.DropDownItems.Count == 0 && i.Enabled && !i.Text.StartsWith("Search everything")
+						select i)
+					{
+						ToolStripMenuItem captured = item3;
+						list.Add(new SearchResult
+						{
+							Caption = "Menu: " + item3.Text.Replace("&", ""),
+							Open = delegate
+							{
+								captured.PerformClick();
+							}
+						});
+					}
+				}
+				using (GlobalSearchDialog globalSearchDialog = new GlobalSearchDialog(list))
+				{
+					globalSearchDialog.ShowDialog(this);
+					Action selectedAction = globalSearchDialog.SelectedAction;
+					if (selectedAction != null)
+					{
+						BeginInvoke(selectedAction);
+					}
+				}
 			}
-			using (GlobalSearchDialog globalSearchDialog = new GlobalSearchDialog(list))
+			finally
 			{
-				globalSearchDialog.ShowDialog(this);
-                var selected=globalSearchDialog.SelectedAction;
-                if(selected!=null)BeginInvoke(selected);
+				commandSearchOpen = false;
 			}
-            }finally{commandSearchOpen=false;}
 		}
 
 		private void ShowControllerLauncher()
@@ -5528,9 +5711,9 @@ namespace EmulatorHub
 				select c)
 			{
 				string value2;
-				if (value.Filters != null && value.Filters.TryGetValue("f" + num, out value2))
+				if (value.Filters != null && value.Filters.TryGetValue("f" + num, out value2) && item.Text != value2)
 				{
-					if(item.Text!=value2)item.Text = value2;
+					item.Text = value2;
 				}
 				num++;
 			}
@@ -5545,7 +5728,10 @@ namespace EmulatorHub
 				{
 					for (int i = 0; i < Math.Min(listView.Columns.Count, value.Columns.Length); i++)
 					{
-						if(listView.Columns[i].Width!=Math.Max(30,value.Columns[i]))listView.Columns[i].Width = Math.Max(30, value.Columns[i]);
+						if (listView.Columns[i].Width != Math.Max(30, value.Columns[i]))
+						{
+							listView.Columns[i].Width = Math.Max(30, value.Columns[i]);
+						}
 					}
 				}
 				foreach (ListViewItem item2 in listView.Items)
@@ -5661,50 +5847,816 @@ namespace EmulatorHub
 			NextData.Ensure(library);
 			Control[] array = NextUi.Descendants(this).Concat(new Control[1] { this }).ToArray();
 			Control[] array2 = originalTextSizes.Keys.Where((Control c) => c.IsDisposed).ToArray();
-			foreach (Control key in array2)
+			Control[] array3 = array2;
+			foreach (Control key in array3)
 			{
 				originalTextSizes.Remove(key);
 			}
 			array2 = array;
-			foreach (Control control in array2)
+			array3 = array2;
+			foreach (Control control in array3)
 			{
 				if (!originalTextSizes.ContainsKey(control))
 				{
-					originalTextSizes[control] = control.Font.Size;
+					float baseline = control.Font.Size;
+                    for (Control ancestor = control.Parent; ancestor != null; ancestor = ancestor.Parent)
+                    {
+                        float inherited;
+                        if (Math.Abs(control.Font.Size - ancestor.Font.Size) < 0.01f && originalTextSizes.TryGetValue(ancestor, out inherited))
+                        { baseline = inherited; break; }
+                    }
+                    originalTextSizes[control] = baseline;
 				}
 			}
 			array2 = array;
-			foreach (Control control in array2)
+			array3 = array2;
+			foreach (Control control in array3)
 			{
-				string family=string.IsNullOrWhiteSpace(library.Theme.FontFamily)?"Bahnschrift":library.Theme.FontFamily;float points=originalTextSizes[control]*(float)library.Enhancements.TextPercent/100f;if(Math.Abs(control.Font.Size-points)>.01f||control.Font.FontFamily.Name!=family)control.Font=new Font(family,points,control.Font.Style);
+				string text = (string.IsNullOrWhiteSpace(library.Theme.FontFamily) ? "Bahnschrift" : library.Theme.FontFamily);
+				float num = originalTextSizes[control] * (float)library.Enhancements.TextPercent / 100f;
+				if (Math.Abs(control.Font.Size - num) > 0.01f || control.Font.FontFamily.Name != text)
+				{
+					control.Font = new Font(text, num, control.Font.Style);
+				}
 			}
 			NextUi.TextPercent = library.Enhancements.TextPercent;
 			NextUi.FontFamily = (string.IsNullOrWhiteSpace(library.Theme.FontFamily) ? "Bahnschrift" : library.Theme.FontFamily);
 			FishBowlHighlights.ReducedMotion = library.Enhancements.ReducedMotion;
-            FluidStyle.Configure(library);UpdateFluidHeader();if(homeSurface!=null)homeSurface.RefreshLayout();if(emulatorHome!=null)emulatorHome.RefreshLayout();
+			FluidStyle.Configure(library);
+			UpdateFluidHeader();
+			if (homeSurface != null)
+			{
+				homeSurface.RefreshLayout();
+			}
+			if (emulatorHome != null)
+			{
+				emulatorHome.RefreshLayout();
+			}
 			FishBowlActionButton.StrongFocus = library.Enhancements.StrongFocus;
+		}
+
+		private void ApplyCosmeticPalette()
+		{
+			CosmeticRuntime.Configure(library.Cosmetics);
+			CosmeticSettings current = CosmeticRuntime.Current;
+			if (!current.CustomPalette)
+			{
+				return;
+			}
+			try
+			{
+				ink = CosmeticRuntime.Parse(current.TextColor);
+				subtle = CosmeticRuntime.Parse(current.MutedColor);
+				top = CosmeticRuntime.Parse(current.TopColor);
+				bottom = CosmeticRuntime.Parse(current.BottomColor);
+				surface = CosmeticRuntime.Parse(current.SurfaceColor);
+				blue = CosmeticRuntime.Parse(current.AccentColor);
+				pink = CosmeticRuntime.Parse(current.SecondaryColor);
+			}
+			catch
+			{
+			}
+		}
+
+		private void ShowCosmetics()
+		{
+			if (library.Cosmetics == null)
+			{
+				library.Cosmetics = new CosmeticSettings();
+			}
+			CosmeticSettings committed = NextData.Copy(library.Cosmetics);
+			bool updating = false;
+			NextDialog dialog = new NextDialog("Cosmetic styles", 920, 700);
+			try
+			{
+				dialog.Actions.Tag = "FishBowl overflow";
+				dialog.Actions.WrapContents = true;
+				FishBowlTabs fishBowlTabs = new FishBowlTabs();
+				fishBowlTabs.Dock = DockStyle.Fill;
+				fishBowlTabs.PreferredColumns = 4;
+				fishBowlTabs.ItemSize = new Size(195, 34);
+				FishBowlTabs fishBowlTabs2 = fishBowlTabs;
+				dialog.Body.Controls.Add(fishBowlTabs2);
+				Dictionary<string, Control> controls = new Dictionary<string, Control>();
+				Dictionary<string, TableLayoutPanel> fields = new Dictionary<string, TableLayoutPanel>();
+				string[] array = new string[4] { "Palette", "Shapes and icons", "Background", "Artwork and badges" };
+				foreach (string key2 in array)
+				{
+					TabPage tabPage = new TabPage(key2);
+					tabPage.AutoScroll = true;
+					tabPage.UseVisualStyleBackColor = false;
+					tabPage.BackColor = FishBowlPalette.DeepSeaSurface;
+					tabPage.ForeColor = FishBowlPalette.ThemeInk;
+					TabPage value = tabPage;
+					fishBowlTabs2.TabPages.Add(value);
+					fields[key2] = NextDialog.Fields(value);
+				}
+				Action<string, string, string> action = delegate(string tab, string label, string key)
+				{
+					TableLayoutPanel tableLayoutPanel = new TableLayoutPanel
+					{
+						ColumnCount = 2,
+						RowCount = 1
+					};
+					tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 63f));
+					tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 37f));
+					TextBox text = new TextBox
+					{
+						Dock = DockStyle.Fill,
+						AccessibleName = label,
+						Text = (((string)typeof(CosmeticSettings).GetProperty(key).GetValue(committed, null)) ?? "")
+					};
+					FishBowlActionButton fishBowlActionButton = ExperienceUi.Button("Choose", delegate
+					{
+						using (ColorDialog colorDialog = new ColorDialog
+						{
+							Color = CosmeticRuntime.Optional(text.Text, FishBowlPalette.IconAccent),
+							FullOpen = true
+						})
+						{
+							if (colorDialog.ShowDialog(dialog) == DialogResult.OK)
+							{
+								text.Text = "#" + colorDialog.Color.R.ToString("X2") + colorDialog.Color.G.ToString("X2") + colorDialog.Color.B.ToString("X2");
+							}
+						}
+					});
+					fishBowlActionButton.Dock = DockStyle.Fill;
+					fishBowlActionButton.MinimumSize = Size.Empty;
+					fishBowlActionButton.AccessibleName = "Choose " + label;
+					tableLayoutPanel.Controls.Add(text, 0, 0);
+					tableLayoutPanel.Controls.Add(fishBowlActionButton, 1, 0);
+					controls[key] = text;
+					NextDialog.Field(fields[tab], label, tableLayoutPanel, 48);
+				};
+				Action<string, string, string, string[]> action2 = delegate(string tab, string label, string key, string[] values)
+				{
+					ComboBox comboBox = NextDialog.Choice(values, (string)typeof(CosmeticSettings).GetProperty(key).GetValue(committed, null));
+					controls[key] = comboBox;
+					NextDialog.Field(fields[tab], label, comboBox);
+				};
+				Action<string, string, string> action3 = delegate(string tab, string label, string key)
+				{
+					CheckBox checkBox = new CheckBox
+					{
+						Text = label,
+						Checked = (bool)typeof(CosmeticSettings).GetProperty(key).GetValue(committed, null)
+					};
+					controls[key] = checkBox;
+					NextDialog.Field(fields[tab], "", checkBox);
+				};
+				Action<string, string, string, int, int> action4 = delegate(string tab, string label, string key, int min, int max)
+				{
+					NumericUpDown numericUpDown = NextDialog.Number((int)typeof(CosmeticSettings).GetProperty(key).GetValue(committed, null), min, max);
+					controls[key] = numericUpDown;
+					NextDialog.Field(fields[tab], label, numericUpDown);
+				};
+				action3("Palette", "Use custom palette", "CustomPalette");
+				action("Palette", "Main text", "TextColor");
+				action("Palette", "Secondary text", "MutedColor");
+				action("Palette", "Header background", "TopColor");
+				action("Palette", "Page background", "BottomColor");
+				action("Palette", "Card background", "SurfaceColor");
+				action("Palette", "Accent", "AccentColor");
+				action("Palette", "Secondary accent", "SecondaryColor");
+				action4("Shapes and icons", "Corner radius (0 = square)", "CornerRadius", 0, 20);
+				action2("Shapes and icons", "Icon style", "IconStyle", new string[3] { "Outline", "Filled", "Monochrome" });
+				action3("Shapes and icons", "Icon-only toolbars with tooltips", "IconOnlyToolbars");
+				action2("Shapes and icons", "Library spacing", "LibrarySpacing", new string[2] { "Compact", "Comfortable" });
+				action3("Artwork and badges", "Show platform labels", "PlatformLabels");
+				action3("Artwork and badges", "Cover and details pane", "DetailPreview");
+				action("Shapes and icons", "Selection color (blank = theme)", "SelectionColor");
+				action("Shapes and icons", "Focus outline (blank = theme)", "FocusColor");
+				action4("Shapes and icons", "Focus outline width", "FocusWidth", 1, 5);
+				action2("Background", "Background style", "BackgroundStyle", new string[5] { "Plain", "Gradient", "Dots", "Waves", "Wallpaper" });
+				TextBox wallpaper = new TextBox
+				{
+					Text = (committed.WallpaperPath ?? "")
+				};
+				controls["WallpaperPath"] = wallpaper;
+				NextDialog.Field(fields["Background"], "Wallpaper image", wallpaper);
+				FishBowlActionButton control = ExperienceUi.Button("Choose wallpaper", delegate
+				{
+					using (OpenFileDialog openFileDialog = new OpenFileDialog
+					{
+						Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif"
+					})
+					{
+						if (openFileDialog.ShowDialog(dialog) == DialogResult.OK)
+						{
+							wallpaper.Text = openFileDialog.FileName;
+						}
+					}
+				});
+				NextDialog.Field(fields["Background"], "", control);
+				action2("Background", "Wallpaper layout", "WallpaperLayout", new string[3] { "Fill", "Fit", "Tile" });
+				action4("Background", "Wallpaper opacity (%)", "WallpaperOpacity", 0, 40);
+				action3("Background", "Show aquarium footer decoration", "ShowFooter");
+				action2("Artwork and badges", "Artwork frame", "ArtworkFrame", new string[4] { "None", "Thin", "Accent", "Rounded" });
+				action3("Artwork and badges", "Soft artwork shadows", "ArtworkShadow");
+				action2("Artwork and badges", "Status badge style", "BadgeStyle", new string[3] { "Text", "Pill", "Square" });
+				action("Artwork and badges", "Ready color (blank = theme)", "ReadyColor");
+				action("Artwork and badges", "Running color (blank = theme)", "RunningColor");
+				action("Artwork and badges", "Warning color (blank = theme)", "WarningColor");
+				foreach (TableLayoutPanel value5 in fields.Values)
+				{
+					foreach (RowStyle item in (IEnumerable)value5.RowStyles)
+					{
+						item.Height = (float)Math.Ceiling((double)item.Height * Math.Max(1.0, (double)NextUi.TextPercent / 100.0));
+					}
+				}
+				Label message = ExperienceUi.Label("Preview changes on the app behind this window. Text contrast is adjusted automatically.", (int)Math.Ceiling(42.0 * Math.Max(1.0, (double)NextUi.TextPercent / 100.0)));
+				message.Dock = DockStyle.Bottom;
+				dialog.Body.Controls.Add(message);
+				Func<CosmeticSettings> read = delegate
+				{
+					CosmeticSettings cosmeticSettings = NextData.Copy(committed);
+					foreach (KeyValuePair<string, Control> item2 in controls)
+					{
+						object value4 = ((item2.Value is CheckBox) ? ((object)((CheckBox)item2.Value).Checked) : ((item2.Value is NumericUpDown) ? ((object)(int)((NumericUpDown)item2.Value).Value) : item2.Value.Text.Trim()));
+						typeof(CosmeticSettings).GetProperty(item2.Key).SetValue(cosmeticSettings, value4, null);
+					}
+					CosmeticRuntime.Validate(cosmeticSettings);
+					return cosmeticSettings;
+				};
+				Action preview = delegate
+				{
+					if (updating)
+					{
+						return;
+					}
+					try
+					{
+						library.Cosmetics = read();
+						ApplyAppearanceNow();
+						message.Text = "Preview active. Use Apply or Save and close to keep it.";
+					}
+					catch (Exception ex)
+					{
+						message.Text = ex.Message;
+					}
+				};
+				Action<CosmeticSettings> set = delegate(CosmeticSettings settings)
+				{
+					updating = true;
+					foreach (KeyValuePair<string, Control> item3 in controls)
+					{
+						object value3 = typeof(CosmeticSettings).GetProperty(item3.Key).GetValue(settings, null);
+						if (item3.Value is CheckBox)
+						{
+							((CheckBox)item3.Value).Checked = (bool)value3;
+						}
+						else if (item3.Value is NumericUpDown)
+						{
+							((NumericUpDown)item3.Value).Value = (int)value3;
+						}
+						else if (item3.Value is ComboBox)
+						{
+							((ComboBox)item3.Value).SelectedItem = value3;
+						}
+						else
+						{
+							item3.Value.Text = ((string)value3) ?? "";
+						}
+					}
+					updating = false;
+					preview();
+				};
+				foreach (KeyValuePair<string, Control> item4 in controls)
+				{
+					Control value2 = item4.Value;
+					value2.Name = item4.Key;
+					if (value2 is CheckBox)
+					{
+						((CheckBox)value2).CheckedChanged += delegate
+						{
+							preview();
+						};
+					}
+					else if (value2 is NumericUpDown)
+					{
+						((NumericUpDown)value2).ValueChanged += delegate
+						{
+							preview();
+						};
+					}
+					else if (value2 is ComboBox)
+					{
+						((ComboBox)value2).SelectedIndexChanged += delegate
+						{
+							preview();
+						};
+					}
+					else
+					{
+						value2.TextChanged += delegate
+						{
+							preview();
+						};
+					}
+				}
+				Action save = delegate
+				{
+					library.Cosmetics = read();
+					committed = NextData.Copy(library.Cosmetics);
+					Store.Save(library);
+					ApplyAppearanceNow();
+				};
+				dialog.Action("Apply", save);
+				dialog.Action("Revert", delegate
+				{
+					set(committed);
+				});
+				dialog.Action("Restore defaults", delegate
+				{
+					set(new CosmeticSettings());
+				});
+				dialog.Action("Save and close", delegate
+				{
+					save();
+					dialog.Close();
+				});
+				dialog.Action("Cancel", dialog.Close);
+				dialog.Shown += delegate
+				{
+					foreach (Button item5 in dialog.Actions.Controls.OfType<Button>())
+					{
+						item5.Width = Math.Max(116, TextRenderer.MeasureText(item5.Text, item5.Font).Width + 58);
+						item5.Height = Math.Max(34, item5.Font.Height + 18);
+					}
+				};
+				try
+				{
+					dialog.ShowDialog(this);
+				}
+				finally
+				{
+					library.Cosmetics = committed;
+					ApplyAppearanceNow();
+				}
+			}
+			finally
+			{
+				if (dialog != null)
+				{
+					((IDisposable)dialog).Dispose();
+				}
+			}
+		}
+
+		internal bool ActivateControllerSelection(Control control)
+		{
+			if (control != emulatorList)
+			{
+				return false;
+			}
+			RunUiAction(OpenSelectedEmulator);
+			return true;
+		}
+
+		internal void RefreshUserToolsViews(LibraryData data)
+		{
+			if (object.ReferenceEquals(data, library))
+			{
+				ApplyThemeColors();
+				ApplyVisualScale();
+				RefreshHub();
+				if (embeddedLibrary != null)
+				{
+					embeddedLibrary.ReloadLibrary();
+				}
+				ConfigureGameFolderWatchers();
+				ConfigureScheduledLibraryScan();
+				FishBowlPalette.StyleWindow(this);
+				CosmeticRuntime.Apply(this);
+			}
+		}
+
+		private void ShowUserTools()
+		{
+			UserTools.Show(this, library, delegate
+			{
+				RefreshUserToolsViews(library);
+			});
+			RefreshHub();
+			if (embeddedLibrary != null)
+			{
+				embeddedLibrary.ReloadLibrary();
+			}
+		}
+
+		private void InitializeHub(bool preview)
+		{
+			Hub.Ensure(library);
+			FluidStyle.Configure(library);
+			SectionMotion.Attach(this);
+			if (!preview)
+			{
+				StartHubRuntime();
+			}
+		}
+
+		public void OpenCommandSearch()
+		{
+			ShowGlobalSearch();
+		}
+
+		private void ShowHubExtensions()
+		{
+			Hub.Show(this, library);
+			RefreshHub();
+			embeddedLibrary.ReloadLibrary();
+		}
+
+		public void CancelScheduledCapture()
+		{
+			if (hubCaptureCancellation != null)
+			{
+				hubCaptureCancellation.Cancel();
+			}
+		}
+
+		private void OfferStartupRecovery()
+		{
+			if (recovery != null && recovery.Interrupted && library.Hub.ResumeAfterCrash && MessageBox.Show(this, "The previous FishBowl run did not close cleanly. Reopen the remembered Library view?", "Recover Library view", MessageBoxButtons.YesNo) == DialogResult.Yes)
+			{
+				workspaceNavigation.SelectedIndex = 2;
+				embeddedLibrary.ReloadLibrary();
+			}
+		}
+
+		private void StartHubRuntime()
+		{
+			StartImmersionRuntime();
+			StartReleaseWatch();
+			try
+			{
+				recovery = new RecoveryMarker(Path.Combine(Store.DataDirectory, "open-session.json"));
+			}
+			catch (Exception ex)
+			{
+				Store.Log("Recovery marker unavailable: " + ex.Message);
+			}
+			base.FormClosed += delegate
+			{
+				if (recovery != null)
+				{
+					try
+					{
+						recovery.Close();
+					}
+					catch
+					{
+					}
+				}
+			};
+			hubCaptureTimer = new System.Windows.Forms.Timer
+			{
+				Interval = 60000
+			};
+			hubCaptureTimer.Tick += delegate
+			{
+				ScheduleHubCapture();
+				CheckScheduledReleases();
+			};
+			hubCaptureTimer.Start();
+			base.FormClosing += delegate(object a, FormClosingEventArgs b)
+			{
+				if (captureRunning)
+				{
+					b.Cancel = true;
+					MessageBox.Show(this, "A scheduled save capture is finishing. Wait for it to complete, then close FishBowl.", "Save capture in progress");
+				}
+			};
+			base.Disposed += delegate
+			{
+				hubCaptureTimer.Stop();
+				hubCaptureTimer.Dispose();
+			};
+		}
+
+		private void ScheduleHubCapture()
+		{
+			HubSettings h = Hub.Ensure(library);
+			if (h.CaptureMinutes <= 0 || captureRunning || UserTools.Guest || UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning)
+			{
+				return;
+			}
+			DateTime result;
+			if (!DateTime.TryParse(h.NextCaptureAt, out result))
+			{
+				h.NextCaptureAt = DateTime.UtcNow.AddMinutes(h.CaptureMinutes).ToString("o");
+				Store.Save(library);
+			}
+			else
+			{
+				if (DateTime.UtcNow < result.ToUniversalTime())
+				{
+					return;
+				}
+				LibraryData copy;
+				try
+				{
+					copy = UserTools.Copy(library);
+				}
+				catch (Exception ex)
+				{
+					h.LastCaptureReport = ex.Message;
+					return;
+				}
+				captureRunning = true;
+				hubCaptureCancellation = new CancellationTokenSource();
+				Interlocked.Increment(ref WorkGate.Busy);
+				Task.Factory.StartNew(() => HubSaveSchedule.Capture(copy, hubCaptureCancellation.Token)).ContinueWith(delegate(Task<ScheduledSaveResult> task)
+				{
+					if (base.IsDisposed || !base.IsHandleCreated)
+					{
+						captureRunning = false;
+						Interlocked.Decrement(ref WorkGate.Busy);
+						return;
+					}
+					try
+					{
+						BeginInvoke((Action)delegate
+						{
+							try
+							{
+								h.LastCaptureReport = (task.IsCanceled ? "Capture cancelled; new snapshots from the batch were discarded." : (task.IsFaulted ? task.Exception.GetBaseException().Message : string.Join("\r\n", task.Result.Messages)));
+								if (!task.IsFaulted && !task.IsCanceled)
+								{
+									HubSaveSchedule.Apply(library, task.Result);
+								}
+								h.NextCaptureAt = DateTime.UtcNow.AddMinutes(Math.Max(1, h.CaptureMinutes)).ToString("o");
+								Store.Save(library);
+							}
+							catch (Exception ex3)
+							{
+								Store.Log("Scheduled linked saves: " + ex3.Message);
+							}
+							finally
+							{
+								captureRunning = false;
+								hubCaptureCancellation.Dispose();
+								hubCaptureCancellation = null;
+								Interlocked.Decrement(ref WorkGate.Busy);
+							}
+						});
+					}
+					catch (InvalidOperationException)
+					{
+						captureRunning = false;
+						Interlocked.Decrement(ref WorkGate.Busy);
+					}
+				});
+			}
+		}
+
+		private void StartReleaseWatch()
+		{
+			releaseWatchIcon = new NotifyIcon
+			{
+				Icon = SystemIcons.Information,
+				Text = "FishBowl emulator releases",
+				Visible = false
+			};
+			releaseWatchIcon.BalloonTipClicked += delegate
+			{
+				ShowHubExtensions();
+			};
+			base.Disposed += delegate
+			{
+				if (releaseWatchCancellation != null)
+				{
+					releaseWatchCancellation.Cancel();
+				}
+				releaseWatchIcon.Visible = false;
+				releaseWatchIcon.Dispose();
+			};
+		}
+
+		private void CheckScheduledReleases()
+		{
+			HubSettings h = Hub.Ensure(library);
+			DateTime result;
+			if (!h.WatchReleases || releaseWatchRunning || UserTools.Guest || UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || backgroundLibraryScanRunning || automaticCopyRunning || (DateTime.TryParse(h.LastReleaseWatchAt, out result) && DateTime.UtcNow - result.ToUniversalTime() < TimeSpan.FromDays(1.0)))
+			{
+				return;
+			}
+			List<EmulatorProfile> profiles = UserTools.Copy(library.Emulators);
+			releaseWatchRunning = true;
+			CancellationTokenSource cancellation = new CancellationTokenSource();
+			releaseWatchCancellation = cancellation;
+			Interlocked.Increment(ref WorkGate.Busy);
+			Task.Factory.StartNew(() => ReleaseWatch.Check(profiles, cancellation.Token)).ContinueWith(delegate(Task<List<ReleaseWatchResult>> task)
+			{
+				if (base.IsDisposed || !base.IsHandleCreated)
+				{
+					cancellation.Dispose();
+					Interlocked.Decrement(ref WorkGate.Busy);
+					return;
+				}
+				try
+				{
+					BeginInvoke((Action)delegate
+					{
+						try
+						{
+							h.LastReleaseWatchAt = DateTime.UtcNow.ToString("o");
+							if (!task.IsFaulted && !task.IsCanceled)
+							{
+								List<string> list = ReleaseWatch.Apply(library, task.Result);
+								Store.Save(library);
+								if (list.Count > 0)
+								{
+									Hub.Record(library, "Emulator releases available: " + string.Join(", ", list));
+									Store.Save(library);
+									SetStatus("Emulator releases available. Open Library extensions → Versions, updates and rollback.");
+									releaseWatchIcon.Visible = true;
+									releaseWatchIcon.ShowBalloonTip(8000, "Emulator releases available", string.Join("\n", list.Take(5)), ToolTipIcon.Info);
+								}
+							}
+							else
+							{
+								Store.Log("Release watch could not finish.");
+								Store.Save(library);
+							}
+						}
+						catch (Exception ex2)
+						{
+							Store.Log("Release watch: " + ex2.Message);
+						}
+						finally
+						{
+							releaseWatchRunning = false;
+							releaseWatchCancellation = null;
+							cancellation.Dispose();
+							Interlocked.Decrement(ref WorkGate.Busy);
+						}
+					});
+				}
+				catch (InvalidOperationException)
+				{
+					cancellation.Dispose();
+					Interlocked.Decrement(ref WorkGate.Busy);
+				}
+			});
+		}
+
+		private void StartImmersionRuntime()
+		{
+			immersionInput = new IdleInput();
+			immersionIdle = new System.Windows.Forms.Timer
+			{
+				Interval = 1000
+			};
+			immersionIdle.Tick += delegate
+			{
+				ImmersionSettings s = Immersion.Ensure(library);
+				if (EligibleForAmbient(s, (DateTime.UtcNow - immersionInput.Last).TotalMinutes, Form.ActiveForm == this, UserTools.ActiveLaunches, WorkGate.Busy))
+				{
+					immersionInput.Last = DateTime.UtcNow;
+					try
+					{
+						using (AmbientWindow ambientWindow = new AmbientWindow(library))
+						{
+							ambientWindow.ShowDialog(this);
+						}
+					}
+					finally
+					{
+						immersionInput.Last = DateTime.UtcNow;
+					}
+				}
+			};
+			immersionIdle.Start();
+			base.Disposed += delegate
+			{
+				immersionIdle.Dispose();
+				immersionInput.Dispose();
+			};
+		}
+
+		public static bool EligibleForAmbient(ImmersionSettings s, double minutes, bool focused, int sessions, int work)
+		{
+			return s.Ambient && focused && sessions == 0 && work == 0 && minutes >= (double)Math.Max(1, Math.Min(60, s.IdleMinutes));
+		}
+
+		private void UpdateFluidHeader()
+		{
+			if (workspaceShell == null)
+			{
+				return;
+			}
+			Control control = NextUi.Descendants(this).FirstOrDefault((Control c) => c.Name == "FishBowlHeader");
+			if (control != null)
+			{
+				Label title = control.Controls.OfType<Label>().FirstOrDefault((Label c) => c.Text == "FishBowl");
+				Label label = control.Controls.OfType<Label>().FirstOrDefault((Label c) => c != title);
+				PictureBox pictureBox = control.Controls.OfType<PictureBox>().FirstOrDefault();
+				if (title != null && label != null)
+				{
+					int num = ((pictureBox == null) ? 84 : (pictureBox.Right + 12));
+					title.Location = new Point(num, 8);
+					label.Location = new Point(num, Math.Max(43, title.Bottom + 3));
+					workspaceShell.RowStyles[1].Height = (library.Theme.ShowBanner ? Math.Max(Math.Max(76, label.Bottom + 10), (pictureBox != null) ? (pictureBox.Bottom + 8) : 0) : 0);
+				}
+			}
 		}
 	}
 	public class FishBowlDialog : Form
 	{
-        public FishBowlDialog(){DoubleBuffered=false;SetStyle(ControlStyles.OptimizedDoubleBuffer,false);}
-        protected override CreateParams CreateParams {get{var parameters=base.CreateParams;parameters.ExStyle &= ~0x02000000;return parameters;}}
-        protected override void OnShown(EventArgs e){base.OnShown(e);SectionMotion.Reveal(this);}
+		private bool startupPromptPrepared;
+		private int? startupTransitionStatus;
+
+		[DllImport("dwmapi.dll")]
+		private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+
+		protected override void OnHandleCreated(EventArgs e)
+		{
+			// Apply to each new HWND before showing it, including the first startup prompt.
+			DisableStartupTransitions();
+			base.OnHandleCreated(e);
+		}
+
+		private void DisableStartupTransitions()
+		{
+			if (IsHandleCreated && StartupPromptLayout.IsPrompt(this))
+			{
+				try
+				{
+					int disabled = 1;
+					startupTransitionStatus = DwmSetWindowAttribute(Handle, 3 /* DWMWA_TRANSITIONS_FORCEDISABLED */, ref disabled, sizeof(int));
+				}
+				catch (DllNotFoundException) { }
+				catch (EntryPointNotFoundException) { }
+			}
+		}
+
+		protected override void OnFormClosing(FormClosingEventArgs e)
+		{
+			base.OnFormClosing(e);
+			if (!e.Cancel) DisableStartupTransitions();
+		}
+
+		protected override void SetVisibleCore(bool value)
+		{
+			if (value && !startupPromptPrepared && StartupPromptLayout.IsPrompt(this))
+			{
+				// OnLoad may run from native WM_SHOWWINDOW, after WS_VISIBLE is set.
+				// Prepare startup prompts before entering the native show sequence.
+				PrepareDialogAppearance();
+				PerformLayout();
+				StartupPromptLayout.PositionBeforeShow(this);
+				startupPromptPrepared = true;
+			}
+			// Reassert after layout/style updates and immediately before native show/hide.
+			// The handle check prevents cleanup from creating another window.
+			DisableStartupTransitions();
+			base.SetVisibleCore(value);
+		}
+
+		protected override CreateParams CreateParams
+		{
+			get
+			{
+				CreateParams createParams = base.CreateParams;
+				createParams.ExStyle &= -33554433;
+				return createParams;
+			}
+		}
+
+		public FishBowlDialog()
+		{
+			ShowInTaskbar = false;
+			DoubleBuffered = true;
+			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+		}
+
+		protected override void OnShown(EventArgs e)
+		{
+			base.OnShown(e);
+			SectionMotion.Reveal(this);
+		}
+
 		protected override void OnLoad(EventArgs e)
+		{
+			if (!startupPromptPrepared) PrepareDialogAppearance();
+			base.OnLoad(e);
+		}
+
+		private void PrepareDialogAppearance()
 		{
 			FishBowlPalette.StyleWindow(this);
 			NextUi.ApplyAccessibility(this);
-            Polish.Accessibility(this);
-			FlowLayoutPanel[] array = NextUi.Descendants(this).OfType<FlowLayoutPanel>().ToArray();
-			foreach (FlowLayoutPanel bar in array)
+			Polish.Accessibility(this);
+			foreach (FlowLayoutPanel bar in NextUi.Descendants(this).OfType<FlowLayoutPanel>().ToArray())
 			{
 				NextUi.Responsive(bar);
 			}
-            CosmeticRuntime.Apply(this);
-            SectionMotion.Attach(this);
+			CosmeticRuntime.Apply(this);
+			SectionMotion.Attach(this);
 			StartupPromptLayout.Apply(this);
-			base.OnLoad(e);
 		}
+
 	}
 	public class BuildLabelDialog : FishBowlDialog
 	{
@@ -6523,7 +7475,8 @@ namespace EmulatorHub
 		{
 			int num = 0;
 			ListViewItem[] array = discovered.CheckedItems.Cast<ListViewItem>().ToArray();
-			foreach (ListViewItem listViewItem in array)
+			ListViewItem[] array2 = array;
+			foreach (ListViewItem listViewItem in array2)
 			{
 				DiscoveredEmulator candidate = listViewItem.Tag as DiscoveredEmulator;
 				if (candidate != null && !library.Emulators.Any((EmulatorProfile p) => HubPaths.Same(p.Executable, candidate.Executable)))
@@ -6729,11 +7682,12 @@ namespace EmulatorHub
 			flowLayoutPanel.Dock = DockStyle.Fill;
 			FlowLayoutPanel flowLayoutPanel2 = flowLayoutPanel;
 			string[] array = new string[3] { "ConfigFolder|Configuration", "InGameSaveFolder|In-game saves", "SaveStateFolder|Save states" };
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
-				string[] array2 = text.Split('|');
+				string[] array3 = text.Split('|');
 				CheckBox checkBox = new CheckBox();
-				checkBox.Text = array2[1];
+				checkBox.Text = array3[1];
 				checkBox.Checked = true;
 				checkBox.AutoSize = true;
 				checkBox.Margin = new Padding(0, 6, 18, 0);
@@ -6743,7 +7697,7 @@ namespace EmulatorHub
 					backupPlan = null;
 					backupText.Text = "Categories changed. Preview the backup again.";
 				};
-				categories.Add(array2[0], checkBox2);
+				categories.Add(array3[0], checkBox2);
 				flowLayoutPanel2.Controls.Add(checkBox2);
 			}
 			Row(panel, flowLayoutPanel2, 34);
@@ -6976,7 +7930,7 @@ namespace EmulatorHub
 				Dock = DockStyle.Fill,
 				ForeColor = Color.FromArgb(174, 176, 186)
 			}, 0, 0);
-			TabControl tabControl = new TabControl
+			TabControl tabControl = new FishBowlTabs
 			{
 				Dock = DockStyle.Fill
 			};
@@ -7102,21 +8056,30 @@ namespace EmulatorHub
 			existingProfile = existing;
 			Text = ((existing == null) ? "Add Emulator" : "Edit Emulator");
 			base.StartPosition = FormStartPosition.CenterParent;
-			base.ClientSize = new Size(620, 386);
+			base.ClientSize = new Size(620, 500);
 			BackColor = Color.FromArgb(31, 32, 37);
 			base.FormBorderStyle = FormBorderStyle.FixedDialog;
 			base.MaximizeBox = false;
 			base.MinimizeBox = false;
 			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel
 			{
-				Dock = DockStyle.Fill,
+				Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
 				Padding = new Padding(18),
 				ColumnCount = 2,
-				RowCount = 10
+				RowCount = 9
 			};
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84f));
-			base.Controls.Add(tableLayoutPanel);
+			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110f));
+			var body = new Panel { Name = "EmulatorEditorBody", Dock = DockStyle.Fill, AutoScroll = true };
+            body.Controls.Add(tableLayoutPanel);
+            var editorLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
+            editorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            editorLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            editorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            editorLayout.Controls.Add(body, 0, 0);
+            base.Controls.Add(editorLayout);
 			preset.DropDownStyle = ComboBoxStyle.DropDownList;
 			preset.DropDownWidth = 660;
 			preset.MaxDropDownItems = 18;
@@ -7149,14 +8112,21 @@ namespace EmulatorHub
 			tableLayoutPanel.SetColumnSpan(hint, 2);
 			FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel
 			{
-				Dock = DockStyle.Fill,
+				Name = "EmulatorEditorActions",
+                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(12),
+                MinimumSize = new Size(0, 62),
 				FlowDirection = FlowDirection.RightToLeft,
-				WrapContents = false
+				WrapContents = true
 			};
 			FishBowlActionButton fishBowlActionButton = new FishBowlActionButton
 			{
-				Text = "Save",
-				Width = 88,
+				Text = existing == null ? "Add emulator" : "Save",
+                AutoSize = true,
+                MinimumSize = new Size(130, 36),
+				Width = 130,
 				Height = 30,
 				FlatStyle = FlatStyle.Flat,
 				BackColor = Color.FromArgb(154, 128, 211),
@@ -7166,7 +8136,9 @@ namespace EmulatorHub
 			FishBowlActionButton fishBowlActionButton2 = new FishBowlActionButton
 			{
 				Text = "Cancel",
-				Width = 88,
+                AutoSize = true,
+                MinimumSize = new Size(104, 36),
+				Width = 104,
 				Height = 30,
 				DialogResult = DialogResult.Cancel,
 				FlatStyle = FlatStyle.Flat,
@@ -7176,7 +8148,9 @@ namespace EmulatorHub
 			FishBowlActionButton fishBowlActionButton3 = new FishBowlActionButton
 			{
 				Text = "Project website",
-				Width = 126,
+                AutoSize = true,
+                MinimumSize = new Size(166, 36),
+				Width = 166,
 				Height = 30,
 				FlatStyle = FlatStyle.Flat,
 				BackColor = Color.FromArgb(47, 48, 56),
@@ -7204,10 +8178,9 @@ namespace EmulatorHub
 			flowLayoutPanel.Controls.Add(fishBowlActionButton2);
 			flowLayoutPanel.Controls.Add(fishBowlActionButton);
 			flowLayoutPanel.Controls.Add(fishBowlActionButton3);
-			tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-			tableLayoutPanel.Controls.Add(flowLayoutPanel, 0, 9);
-			tableLayoutPanel.SetColumnSpan(flowLayoutPanel, 2);
-			base.AcceptButton = fishBowlActionButton;
+			editorLayout.Controls.Add(flowLayoutPanel, 0, 1);
+			executable.FontChanged += delegate { tableLayoutPanel.ColumnStyles[1].Width = Math.Max(110, TextRenderer.MeasureText("Browse", executable.Font).Width + 56); };
+            base.AcceptButton = fishBowlActionButton;
 			base.CancelButton = fishBowlActionButton2;
 			if (existing != null)
 			{
@@ -7334,10 +8307,6 @@ namespace EmulatorHub
 			form.Icon = icon;
 			form.Disposed += delegate
 			{
-				if (form.Icon == icon)
-				{
-					form.Icon = null;
-				}
 				icon.Dispose();
 			};
 		}
@@ -8022,7 +8991,8 @@ namespace EmulatorHub
 			string text = RequirementsStorage.Root(library);
 			string text2 = (string.IsNullOrWhiteSpace(platform.Text) ? "Other" : platform.Text.Trim());
 			string[] array = queued.ToArray();
-			foreach (string text3 in array)
+			string[] array2 = array;
+			foreach (string text3 in array2)
 			{
 				try
 				{
@@ -8274,7 +9244,6 @@ namespace EmulatorHub
 
 		public WorkspaceItemDialog(WorkspaceItem item)
 		{
-			WorkspaceItemDialog workspaceItemDialog = this;
 			this.item = item;
 			Text = "Workspace Item";
 			base.StartPosition = FormStartPosition.CenterParent;
@@ -8333,10 +9302,10 @@ namespace EmulatorHub
 			fishBowlActionButton2.FlatAppearance.BorderSize = 0;
 			fishBowlActionButton2.Click += delegate
 			{
-				item.Title = (string.IsNullOrWhiteSpace(workspaceItemDialog.title.Text) ? "Workspace item" : workspaceItemDialog.title.Text.Trim());
-				item.Kind = workspaceItemDialog.kind.Text;
-				item.Target = workspaceItemDialog.target.Text.Trim();
-				item.Notes = workspaceItemDialog.notes.Text.Trim();
+				item.Title = (string.IsNullOrWhiteSpace(title.Text) ? "Workspace item" : title.Text.Trim());
+				item.Kind = kind.Text;
+				item.Target = target.Text.Trim();
+				item.Notes = notes.Text.Trim();
 			};
 			base.Controls.Add(fishBowlActionButton2);
 			base.Controls.Add(new FishBowlActionButton
@@ -8639,7 +9608,8 @@ namespace EmulatorHub
 				if (openFileDialog2.ShowDialog(this) == DialogResult.OK)
 				{
 					string[] fileNames = openFileDialog2.FileNames;
-					foreach (string path in fileNames)
+					string[] array = fileNames;
+					foreach (string path in array)
 					{
 						GameSaves.Link(Game, path, category.Text);
 					}
@@ -8660,7 +9630,8 @@ namespace EmulatorHub
 			}
 			List<string> list = new List<string>();
 			GameSaveEntry[] array2 = array;
-			foreach (GameSaveEntry gameSaveEntry in array2)
+			GameSaveEntry[] array3 = array2;
+			foreach (GameSaveEntry gameSaveEntry in array3)
 			{
 				try
 				{
@@ -8697,7 +9668,8 @@ namespace EmulatorHub
 		{
 			GameSaveEntry[] array = (from ListViewItem item in files.SelectedItems
 				select (GameSaveEntry)item.Tag).ToArray();
-			foreach (GameSaveEntry item2 in array)
+			GameSaveEntry[] array2 = array;
+			foreach (GameSaveEntry item2 in array2)
 			{
 				Game.Saves.Remove(item2);
 			}
@@ -8729,8 +9701,23 @@ namespace EmulatorHub
 			Process.Start(processStartInfo);
 		}
 	}
-	public partial class GameLibraryDialog : FishBowlDialog
+	public class GameLibraryDialog : FishBowlDialog
 	{
+		private class RowOrder : IComparer
+		{
+			private readonly Dictionary<string, int> positions;
+
+			public RowOrder(Dictionary<string, int> p)
+			{
+				positions = p;
+			}
+
+			public int Compare(object a, object b)
+			{
+				return positions[((GameEntry)((ListViewItem)a).Tag).Id].CompareTo(positions[((GameEntry)((ListViewItem)b).Tag).Id]);
+			}
+		}
+
 		private readonly LibraryData library;
 
 		private readonly ListView games = new SmoothListView();
@@ -8761,6 +9748,65 @@ namespace EmulatorHub
 		private bool artworkView;
 
 		private bool buildingLibraryFilters;
+
+		private readonly System.Windows.Forms.Timer polishTimer = new System.Windows.Forms.Timer
+		{
+			Interval = 220
+		};
+
+		private readonly Dictionary<string, ListViewItem> reusableRows = new Dictionary<string, ListViewItem>();
+
+		private readonly Dictionary<string, string> fileSizes = new Dictionary<string, string>();
+
+		private DateTime statExpiry;
+
+		private readonly Dictionary<string, int> thumbnailSlots = new Dictionary<string, int>();
+
+		private readonly Dictionary<int, HashSet<ListViewItem>> slotOwners = new Dictionary<int, HashSet<ListViewItem>>();
+
+		private bool thumbnailBusy;
+
+		private bool polishReady;
+
+		private bool refreshingRows;
+
+		private int nextSlot = 1;
+
+		private int artSize;
+
+		private string artStyle;
+
+		private string viewUser;
+
+		private Panel emptyState;
+
+		private DateTime searchDue;
+
+		private bool searchQueued;
+
+		private bool fittingHeader;
+
+		private Panel detailPane;
+
+		private PictureBox detailCover;
+
+		private TextBox detailText;
+
+		private string detailStamp;
+
+		private ImageList densityImages;
+
+		private int densityHeight;
+
+		private Bitmap immersionBackdrop;
+
+		private string immersionStamp;
+
+		private ulong? visitStamp;
+
+		private DateTime visitScan;
+
+		public int VisitRefreshCount { get; private set; }
 
 		public GameLibraryDialog(LibraryData library)
 		{
@@ -8838,7 +9884,7 @@ namespace EmulatorHub
 				AutoScroll = false
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
-            BuildCompactActions(flowLayoutPanel);
+			BuildCompactActions(flowLayoutPanel);
 			base.Controls.Add(flowLayoutPanel);
 			games.Dock = DockStyle.Fill;
 			games.View = View.Details;
@@ -8867,8 +9913,8 @@ namespace EmulatorHub
 				UpdateSelectionCommands();
 			};
 			RefreshGames();
-            InitializePolish();
-            InitializeHubLibrary();
+			InitializePolish();
+			InitializeHubLibrary();
 		}
 
 		private void AddButton(FlowLayoutPanel panel, string text, Action action)
@@ -8951,7 +9997,10 @@ namespace EmulatorHub
 			RefreshGames();
 		}
 
-		private void RefreshGames() { RefreshLibraryRows(); }
+		private void RefreshGames()
+		{
+			RefreshLibraryRows();
+		}
 
 		private GameEntry SelectedGame()
 		{
@@ -9089,10 +10138,12 @@ namespace EmulatorHub
 			}
 		}
 
-        private void SyncFolders() {
-            var found=BackgroundWork<List<GameEntry>>.Run(this,"Scan game folders",(token,progress)=>LibraryJobs.Scan(library,token,progress));
-            Hub.PreviewImport(this,library,found);RefreshGames();
-        }
+		private void SyncFolders()
+		{
+			List<GameEntry> found = BackgroundWork<List<GameEntry>>.Run(this, "Scan game folders", (CancellationToken token, Action<string> progress) => LibraryJobs.Scan(library, token, progress));
+			Hub.PreviewImport(this, library, found);
+			RefreshGames();
+		}
 
 		private void ShowDuplicates()
 		{
@@ -9251,7 +10302,10 @@ namespace EmulatorHub
 			return DateTime.TryParse(text, out result) ? result : DateTime.MinValue;
 		}
 
-		private void ApplyArtworkView() { ApplyLazyArtwork(); }
+		private void ApplyArtworkView()
+		{
+			ApplyLazyArtwork();
+		}
 
 		public void RefreshFilterChoices()
 		{
@@ -9320,13 +10374,27 @@ namespace EmulatorHub
 			RefreshGames();
 		}
 
-        private void ToggleGameView() {
-            RememberNavigation();bool next=!artworkView;var settings=UserTools.Ensure(library);LibraryNavigation saved;
-            artworkView=next;library.Experience.LibraryView=next?"Artwork":"Details";
-            if(settings.Views!=null&&settings.Views.TryGetValue(next?"Artwork":"Details",out saved)){settings.Navigation=UserTools.Copy(saved);RestoreNavigation();}
-            else settings.Navigation=null;
-            RefreshGames();RememberNavigation();Store.Save(library);
-        }
+		private void ToggleGameView()
+		{
+			RememberNavigation();
+			bool flag = !artworkView;
+			UserToolSettings userToolSettings = UserTools.Ensure(library);
+			artworkView = flag;
+			library.Experience.LibraryView = (flag ? "Artwork" : "Details");
+			LibraryNavigation value;
+			if (userToolSettings.Views != null && userToolSettings.Views.TryGetValue(flag ? "Artwork" : "Details", out value))
+			{
+				userToolSettings.Navigation = UserTools.Copy(value);
+				RestoreNavigation();
+			}
+			else
+			{
+				userToolSettings.Navigation = null;
+			}
+			RefreshGames();
+			RememberNavigation();
+			Store.Save(library);
+		}
 
 		private void BulkEditGames()
 		{
@@ -9351,6 +10419,1100 @@ namespace EmulatorHub
 		{
 			scope.SelectedItem = "Collection: " + name;
 			RefreshGames();
+		}
+
+		private void AddActionGroup(FlowLayoutPanel bar, string title, Action<ContextMenuStrip> build)
+		{
+			ContextMenuStrip menu = CompactMenus.Menu();
+			FishBowlActionButton button = ExperienceUi.Button(title + " ▾", delegate
+			{
+			});
+			button.Tag = menu;
+			button.Click += delegate
+			{
+				ToolStripItem[] array = menu.Items.Cast<ToolStripItem>().ToArray();
+				foreach (ToolStripItem toolStripItem in array)
+				{
+					toolStripItem.Dispose();
+				}
+				menu.Items.Clear();
+				menu.BackColor = FishBowlPalette.ThemeSurface;
+				menu.ForeColor = FishBowlPalette.ThemeInk;
+				build(menu);
+				menu.Show(button, new Point(0, button.Height));
+			};
+			button.Disposed += delegate
+			{
+				menu.Dispose();
+			};
+			bar.Controls.Add(button);
+		}
+
+		private void GroupAction(ContextMenuStrip menu, string text, Action action, bool selected = false)
+		{
+			ToolStripMenuItem toolStripMenuItem = new ToolStripMenuItem(text);
+			toolStripMenuItem.Enabled = !selected || SelectedGame() != null;
+			toolStripMenuItem.ForeColor = FishBowlPalette.ThemeInk;
+			ToolStripMenuItem toolStripMenuItem2 = toolStripMenuItem;
+			toolStripMenuItem2.Click += delegate
+			{
+				try
+				{
+					action();
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show(this, ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				}
+			};
+			menu.Items.Add(toolStripMenuItem2);
+		}
+
+		private void BuildCompactActions(FlowLayoutPanel bar)
+		{
+			AddButton(bar, "Add game", AddGame);
+			AddButton(bar, "Launch", LaunchGame);
+			AddButton(bar, "Details", ShowDetails);
+			AddActionGroup(bar, "Game actions", delegate(ContextMenuStrip menu)
+			{
+				GroupAction(menu, "Edit game", EditGame, true);
+                GroupAction(menu, "Identify game and retain icon", delegate
+                {
+                    var selected = SelectedGame();
+                    if (selected == null) return;
+                    bool automaticTitle = selected.Title == Path.GetFileNameWithoutExtension(selected.Path) || selected.Title == "New game";
+                    GameRecognition.Apply(selected, library.Emulators, automaticTitle);
+                    Store.Save(library);
+                    RefreshGames();
+                }, true);
+				GroupAction(menu, "Game extensions...", delegate
+				{
+					Hub.GameOptions(this, library, SelectedGame());
+					RefreshGames();
+				}, true);
+				GroupAction(menu, "Online metadata and cover...", delegate
+				{
+					Hub.Metadata(this, library, SelectedGame());
+					RefreshGames();
+				}, true);
+				GroupAction(menu, "Open game folder", OpenGameFolder, true);
+				GroupAction(menu, "Saves and history", ShowSaves, true);
+				GroupAction(menu, "Progress and rating", EditProgress, true);
+				menu.Items.Add(new ToolStripSeparator());
+				GroupAction(menu, "Pin / unpin", TogglePinned, true);
+				GroupAction(menu, "Favorite / unfavorite", ToggleFavorite, true);
+				GroupAction(menu, "Bulk edit selected games", BulkEditGames, true);
+				GroupAction(menu, "Preview metadata", PreviewMetadata, true);
+				GroupAction(menu, "Add to play queue", delegate
+				{
+					LibraryAdditions.Enqueue(library, SelectedGame());
+					Store.Save(library);
+				}, true);
+			});
+			AddActionGroup(bar, "Library tools", delegate(ContextMenuStrip menu)
+			{
+				GroupAction(menu, "List / artwork view", ToggleGameView);
+				GroupAction(menu, "Library extensions...", delegate
+				{
+					Hub.Show(this, library);
+					ReloadLibrary();
+				});
+				GroupAction(menu, "Collections", CreateCollection);
+				GroupAction(menu, "Smart lists", delegate
+				{
+					LibraryAdditions.SmartLists(this, library);
+				});
+				GroupAction(menu, "Play queue", delegate
+				{
+					LibraryAdditions.Queue(this, library, SelectedGame());
+				});
+				GroupAction(menu, "Surprise me", delegate
+				{
+					LibraryAdditions.Surprise(this, library);
+				});
+				menu.Items.Add(new ToolStripSeparator());
+				GroupAction(menu, "Sync folders", SyncFolders);
+				GroupAction(menu, "Find duplicates", ShowDuplicates);
+				GroupAction(menu, "Repair game paths", RepairGames);
+				GroupAction(menu, "Export current view to CSV", delegate
+				{
+					LibraryAdditions.Export(this, VisibleGames());
+				});
+				GroupAction(menu, "User tools...", delegate
+				{
+					UserTools.Show(this, library, delegate
+					{
+						foreach (MainForm item in Application.OpenForms.OfType<MainForm>())
+						{
+							item.RefreshUserToolsViews(library);
+						}
+						FishBowlPalette.StyleWindow(this);
+						RefreshGames();
+					});
+					RefreshGames();
+				});
+			});
+			foreach (Button item2 in bar.Controls.OfType<Button>())
+			{
+				item2.Height = Math.Max(38, item2.Height);
+				item2.Font = new Font("Bahnschrift", 10f, FontStyle.Regular);
+			}
+		}
+
+		private void FitLibraryHeader()
+		{
+			if (fittingHeader || search.Parent == null)
+			{
+				return;
+			}
+			Panel panel = search.Parent as Panel;
+			if (panel == null)
+			{
+				return;
+			}
+			fittingHeader = true;
+			try
+			{
+				List<Label> list = (from l in panel.Controls.OfType<Label>()
+					orderby l.Top
+					select l).ToList();
+				FlowLayoutPanel flowLayoutPanel = panel.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+				if (list.Count < 2 || flowLayoutPanel == null)
+				{
+					return;
+				}
+				int num = Math.Max(200, panel.ClientSize.Width - panel.Padding.Horizontal - flowLayoutPanel.Padding.Horizontal - 8);
+				foreach (ComboBox item in flowLayoutPanel.Controls.OfType<ComboBox>())
+				{
+					int val = TextRenderer.MeasureText(item.Text, item.Font).Width + 42;
+					item.Width = Math.Max(120, Math.Min(300, val));
+				}
+				int num2 = 0;
+				int num3 = 0;
+				int num4 = 0;
+				foreach (Control control in flowLayoutPanel.Controls)
+				{
+					int val = control.Width + control.Margin.Horizontal;
+					int val2 = Math.Max(control.Height, control.Font.Height + 12) + control.Margin.Vertical;
+					if (num3 > 0 && num3 + val > num)
+					{
+						num2 += num4;
+						num4 = 0;
+						num3 = 0;
+					}
+					num3 += val;
+					num4 = Math.Max(num4, val2);
+				}
+				flowLayoutPanel.Height = Math.Max(66, num2 + num4 + flowLayoutPanel.Padding.Vertical);
+				list[0].Location = new Point(18, 12);
+				list[1].Location = new Point(20, list[0].Bottom + 5);
+				if (search.Font.Height > 20)
+				{
+					int num5 = list[1].Bottom + 8;
+					search.Location = new Point(20, num5);
+					search.Width = Math.Max(180, Math.Min(350, num / 2 - 12));
+					scope.Width = Math.Max(180, Math.Min(320, num - search.Width - 12));
+					scope.Location = new Point(search.Right + 12, num5);
+					panel.Height = Math.Max(132, num5 + Math.Max(search.Height, scope.Height) + flowLayoutPanel.Height + 20);
+				}
+				else
+				{
+					scope.Width = 170;
+					scope.Location = new Point(panel.ClientSize.Width - 190, 22);
+					search.Width = 210;
+					search.Location = new Point(scope.Left - 220, 22);
+					panel.Height = Math.Max(132, list[1].Bottom + flowLayoutPanel.Height + 12);
+				}
+			}
+			finally
+			{
+				fittingHeader = false;
+			}
+		}
+
+		private void InitializePolish()
+		{
+			if (polishReady)
+			{
+				return;
+			}
+			polishReady = true;
+			games.ShowItemToolTips = true;
+			games.AccessibleDescription = "Use arrows to choose games, Enter to launch, and Tab to reach game actions.";
+			games.KeyDown += delegate(object a, KeyEventArgs b)
+			{
+				if (b.KeyCode == Keys.Return)
+				{
+					LaunchGame();
+					b.Handled = true;
+				}
+				else if (b.KeyCode == Keys.Escape)
+				{
+					search.Clear();
+					b.Handled = true;
+				}
+			};
+			scope.AccessibleName = "Library scope";
+			consoleChoice.AccessibleName = "Console filter";
+			emulatorChoice.AccessibleName = "Emulator filter";
+			saveChoice.AccessibleName = "Save status filter";
+			sortChoice.AccessibleName = "Game sorting";
+			tagChoice.AccessibleName = "Tag filter";
+			emptyState = new Panel
+			{
+				Dock = DockStyle.Fill,
+				Visible = false,
+				BackColor = FishBowlPalette.ThemeSurface
+			};
+			Label label = new Label();
+			label.Dock = DockStyle.Top;
+			label.Height = 100;
+			label.Padding = new Padding(24);
+			label.ForeColor = FishBowlPalette.ThemeInk;
+			label.Text = "No games yet. Add a game or scan a configured game folder to begin.";
+			Label label2 = label;
+			emptyState.Controls.Add(label2);
+			FlowLayoutPanel flowLayoutPanel = ExperienceUi.Bar();
+			flowLayoutPanel.Dock = DockStyle.Top;
+			flowLayoutPanel.Controls.Add(ExperienceUi.Button("Add game", AddGame));
+			flowLayoutPanel.Controls.Add(ExperienceUi.Button("Clear filters", delegate
+			{
+				buildingLibraryFilters = true;
+				search.Clear();
+				tagChoice.Clear();
+				scope.SelectedIndex = 0;
+				consoleChoice.SelectedIndex = 0;
+				emulatorChoice.SelectedIndex = 0;
+				saveChoice.SelectedIndex = 0;
+				buildingLibraryFilters = false;
+				RefreshGames();
+			}));
+			flowLayoutPanel.Controls.Add(ExperienceUi.Button("Check Library health", delegate
+			{
+				Polish.HealthScreen(this, library);
+			}));
+			emptyState.Controls.Add(flowLayoutPanel);
+			emptyState.Controls.SetChildIndex(label2, 0);
+			base.Controls.Add(emptyState);
+			emptyState.BringToFront();
+			polishTimer.Tick += delegate
+			{
+				if (searchQueued && DateTime.UtcNow >= searchDue)
+				{
+					searchQueued = false;
+					RefreshGames();
+				}
+				LoadVisibleArtwork();
+				RememberNavigation();
+			};
+			polishTimer.Start();
+			base.Shown += delegate
+			{
+				FitLibraryHeader();
+				RestoreNavigation();
+				RefreshGames();
+			};
+			base.SizeChanged += delegate
+			{
+				FitLibraryHeader();
+			};
+			foreach (Control item in NextUi.Descendants(this))
+			{
+				item.FontChanged += delegate
+				{
+					FitLibraryHeader();
+				};
+			}
+			base.FormClosing += delegate
+			{
+				RememberNavigation();
+				if (!UserTools.Guest)
+				{
+					Store.Save(library);
+				}
+			};
+			base.Disposed += delegate
+			{
+				polishTimer.Stop();
+				polishTimer.Dispose();
+			};
+		}
+
+		private void QueueLibraryRefresh()
+		{
+			if (!buildingLibraryFilters)
+			{
+				searchQueued = true;
+				searchDue = DateTime.UtcNow.AddMilliseconds(180.0);
+			}
+		}
+
+		private void RememberNavigation()
+		{
+			if (!polishReady || buildingLibraryFilters || refreshingRows || UserTools.Guest)
+			{
+				return;
+			}
+			UserToolSettings userToolSettings = UserTools.Ensure(library);
+			if (viewUser != userToolSettings.ActiveId)
+			{
+				return;
+			}
+			string topId = null;
+			try
+			{
+				if (games.View == View.Details && games.TopItem != null)
+				{
+					topId = ((GameEntry)games.TopItem.Tag).Id;
+				}
+				else
+				{
+					ListViewItem itemAt = games.GetItemAt(20, 20);
+					if (itemAt != null)
+					{
+						topId = ((GameEntry)itemAt.Tag).Id;
+					}
+				}
+			}
+			catch (InvalidOperationException)
+			{
+			}
+			userToolSettings.Navigation = new LibraryNavigation
+			{
+				Search = search.Text,
+				Scope = scope.Text,
+				Console = consoleChoice.Text,
+				Emulator = emulatorChoice.Text,
+				Saves = saveChoice.Text,
+				Sort = sortChoice.Text,
+				Tags = tagChoice.Text,
+				SelectedId = ((SelectedGame() == null) ? null : SelectedGame().Id),
+				TopId = topId,
+				Artwork = artworkView
+			};
+			if (userToolSettings.Views == null)
+			{
+				userToolSettings.Views = new Dictionary<string, LibraryNavigation>();
+			}
+			userToolSettings.Views[artworkView ? "Artwork" : "Details"] = UserTools.Copy(userToolSettings.Navigation);
+		}
+
+		private void RestoreNavigation()
+		{
+			UserToolSettings userToolSettings = UserTools.Ensure(library);
+			viewUser = userToolSettings.ActiveId;
+			LibraryNavigation navigation = userToolSettings.Navigation;
+			if (navigation == null)
+			{
+				return;
+			}
+			buildingLibraryFilters = true;
+			try
+			{
+				search.Text = navigation.Search ?? "";
+				tagChoice.Text = navigation.Tags ?? "";
+				Tuple<ComboBox, string>[] array = new Tuple<ComboBox, string>[5]
+				{
+					Tuple.Create(scope, navigation.Scope),
+					Tuple.Create(consoleChoice, navigation.Console),
+					Tuple.Create(emulatorChoice, navigation.Emulator),
+					Tuple.Create(saveChoice, navigation.Saves),
+					Tuple.Create(sortChoice, navigation.Sort)
+				};
+				foreach (Tuple<ComboBox, string> tuple in array)
+				{
+					if (tuple.Item2 != null && tuple.Item1.Items.Contains(tuple.Item2))
+					{
+						tuple.Item1.SelectedItem = tuple.Item2;
+					}
+				}
+				artworkView = navigation.Artwork;
+				library.Experience.LibraryView = (artworkView ? "Artwork" : "Details");
+			}
+			finally
+			{
+				buildingLibraryFilters = false;
+			}
+		}
+
+		private void RefreshLibraryRows()
+		{
+			if (buildingLibraryFilters)
+			{
+				return;
+			}
+			bool flag = polishReady && viewUser != UserTools.Ensure(library).ActiveId;
+			if (flag)
+			{
+				RestoreNavigation();
+			}
+			bool flag2 = flag;
+			HashSet<string> hashSet = new HashSet<string>(from ListViewItem x in games.SelectedItems
+				select ((GameEntry)x.Tag).Id);
+			if (flag2)
+			{
+				hashSet.Clear();
+			}
+			string text = null;
+			try
+			{
+				if (!flag2 && games.View == View.Details && games.TopItem != null)
+				{
+					text = ((GameEntry)games.TopItem.Tag).Id;
+				}
+			}
+			catch (InvalidOperationException)
+			{
+			}
+			List<GameEntry> list = VisibleGames().ToList();
+			HashSet<string> wanted = new HashSet<string>(list.Select((GameEntry g) => g.Id));
+			if (DateTime.UtcNow > statExpiry)
+			{
+				fileSizes.Clear();
+				statExpiry = DateTime.UtcNow.AddSeconds(10.0);
+			}
+			Dictionary<string, EmulatorProfile> dictionary = (from e in library.Emulators
+				group e by e.Id).ToDictionary((IGrouping<string, EmulatorProfile> g) => g.Key, (IGrouping<string, EmulatorProfile> g) => g.First());
+			bool flag3 = !(from ListViewItem x in games.Items
+				select ((GameEntry)x.Tag).Id).SequenceEqual(list.Select((GameEntry g) => g.Id));
+			refreshingRows = true;
+			games.BeginUpdate();
+			try
+			{
+				string[] array = reusableRows.Keys.Where((string k) => !wanted.Contains(k)).ToArray();
+				foreach (string key in array)
+				{
+					foreach (HashSet<ListViewItem> value4 in slotOwners.Values)
+					{
+						value4.Remove(reusableRows[key]);
+					}
+					games.Items.Remove(reusableRows[key]);
+					reusableRows.Remove(key);
+				}
+				foreach (GameEntry item in list)
+				{
+					ListViewItem value;
+					if (!reusableRows.TryGetValue(item.Id, out value))
+					{
+						ListViewItem listViewItem = new ListViewItem(new string[5] { "", "", "", "", "" });
+						listViewItem.Tag = item;
+						listViewItem.ImageIndex = 0;
+						value = listViewItem;
+						reusableRows[item.Id] = value;
+						games.Items.Add(value);
+					}
+					value.Tag = item;
+					EmulatorProfile value2;
+					dictionary.TryGetValue(string.IsNullOrWhiteSpace(item.PreferredEmulatorId) ? (item.EmulatorId ?? "") : item.PreferredEmulatorId, out value2);
+					if (value2 == null && library.Emulators.Count == 1)
+					{
+						value2 = library.Emulators[0];
+					}
+					string text2 = item.Path ?? "";
+					string value3;
+					if (!fileSizes.TryGetValue(text2, out value3))
+					{
+						try
+						{
+							FileInfo fileInfo = new FileInfo(text2);
+							value3 = (fileInfo.Exists ? FormatBytes(fileInfo.Length) : "Missing");
+						}
+						catch
+						{
+							value3 = "Unavailable";
+						}
+						fileSizes[text2] = value3;
+					}
+					if (Hub.Native(item))
+					{
+						value2 = Hub.NativeProfile(item);
+					}
+					string[] array2 = new string[5]
+					{
+						(item.Pinned ? "● " : "") + (item.Favorite ? "★ " : "") + item.Title + ((library.Cosmetics != null && library.Cosmetics.PlatformLabels && !string.IsNullOrWhiteSpace(item.ConsoleLabel)) ? (" [" + item.ConsoleLabel + "]") : ""),
+						(value2 == null) ? "Not assigned" : value2.Name,
+						text2,
+						value3,
+						string.IsNullOrWhiteSpace(item.LastLaunched) ? "Never" : item.LastLaunched
+					};
+					for (int l = 0; l < array2.Length; l++)
+					{
+						if (value.SubItems[l].Text != array2[l])
+						{
+							value.SubItems[l].Text = array2[l];
+						}
+					}
+					value.ToolTipText = ((value3 == "Missing") ? "Missing game file. Use Library tools → Repair game paths." : ((value2 == null) ? "Assign an emulator in Game actions → Edit game." : "Enter or double-click to launch. Game actions contains editing and saves."));
+					value.Selected = hashSet.Contains(item.Id);
+				}
+				if (flag3 && list.Count > 0)
+				{
+					Dictionary<string, int> p = list.Select((GameEntry g, int i) => new
+					{
+						Id = g.Id,
+						Index = i
+					}).ToDictionary(x => x.Id, x => x.Index);
+					games.ListViewItemSorter = new RowOrder(p);
+					games.Sort();
+					games.ListViewItemSorter = null;
+				}
+				ApplyArtworkView();
+				if (hashSet.Count == 0 && polishReady)
+				{
+					LibraryNavigation navigation = UserTools.Ensure(library).Navigation;
+					if (navigation != null && !string.IsNullOrWhiteSpace(navigation.SelectedId) && reusableRows.ContainsKey(navigation.SelectedId))
+					{
+						reusableRows[navigation.SelectedId].Selected = true;
+					}
+					if (text == null && navigation != null)
+					{
+						text = navigation.TopId;
+					}
+				}
+				if (text != null && reusableRows.ContainsKey(text))
+				{
+					if (games.View == View.Details)
+					{
+						games.TopItem = reusableRows[text];
+					}
+					else
+					{
+						reusableRows[text].EnsureVisible();
+					}
+				}
+			}
+			finally
+			{
+				games.EndUpdate();
+				refreshingRows = false;
+			}
+			if (emptyState != null)
+			{
+				games.Visible = list.Count > 0;
+				emptyState.Visible = list.Count == 0;
+				emptyState.Controls.OfType<Label>().First().Text = ((library.Games.Count == 0) ? "No games yet. Add a game or scan a configured folder from Library tools." : "No games match these filters. Clear filters to show your Library, or check Library health for missing files.");
+				if (emptyState.Visible)
+				{
+					emptyState.BringToFront();
+				}
+			}
+			UpdateSelectionCommands();
+			RememberNavigation();
+		}
+
+		private void ApplyLazyArtwork()
+		{
+			UpdateDetailPane();
+			games.TileSize = new Size(Math.Max(130, library.Experience.ArtworkSize + 24), library.Experience.ArtworkSize + ((library.Cosmetics != null && library.Cosmetics.LibrarySpacing == "Compact") ? 32 : 55));
+			games.View = ((!artworkView) ? View.Details : View.LargeIcon);
+			ApplyHubSpacing();
+			if (!artworkView)
+			{
+				return;
+			}
+			int num = Math.Max(64, Math.Min(192, library.Experience.ArtworkSize));
+			string text = Json.Serialize(CosmeticRuntime.Current) + "|" + FishBowlPalette.ThemeSurface.ToArgb() + "|" + FishBowlPalette.ThemeInk.ToArgb() + "|" + FishBowlPalette.IconAccent.ToArgb();
+			if (num != artSize || text != artStyle || coverImages.Images.Count == 0)
+			{
+				thumbnailSlots.Clear();
+				slotOwners.Clear();
+				nextSlot = 1;
+				coverImages.Images.Clear();
+				coverImages.ImageSize = new Size(num, num);
+				IntPtr handle = coverImages.Handle;
+				using (Bitmap value = MakeThumbnail(null, "?", num))
+				{
+					coverImages.Images.Add(value);
+				}
+				artSize = num;
+				artStyle = text;
+				foreach (ListViewItem item in games.Items)
+				{
+					item.ImageIndex = 0;
+				}
+			}
+			LoadVisibleArtwork();
+		}
+
+		public static Bitmap MakeThumbnail(string path, string title, int size)
+		{
+			Bitmap bitmap = new Bitmap(size, size);
+			using (Graphics graphics = Graphics.FromImage(bitmap))
+			{
+				graphics.Clear(FishBowlPalette.ThemeSurface);
+				bool flag = false;
+				try
+				{
+					if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+					{
+						using (Image image = Image.FromFile(path))
+						{
+							if (image.Width < 12000 && image.Height < 12000)
+							{
+								graphics.DrawImage(image, new Rectangle(4, 4, size - 8, size - 8));
+								flag = true;
+							}
+						}
+					}
+				}
+				catch
+				{
+				}
+				if (!flag)
+				{
+					using (Font font = new Font("Segoe UI", Math.Max(8, size / 3), FontStyle.Bold))
+					{
+						FishBowlText.DrawText(graphics, string.IsNullOrWhiteSpace(title) ? "?" : title.Substring(0, 1).ToUpperInvariant(), font, new Rectangle(0, 0, size, size), FishBowlPalette.ThemeInk, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+					}
+				}
+				CosmeticRuntime.DecorateArtwork(bitmap);
+			}
+			return bitmap;
+		}
+
+		private void LoadVisibleArtwork()
+		{
+			if (!polishReady || !artworkView || thumbnailBusy || !games.Visible || !games.IsHandleCreated || games.Items.Count == 0)
+			{
+				return;
+			}
+			HashSet<ListViewItem> hashSet = new HashSet<ListViewItem>();
+			for (int i = 8; i < games.ClientSize.Height; i += 32)
+			{
+				for (int j = 8; j < games.ClientSize.Width; j += 32)
+				{
+					ListViewItem itemAt = games.GetItemAt(j, i);
+					if (itemAt != null)
+					{
+						hashSet.Add(itemAt);
+					}
+				}
+			}
+			int use;
+			foreach (ListViewItem item in hashSet)
+			{
+				GameEntry gameEntry = item.Tag as GameEntry;
+				if (gameEntry == null)
+				{
+					continue;
+				}
+				long num = 0L;
+				try
+				{
+					if (File.Exists(gameEntry.ArtworkPath))
+					{
+						num = File.GetLastWriteTimeUtc(gameEntry.ArtworkPath).Ticks;
+					}
+				}
+				catch
+				{
+				}
+				string key = (gameEntry.ArtworkPath ?? "") + "|" + gameEntry.Title + "|" + gameEntry.ConsoleLabel + "|" + num + "|" + artSize + "|" + artStyle;
+				int value;
+				if (thumbnailSlots.TryGetValue(key, out value))
+				{
+					item.ImageIndex = value;
+					if (!slotOwners.ContainsKey(value))
+					{
+						slotOwners[value] = new HashSet<ListViewItem>();
+					}
+					slotOwners[value].Add(item);
+					continue;
+				}
+				thumbnailBusy = true;
+				string path = gameEntry.ArtworkPath;
+				string title = gameEntry.Title;
+				string platform = gameEntry.ConsoleLabel;
+				bool badge = library.Cosmetics != null && library.Cosmetics.PlatformLabels;
+				int size = artSize;
+				string style = artStyle;
+				Task.Factory.StartNew(() => Hub.PlatformThumbnail(path, title, platform, size, badge)).ContinueWith(delegate(Task<Bitmap> task)
+				{
+					if (task.IsFaulted)
+					{
+						thumbnailBusy = false;
+					}
+					else
+					{
+						Bitmap bitmap = task.Result;
+						if (!base.IsDisposed && !base.Disposing && base.IsHandleCreated)
+						{
+							try
+							{
+								BeginInvoke((Action)delegate
+								{
+									try
+									{
+										if (!base.IsDisposed && !base.Disposing && artSize == size && !(artStyle != style))
+										{
+											use = nextSlot++;
+											if (use >= 128)
+											{
+												nextSlot = 2;
+												use = 1;
+											}
+											if (use < coverImages.Images.Count)
+											{
+												string[] array = (from k in thumbnailSlots
+													where k.Value == use
+													select k.Key).ToArray();
+												foreach (string key2 in array)
+												{
+													thumbnailSlots.Remove(key2);
+												}
+												HashSet<ListViewItem> value2;
+												if (slotOwners.TryGetValue(use, out value2))
+												{
+													foreach (ListViewItem item2 in value2)
+													{
+														if (item2.ListView == games)
+														{
+															item2.ImageIndex = 0;
+														}
+													}
+												}
+												coverImages.Images[use] = bitmap;
+											}
+											else
+											{
+												coverImages.Images.Add(bitmap);
+											}
+											thumbnailSlots[key] = use;
+											slotOwners[use] = new HashSet<ListViewItem> { item };
+											if (item.ListView == games)
+											{
+												item.ImageIndex = use;
+											}
+										}
+									}
+									finally
+									{
+										bitmap.Dispose();
+										thumbnailBusy = false;
+									}
+								});
+								return;
+							}
+							catch (InvalidOperationException)
+							{
+								bitmap.Dispose();
+								thumbnailBusy = false;
+								return;
+							}
+						}
+						bitmap.Dispose();
+					}
+				});
+				break;
+			}
+		}
+
+		[DllImport("user32.dll")]
+		private static extern IntPtr SendMessage(IntPtr hwnd, int message, IntPtr wparam, IntPtr lparam);
+
+		private void ApplyHubSpacing()
+		{
+			if (games.Columns.Count >= 5 && games.ClientSize.Width > 0)
+			{
+				int num = games.Columns.Cast<ColumnHeader>().Take(games.Columns.Count - 1).Sum((ColumnHeader c) => c.Width);
+				games.Columns[games.Columns.Count - 1].Width = Math.Max(130, games.ClientSize.Width - num - SystemInformation.VerticalScrollBarWidth);
+			}
+			int num2 = ((library.Cosmetics != null && library.Cosmetics.LibrarySpacing == "Compact") ? Math.Max(FluidStyle.Roomier ? 24 : 18, games.Font.Height + (FluidStyle.Roomier ? 8 : 4)) : Math.Max(FluidStyle.Roomier ? 34 : 28, games.Font.Height + (FluidStyle.Roomier ? 18 : 12)));
+			if (densityImages == null)
+			{
+				densityImages = new ImageList
+				{
+					ColorDepth = ColorDepth.Depth32Bit
+				};
+				games.SmallImageList = densityImages;
+			}
+			if (num2 != densityHeight)
+			{
+				densityImages.Images.Clear();
+				densityImages.ImageSize = new Size(1, num2);
+				IntPtr handle = densityImages.Handle;
+				using (Bitmap value = new Bitmap(1, num2))
+				{
+					densityImages.Images.Add(value);
+				}
+				densityHeight = num2;
+			}
+			if (artworkView && games.IsHandleCreated)
+			{
+				int num3 = Math.Max(110, library.Experience.ArtworkSize + 32);
+				int num4 = library.Experience.ArtworkSize + ((library.Cosmetics != null && library.Cosmetics.LibrarySpacing == "Compact") ? 38 : 65);
+				SendMessage(games.Handle, 4149, IntPtr.Zero, new IntPtr((num4 << 16) | num3));
+			}
+		}
+
+		private void InitializeHubLibrary()
+		{
+			StartImmersionLibrary();
+			base.KeyPreview = true;
+			base.KeyDown += delegate(object a, KeyEventArgs b)
+			{
+				if (base.TopLevel && b.Control && b.KeyCode == Keys.K)
+				{
+					b.SuppressKeyPress = true;
+					MainForm mainForm = Application.OpenForms.OfType<MainForm>().FirstOrDefault();
+					if (mainForm != null)
+					{
+						mainForm.OpenCommandSearch();
+					}
+					else
+					{
+						using (GlobalSearchDialog globalSearchDialog = new GlobalSearchDialog(library.Games.Select((GameEntry g) => new SearchResult
+						{
+							Caption = "Game: " + g.Title,
+							Open = delegate
+							{
+								Hub.GameOptions(this, library, g);
+							}
+						}).Concat(new SearchResult[1]
+						{
+							new SearchResult
+							{
+								Caption = "Library extensions",
+								Open = delegate
+								{
+									Hub.Show(this, library);
+								}
+							}
+						})))
+						{
+							globalSearchDialog.ShowDialog(this);
+							Action selectedAction = globalSearchDialog.SelectedAction;
+							if (selectedAction != null)
+							{
+								BeginInvoke(selectedAction);
+							}
+						}
+					}
+					ReloadOnVisit();
+					b.SuppressKeyPress = true;
+				}
+			};
+			detailPane = new Panel
+			{
+				Dock = DockStyle.Right,
+				Width = 265,
+				Visible = false,
+				Padding = new Padding(12),
+				BackColor = FishBowlPalette.ThemeSurface
+			};
+			detailCover = new PictureBox
+			{
+				Dock = DockStyle.Top,
+				Height = 220,
+				SizeMode = PictureBoxSizeMode.Zoom
+			};
+			detailText = new TextBox
+			{
+				Dock = DockStyle.Fill,
+				ReadOnly = true,
+				Multiline = true,
+				ScrollBars = ScrollBars.Vertical,
+				BorderStyle = BorderStyle.None,
+				ForeColor = FishBowlPalette.ThemeInk,
+				BackColor = FishBowlPalette.ThemeSurface,
+				AccessibleName = "Selected game details"
+			};
+			detailPane.Controls.Add(detailText);
+			detailPane.Controls.Add(detailCover);
+			Panel panel = new Panel();
+			panel.Dock = DockStyle.Fill;
+			Panel panel2 = panel;
+			base.Controls.Remove(games);
+			base.Controls.Remove(emptyState);
+			panel2.Controls.Add(games);
+			panel2.Controls.Add(emptyState);
+			panel2.Controls.Add(detailPane);
+			base.Controls.Add(panel2);
+			panel2.BringToFront();
+			base.SizeChanged += delegate
+			{
+				UpdateDetailPane();
+				ApplyHubSpacing();
+			};
+			games.SelectedIndexChanged += delegate
+			{
+				UpdateDetailPane();
+			};
+			base.Disposed += delegate
+			{
+				if (detailCover.Image != null)
+				{
+					detailCover.Image.Dispose();
+				}
+				games.SmallImageList = null;
+				if (densityImages != null)
+				{
+					densityImages.Dispose();
+				}
+			};
+		}
+
+		private void UpdateDetailPane()
+		{
+			RefreshImmersionBackdrop();
+			if (detailPane == null)
+			{
+				return;
+			}
+			detailPane.Visible = library.Cosmetics != null && library.Cosmetics.DetailPreview && base.ClientSize.Width >= 900;
+			GameEntry gameEntry = SelectedGame();
+			string text = ((gameEntry == null) ? "" : (gameEntry.Id + "|" + gameEntry.ArtworkPath + "|" + gameEntry.Description));
+			if (text == detailStamp)
+			{
+				return;
+			}
+			detailStamp = text;
+			Image image = detailCover.Image;
+			detailCover.Image = null;
+			if (image != null)
+			{
+				image.Dispose();
+			}
+			detailText.Text = ((gameEntry == null) ? "Select a game to preview its cover and details." : (gameEntry.Title + "\r\n" + gameEntry.ConsoleLabel + "\r\n" + gameEntry.Genre + "\r\n" + gameEntry.Description));
+			if (gameEntry == null || !File.Exists(gameEntry.ArtworkPath))
+			{
+				return;
+			}
+			try
+			{
+				using (Image image2 = Image.FromFile(gameEntry.ArtworkPath))
+				{
+					if (image2.Width < 12000 && image2.Height < 12000)
+					{
+						detailCover.Image = new Bitmap(image2, new Size(220, 200));
+					}
+				}
+			}
+			catch
+			{
+			}
+		}
+
+		private void RefreshImmersionBackdrop()
+		{
+			GameEntry gameEntry = SelectedGame();
+			ImmersionSettings immersionSettings = Immersion.Ensure(library);
+			string text = ((immersionSettings.Backdrops && gameEntry != null) ? (gameEntry.Id + "|" + Immersion.ArtworkStamp(gameEntry.ArtworkPath) + "|" + FishBowlPalette.ThemeSurface.ToArgb()) : "");
+			if (!(text == immersionStamp))
+			{
+				immersionStamp = text;
+				games.BackgroundImage = null;
+				if (immersionBackdrop != null)
+				{
+					immersionBackdrop.Dispose();
+					immersionBackdrop = null;
+				}
+				if (text.Length > 0)
+				{
+					immersionBackdrop = Immersion.Dimmed(gameEntry.ArtworkPath, 960, 540, games.BackColor);
+				}
+				games.BackgroundImage = immersionBackdrop;
+			}
+		}
+
+		private void StartImmersionLibrary()
+		{
+			games.SelectedIndexChanged += delegate
+			{
+				RefreshImmersionBackdrop();
+				if (Focused || base.ContainsFocus)
+				{
+					Immersion.Sound(library, false);
+				}
+			};
+			base.Disposed += delegate
+			{
+				games.BackgroundImage = null;
+				if (immersionBackdrop != null)
+				{
+					immersionBackdrop.Dispose();
+				}
+			};
+		}
+
+		private static void Mix(ref ulong hash, string value)
+		{
+			hash = (hash ^ (uint)((value != null) ? value.GetHashCode() : 0)) * 1099511628211L;
+		}
+
+		private ulong VisitStamp()
+		{
+			ulong hash = 1469598103934665603uL;
+			foreach (GameEntry game in library.Games)
+			{
+				string[] array = new string[26]
+				{
+					game.Id, game.Title, game.Path, game.EmulatorId, game.PreferredEmulatorId, game.ArtworkPath, game.LastLaunched, game.AddedAt, game.Genre, game.Developer,
+					game.ReleaseYear, game.ConsoleLabel, game.PlayStatus, game.Notes, game.Description, game.ManualPath, game.Arguments, game.TitleId, game.EmulatorCore, game.CompatibilityNotes,
+					game.LaunchProfileName, game.PreferredBuildId, game.ControllerProfileId, game.LastDiscPath, game.SaveCopyPreference, game.SessionTrackingNote
+				};
+				foreach (string value in array)
+				{
+					Mix(ref hash, value);
+				}
+				hash = (hash ^ (ulong)game.TotalPlaySeconds ^ (ulong)game.LaunchCount ^ (ulong)game.PersonalRating ^ (ulong)(game.Pinned ? 71 : 0) ^ (ulong)(game.Favorite ? 131 : 0)) * 1099511628211L;
+				foreach (string item in game.Tags ?? new List<string>())
+				{
+					Mix(ref hash, item);
+				}
+				foreach (string item2 in game.Discs ?? new List<string>())
+				{
+					Mix(ref hash, item2);
+				}
+				foreach (GameSaveEntry item3 in game.Saves ?? new List<GameSaveEntry>())
+				{
+					Mix(ref hash, item3.Path);
+					Mix(ref hash, item3.Kind);
+				}
+				if (game.Extras == null)
+				{
+					continue;
+				}
+				Mix(ref hash, game.Extras.Native.ToString());
+				Mix(ref hash, game.Extras.WorkingDirectory);
+				Mix(ref hash, game.Extras.TrailerUrl);
+				Mix(ref hash, game.Extras.MetadataSource);
+				if (game.Extras.Fields == null)
+				{
+					continue;
+				}
+				foreach (KeyValuePair<string, string> field in game.Extras.Fields)
+				{
+					Mix(ref hash, field.Key);
+					Mix(ref hash, field.Value);
+				}
+			}
+			Mix(ref hash, Json.Serialize(new object[8]
+			{
+				library.Emulators,
+				library.Collections,
+				library.Experience,
+				library.Cosmetics,
+				UserTools.Ensure(library).ActiveId,
+				library.Theme.Name,
+				library.Theme.AccentColor,
+				library.Enhancements.TextPercent
+			}));
+			return hash;
+		}
+
+		public void ReloadOnVisit()
+		{
+			ulong num = VisitStamp();
+			ulong? num2 = visitStamp;
+			ulong num3 = num;
+			if (num2.GetValueOrDefault() != num3 || !num2.HasValue || !((DateTime.UtcNow - visitScan).TotalSeconds < 10.0))
+			{
+				ReloadLibrary();
+				VisitRefreshCount++;
+				visitStamp = VisitStamp();
+				visitScan = DateTime.UtcNow;
+			}
 		}
 	}
 	public class CollectionsDialog : FishBowlDialog
@@ -9539,11 +11701,12 @@ namespace EmulatorHub
 
 		private readonly List<EmulatorProfile> emulators;
 
+		private string suggestedTitle;
+
 		public GameEntry Game { get; private set; }
 
 		public GameDialog(GameEntry existing, IEnumerable<EmulatorProfile> profiles)
 		{
-			GameDialog gameDialog = this;
 			emulators = profiles.ToList();
 			Text = "Edit Game";
 			base.StartPosition = FormStartPosition.CenterParent;
@@ -9561,7 +11724,7 @@ namespace EmulatorHub
 				BackColor = BackColor
 			};
 			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78f));
+			tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110f));
 			base.Controls.Add(tableLayoutPanel);
 			AddRow(tableLayoutPanel, "Title", title, null, 0);
 			AddRow(tableLayoutPanel, "Game file", path, PickGame, 2);
@@ -9611,7 +11774,7 @@ namespace EmulatorHub
 			fishBowlActionButton.FlatAppearance.BorderSize = 0;
 			fishBowlActionButton.Click += delegate
 			{
-				gameDialog.Save(existing);
+				Save(existing);
 			};
 			FishBowlActionButton value = new FishBowlActionButton
 			{
@@ -9620,9 +11783,22 @@ namespace EmulatorHub
 				Location = new Point(440, 454),
 				Size = new Size(82, 28)
 			};
-			base.Controls.Add(favorite);
-			base.Controls.Add(fishBowlActionButton);
-			base.Controls.Add(value);
+			var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 12, 0, 0) };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            favorite.Anchor = AnchorStyles.Left;
+            fishBowlActionButton.AutoSize = value.AutoSize = true;
+            fishBowlActionButton.MinimumSize = value.MinimumSize = new Size(90, 32);
+            footer.Controls.Add(favorite, 0, 0);
+            footer.Controls.Add(fishBowlActionButton, 1, 0);
+            footer.Controls.Add(value, 2, 0);
+            tableLayoutPanel.Controls.Add(footer, 0, 12);
+            tableLayoutPanel.SetColumnSpan(footer, 2);
+            for (int row = 0; row < 11; row++) tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            tableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            notes.MinimumSize = new Size(0, 100);
 			title.Text = existing.Title;
 			path.Text = existing.Path;
 			artwork.Text = existing.ArtworkPath;
@@ -9630,6 +11806,8 @@ namespace EmulatorHub
 			notes.Text = existing.Notes;
 			favorite.Checked = existing.Favorite;
 			preferredEmulator.SelectedIndex = Math.Max(0, preferredEmulator.Items.Cast<EmulatorChoice>().ToList().FindIndex((EmulatorChoice item) => item.Id == existing.PreferredEmulatorId));
+            suggestedTitle = (existing.Title == "New game" || string.IsNullOrWhiteSpace(existing.Title) || existing.Title == GameRecognition.CleanTitle(existing.Path ?? "")) ? existing.Title : null;
+            path.Leave += delegate { SuggestGame(); };
 		}
 
 		private void AddRow(TableLayoutPanel form, string label, Control input, EventHandler browse, int row)
@@ -9666,8 +11844,25 @@ namespace EmulatorHub
 			}
 		}
 
-		private void PickGame(object sender, EventArgs args)
-		{
+		private void SuggestGame()
+        {
+            if (!File.Exists(path.Text.Trim())) return;
+            using (var recognized = GameRecognition.Inspect(path.Text.Trim()))
+            {
+                var matches = emulators.Where(e => (e.Extensions ?? new List<string>()).Any(ext => ext.TrimStart('.').Equals(Path.GetExtension(path.Text.Trim()).TrimStart('.'), StringComparison.OrdinalIgnoreCase))).ToList();
+                if (preferredEmulator.SelectedIndex == 0 && matches.Count == 1)
+                    preferredEmulator.SelectedIndex = preferredEmulator.Items.Cast<EmulatorChoice>().ToList().FindIndex(c => c.Id == matches[0].Id);
+                var choice = preferredEmulator.SelectedItem as EmulatorChoice;
+                var emulator = emulators.FirstOrDefault(e => choice != null && e.Id == choice.Id);
+                string installed = InstalledGames.Find(emulator, recognized.TitleId, path.Text.Trim());
+                if (recognized.Icon == null && installed != null) InstalledGames.Metadata(installed, recognized);
+                if (string.IsNullOrWhiteSpace(title.Text) || title.Text == "New game" || title.Text == suggestedTitle)
+                { title.Text = recognized.Title; suggestedTitle = recognized.Title; }
+            }
+        }
+
+        private void PickGame(object sender, EventArgs args)
+        {
 			OpenFileDialog openFileDialog = new OpenFileDialog();
 			openFileDialog.Filter = "All files (*.*)|*.*";
 			using (OpenFileDialog openFileDialog2 = openFileDialog)
@@ -9675,6 +11870,7 @@ namespace EmulatorHub
 				if (openFileDialog2.ShowDialog(this) == DialogResult.OK)
 				{
 					path.Text = openFileDialog2.FileName;
+                    SuggestGame();
 				}
 			}
 		}
@@ -9709,6 +11905,7 @@ namespace EmulatorHub
 			Game.Notes = notes.Text.Trim();
 			Game.PreferredEmulatorId = ((emulatorChoice == null) ? null : emulatorChoice.Id);
 			Game.Favorite = favorite.Checked;
+            GameRecognition.Apply(Game, emulators, false);
 		}
 	}
 	public class StartupAssistantDialog : FishBowlDialog
@@ -10009,24 +12206,44 @@ namespace EmulatorHub
 			}
 		}
 	}
-    public class ResultsDialog : FishBowlDialog {
-        public ResultsDialog(string title,IEnumerable<string> rows){
-            Text=title;StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(720,400);
-            BackColor=FishBowlPalette.DeepSeaSurface;FormBorderStyle=FormBorderStyle.Sizable;
-            FishBowlPromptBranding.ApplyAppIcon(this);
-            Controls.Add(new TextBox {
-                Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,WordWrap=true,ScrollBars=ScrollBars.Vertical,
-                BorderStyle=BorderStyle.None,BackColor=FishBowlPalette.DeepSeaSurface,ForeColor=FishBowlPalette.ThemeInk,
-                Font=new Font("Bahnschrift",10f),Text=string.Join("\r\n\r\n",rows??Enumerable.Empty<string>()),
-                AccessibleName=title+" messages",TabStop=true
-            });
-        }
-    }
+	public class ResultsDialog : FishBowlDialog
+	{
+		public ResultsDialog(string title, IEnumerable<string> rows)
+		{
+			Text = title;
+			if (title == "FishBowl Notifications")
+			{
+				Controls.Add(new Label { Text = "FishBowl Notifications", AutoSize = true, Font = new Font("Bahnschrift", 16f, FontStyle.Bold), ForeColor = FishBowlPalette.IconAccent });
+				var close = new FishBowlActionButton { Text = "Close", DialogResult = DialogResult.OK };
+				Controls.Add(close); AcceptButton = close; CancelButton = close;
+			}
+
+			base.StartPosition = FormStartPosition.CenterParent;
+			base.ClientSize = new Size(720, 400);
+			BackColor = FishBowlPalette.DeepSeaSurface;
+			base.FormBorderStyle = FormBorderStyle.Sizable;
+			FishBowlPromptBranding.ApplyAppIcon(this);
+			base.Controls.Add(new TextBox
+			{
+				Dock = DockStyle.Fill,
+				Multiline = true,
+				ReadOnly = true,
+				WordWrap = true,
+				ScrollBars = ScrollBars.Vertical,
+				BorderStyle = BorderStyle.None,
+				BackColor = FishBowlPalette.DeepSeaSurface,
+				ForeColor = FishBowlPalette.ThemeInk,
+				Font = new Font("Bahnschrift", 10f),
+				Text = string.Join("\r\n\r\n", rows ?? Enumerable.Empty<string>()),
+				AccessibleName = title + " messages",
+				TabStop = true
+			});
+		}
+	}
 	public class GameDetailsDialog : FishBowlDialog
 	{
 		public GameDetailsDialog(GameEntry game, EmulatorProfile emulator)
 		{
-			GameDetailsDialog owner = this;
 			Text = game.Title;
 			base.StartPosition = FormStartPosition.CenterParent;
 			base.ClientSize = new Size(560, 386);
@@ -10077,7 +12294,7 @@ namespace EmulatorHub
 			{
 				using (GameExtrasDialog gameExtrasDialog = new GameExtrasDialog(game))
 				{
-					gameExtrasDialog.ShowDialog(owner);
+					gameExtrasDialog.ShowDialog(this);
 				}
 			};
 			base.Controls.Add(fishBowlActionButton);
@@ -10210,8 +12427,8 @@ namespace EmulatorHub
 			fishBowlActionButton2.FlatAppearance.BorderSize = 0;
 			fishBowlActionButton2.Click += delegate
 			{
-				game.CompatibilityNotes = gameExtrasDialog.compatibility.Text.Trim();
-				game.ManualPath = gameExtrasDialog.manual.Text.Trim();
+				game.CompatibilityNotes = compatibility.Text.Trim();
+				game.ManualPath = manual.Text.Trim();
 			};
 			base.Controls.Add(fishBowlActionButton2);
 			base.Controls.Add(new FishBowlActionButton
@@ -11007,7 +13224,9 @@ namespace EmulatorHub
 			int num = 0;
 			foreach (GameEntry game in list)
 			{
-				if (!library.Games.Any((GameEntry g) => string.Equals(g.Path, game.Path, StringComparison.OrdinalIgnoreCase)))
+				List<GameEntry> games = library.Games;
+				Func<GameEntry, bool> predicate = (GameEntry g) => string.Equals(g.Path, game.Path, StringComparison.OrdinalIgnoreCase);
+				if (!games.Any(predicate))
 				{
 					library.Games.Add(game);
 					num++;
@@ -11395,7 +13614,7 @@ namespace EmulatorHub
 			});
 			base.Controls.Add(new TextBox
 			{
-				Text = "• Home, Emulators and Library now share one workspace.\r\n• Customizable Home cards, recent games, pinned games, attention and save review.\r\n• Folder saves, snapshot history, verified restores, bundles and retention.\r\n• Persistent grouped save notifications with quiet hours and per-game preferences.\r\n• Artwork view, bulk edits, reviewed multi-disc organization and undo.\r\n• Readiness tools, portable paths, optional synced-folder backups and safer restore points.",
+				Text = "• Menu navigation uses buffered surfaces and retains unchanged Home content.\r\n• Idle events no longer repeatedly repaint every open window. Theme changes and new controls still update.\r\n• Welcome, update notes, storage prompts and startup notifications share matching headers, logos, spacing and action footers.\r\n• Startup buttons have room for their labels and icons at larger text sizes. Notification text supports scrolling and keyboard focus.\r\n• Installed 3DS games use their main content metadata when launched. Game names and available icons are retained locally.",
 				ReadOnly = true,
 				Multiline = true,
 				BorderStyle = BorderStyle.None,
@@ -12883,8 +15102,8 @@ namespace EmulatorHub
 		public static GraphicsPath Round(RectangleF box, float radius)
 		{
 			GraphicsPath graphicsPath = new GraphicsPath();
-			radius = CosmeticRuntime.Current.CornerRadius == 6 ? radius : Math.Max(0, Math.Min(20,CosmeticRuntime.Current.CornerRadius));
-            float num = Math.Min(radius * 2f, Math.Min(box.Width, box.Height));
+			radius = ((CosmeticRuntime.Current.CornerRadius == 6) ? radius : ((float)Math.Max(0, Math.Min(20, CosmeticRuntime.Current.CornerRadius))));
+			float num = Math.Min(radius * 2f, Math.Min(box.Width, box.Height));
 			if (num <= 0f)
 			{
 				graphicsPath.AddRectangle(box);
@@ -12901,11 +15120,26 @@ namespace EmulatorHub
 		public static string IconForText(string text)
 		{
 			string text2 = (text ?? "").Trim().ToLowerInvariant();
-            if (text2.StartsWith("launch") || text2.StartsWith("play")) return "play";
-            if (text2.StartsWith("details")) return "info";
-            if (text2.StartsWith("game actions")) return "edit";
-            if (text2.StartsWith("library tools")) return "layers";
-            if (text2=="more" || text2.StartsWith("manage")) return "settings";
+			if (text2.StartsWith("launch") || text2.StartsWith("play"))
+			{
+				return "play";
+			}
+			if (text2.StartsWith("details"))
+			{
+				return "info";
+			}
+			if (text2.StartsWith("game actions"))
+			{
+				return "edit";
+			}
+			if (text2.StartsWith("library tools"))
+			{
+				return "layers";
+			}
+			if (text2 == "more" || text2.StartsWith("manage"))
+			{
+				return "settings";
+			}
 			if (text2.Contains("favorite") || text2.Contains("favour"))
 			{
 				return (text2.Contains("★") || text2.Contains("favorited")) ? "star-filled" : "star";
@@ -13027,8 +15261,11 @@ namespace EmulatorHub
 
 		public static Image Icon(string kind, int size, Color ink, Color accent)
 		{
-			if (CosmeticRuntime.Current.IconStyle == "Monochrome") accent = ink;
-            string key = CosmeticRuntime.Current.IconStyle + "|" + CosmeticRuntime.Current.CornerRadius + "|" + kind + "|" + size + "|" + ink.ToArgb() + "|" + accent.ToArgb();
+			if (CosmeticRuntime.Current.IconStyle == "Monochrome")
+			{
+				accent = ink;
+			}
+			string key = CosmeticRuntime.Current.IconStyle + "|" + CosmeticRuntime.Current.CornerRadius + "|" + kind + "|" + size + "|" + ink.ToArgb() + "|" + accent.ToArgb();
 			lock (iconCacheLock)
 			{
 				Image value;
@@ -13056,12 +15293,12 @@ namespace EmulatorHub
 				Graphics g = Graphics.FromImage(image);
 				try
 				{
-					Pen pen = new Pen(ink, CosmeticRuntime.Current.IconStyle == "Filled" ? 3.4f : 2.3f);
+					Pen pen = new Pen(ink, (CosmeticRuntime.Current.IconStyle == "Filled") ? 3.4f : 2.3f);
 					try
 					{
 						using (Pen pen4 = new Pen(accent, 2.3f))
 						{
-							SolidBrush wash = new SolidBrush(Color.FromArgb(CosmeticRuntime.Current.IconStyle == "Filled" ? 150 : 0, ink));
+							SolidBrush wash = new SolidBrush(Color.FromArgb((CosmeticRuntime.Current.IconStyle == "Filled") ? 150 : 0, ink));
 							try
 							{
 								g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -13069,12 +15306,14 @@ namespace EmulatorHub
 								Pen pen2 = pen;
 								Pen pen3 = pen;
 								LineCap lineCap2 = (pen4.EndCap = LineCap.Round);
-								lineCap2 = (pen4.StartCap = lineCap2);
-								lineCap2 = (pen3.EndCap = lineCap2);
-								pen2.StartCap = lineCap2;
+								LineCap lineCap3 = lineCap2;
+								lineCap2 = (pen4.StartCap = lineCap3);
+								lineCap3 = lineCap2;
+								lineCap2 = (pen3.EndCap = lineCap3);
+								lineCap3 = (pen2.StartCap = lineCap2);
 								Pen pen5 = pen;
 								LineJoin lineJoin2 = (pen4.LineJoin = LineJoin.Round);
-								pen5.LineJoin = lineJoin2;
+								LineJoin lineJoin4 = (pen5.LineJoin = lineJoin2);
 								Action<float, float, float, float, float> action = delegate(float x, float y, float w, float h, float r)
 								{
 									using (GraphicsPath path2 = Round(new RectangleF(x, y, w, h), r))
@@ -13504,18 +15743,64 @@ namespace EmulatorHub
 		public Color AccentColor = FishBowlPalette.IconAccent;
 
 		public bool ManagementPages;
-        public int PreferredColumns; public bool RoomyHeaders;
-        private bool legacyHeaders;
-        public bool LegacyHeaders {get{return legacyHeaders;}set{legacyHeaders=value;SetStyle(ControlStyles.UserPaint|ControlStyles.ResizeRedraw|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,value);if(value){NativeHeaders=false;DrawMode=TabDrawMode.OwnerDrawFixed;Appearance=TabAppearance.FlatButtons;}Invalidate();}}
-        private bool nativeHeaders;
-        public bool NativeHeaders {get{return nativeHeaders;}set{if(nativeHeaders==value)return;nativeHeaders=value;DrawMode=value?TabDrawMode.Normal:TabDrawMode.OwnerDrawFixed;Appearance=value?TabAppearance.Normal:TabAppearance.FlatButtons;}}
 
-        protected override void OnFontChanged(EventArgs e) {
-            base.OnFontChanged(e);
-            if (PreferredColumns>0) {FitTabs();Invalidate();}
-        }
+		public int PreferredColumns;
+
+		public bool RoomyHeaders;
+
+		private bool legacyHeaders;
+
+		private bool nativeHeaders;
 
 		private bool fittingTabs;
+
+		public bool LegacyHeaders
+		{
+			get
+			{
+				return legacyHeaders;
+			}
+			set
+			{
+				if (legacyHeaders == value) return;
+				legacyHeaders = value;
+				SetStyle(ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, value);
+				if (value)
+				{
+					NativeHeaders = false;
+					base.DrawMode = TabDrawMode.OwnerDrawFixed;
+					base.Appearance = TabAppearance.FlatButtons;
+				}
+				Invalidate();
+			}
+		}
+
+		public bool NativeHeaders
+		{
+			get
+			{
+				return nativeHeaders;
+			}
+			set
+			{
+				if (nativeHeaders != value)
+				{
+					nativeHeaders = value;
+					base.DrawMode = ((!value) ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal);
+					base.Appearance = ((!value) ? TabAppearance.FlatButtons : TabAppearance.Normal);
+				}
+			}
+		}
+
+		protected override void OnFontChanged(EventArgs e)
+		{
+			base.OnFontChanged(e);
+			if (PreferredColumns > 0)
+			{
+				FitTabs();
+				Invalidate();
+			}
+		}
 
 		public FishBowlTabs()
 		{
@@ -13525,6 +15810,7 @@ namespace EmulatorHub
 			base.Multiline = true;
 			base.SizeMode = TabSizeMode.Fixed;
 			base.Padding = new Point(8, 4);
+			LegacyHeaders = true;
 		}
 
 		public void FitTabs()
@@ -13536,12 +15822,12 @@ namespace EmulatorHub
 			fittingTabs = true;
 			try
 			{
-				int preferredWidth=PreferredColumns>0 && TabPages.Count>0 ? Math.Max(190,TabPages.Cast<TabPage>().Max(page=>TextRenderer.MeasureText(page.Text,Font).Width+32)) : 190;
-                int num = PreferredColumns>0 ? Math.Min(PreferredColumns,Math.Max(1,ClientSize.Width/preferredWidth)) : ((ManagementPages && base.ClientSize.Width >= 900) ? 6 : 3);
-				int num2 = Math.Max(100, (base.ClientSize.Width - (num - 1) * 10 - 8) / num);
-				if (base.ItemSize.Width != num2 || base.ItemSize.Height != Math.Max(RoomyHeaders?44:36, Font.Height + (RoomyHeaders?22:14)))
+				int num = ((PreferredColumns > 0 && base.TabPages.Count > 0) ? Math.Max(190, base.TabPages.Cast<TabPage>().Max((TabPage page) => TextRenderer.MeasureText(page.Text, Font).Width + 32)) : 190);
+				int num2 = ((PreferredColumns > 0) ? Math.Min(PreferredColumns, Math.Max(1, base.ClientSize.Width / num)) : ((ManagementPages && base.ClientSize.Width >= 900) ? 6 : 3));
+				int num3 = Math.Max(100, (base.ClientSize.Width - (num2 - 1) * 10 - 8) / num2);
+				if (base.ItemSize.Width != num3 || base.ItemSize.Height != Math.Max(RoomyHeaders ? 44 : 36, Font.Height + (RoomyHeaders ? 22 : 14)))
 				{
-					base.ItemSize = new Size(num2, Math.Max(RoomyHeaders?44:36, Font.Height + (RoomyHeaders?22:14)));
+					base.ItemSize = new Size(num3, Math.Max(RoomyHeaders ? 44 : 36, Font.Height + (RoomyHeaders ? 22 : 14)));
 				}
 			}
 			finally
@@ -13590,10 +15876,32 @@ namespace EmulatorHub
 			Invalidate();
 		}
 
+		protected override void OnPaintBackground(PaintEventArgs e)
+		{
+			if (!LegacyHeaders) { base.OnPaintBackground(e); return; }
+			GraphicsState state = e.Graphics.Save();
+			try
+			{
+				e.Graphics.ExcludeClip(DisplayRectangle);
+				using (SolidBrush brush = new SolidBrush(SurfaceColor)) e.Graphics.FillRectangle(brush, ClientRectangle);
+			}
+			finally { e.Graphics.Restore(state); }
+		}
+
 		protected override void OnPaint(PaintEventArgs e)
 		{
-            if(!LegacyHeaders){base.OnPaint(e);return;}
-			using(var background=new SolidBrush(SurfaceColor)){var saved=e.Graphics.Save();e.Graphics.ExcludeClip(DisplayRectangle);e.Graphics.FillRectangle(background,ClientRectangle);e.Graphics.Restore(saved);}
+			if (!LegacyHeaders)
+			{
+				base.OnPaint(e);
+				return;
+			}
+			using (SolidBrush brush = new SolidBrush(SurfaceColor))
+			{
+				GraphicsState gstate = e.Graphics.Save();
+				e.Graphics.ExcludeClip(DisplayRectangle);
+				e.Graphics.FillRectangle(brush, base.ClientRectangle);
+				e.Graphics.Restore(gstate);
+			}
 			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 			for (int i = 0; i < base.TabPages.Count; i++)
 			{
@@ -13603,16 +15911,16 @@ namespace EmulatorHub
 				bool flag = base.SelectedIndex == i;
 				using (GraphicsPath path = FishBowlVisuals.Round(rectangle, 5f))
 				{
-					using (SolidBrush brush = new SolidBrush(flag ? FishBowlHighlights.Blend(SurfaceColor) : SurfaceColor))
+					using (SolidBrush brush2 = new SolidBrush(flag ? FishBowlHighlights.Blend(SurfaceColor) : SurfaceColor))
 					{
-						e.Graphics.FillPath(brush, path);
+						e.Graphics.FillPath(brush2, path);
 					}
 				}
 				if (flag)
 				{
-					using (SolidBrush brush = new SolidBrush(Color.FromArgb((int)(120+135*SectionMotion.For(this).Progress),AccentColor)))
+					using (SolidBrush brush2 = new SolidBrush(Color.FromArgb((int)(120f + 135f * SectionMotion.For(this).Progress), AccentColor)))
 					{
-						e.Graphics.FillRectangle(brush, rectangle.Left + 7, rectangle.Bottom - 3, Math.Max(1, rectangle.Width - 14), 2);
+						e.Graphics.FillRectangle(brush2, rectangle.Left + 7, rectangle.Bottom - 3, Math.Max(1, rectangle.Width - 14), 2);
 					}
 				}
 				int num = rectangle.Left + 8;
@@ -13630,47 +15938,82 @@ namespace EmulatorHub
 				e.Graphics.DrawRectangle(pen, rect);
 			}
 		}
+
 		protected override void OnDrawItem(DrawItemEventArgs e)
 		{
-			if(NativeHeaders){base.OnDrawItem(e);return;}
-            if(e.Index<0||e.Index>=TabPages.Count)return;
-            using(var brush=new SolidBrush(SurfaceColor))e.Graphics.FillRectangle(brush,e.Bounds);
-			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-			for (int i = e.Index; i == e.Index; i++)
+			if (NativeHeaders)
 			{
-				TabPage tabPage = base.TabPages[i];
-				Rectangle tabRect = GetTabRect(i);
-				Rectangle rectangle = Rectangle.Inflate(tabRect, -2, -2);
-				bool flag = base.SelectedIndex == i;
-				using (GraphicsPath path = FishBowlVisuals.Round(rectangle, 5f))
-				{
-					using (SolidBrush brush = new SolidBrush(flag ? FishBowlHighlights.Blend(SurfaceColor) : SurfaceColor))
-					{
-						e.Graphics.FillPath(brush, path);
-					}
-				}
-				if (flag)
-				{
-					using (SolidBrush brush = new SolidBrush(Color.FromArgb((int)(120+135*SectionMotion.For(this).Progress),AccentColor)))
-					{
-						e.Graphics.FillRectangle(brush, rectangle.Left + 7, rectangle.Bottom - 3, Math.Max(1, rectangle.Width - 14), 2);
-					}
-				}
-				int num = rectangle.Left + 8;
-				if (base.ImageList != null && tabPage.ImageIndex >= 0 && tabPage.ImageIndex < base.ImageList.Images.Count)
-				{
-					e.Graphics.DrawImage(base.ImageList.Images[tabPage.ImageIndex], new Rectangle(num, rectangle.Top + (rectangle.Height - 18) / 2, 18, 18));
-					num += 24;
-				}
-				Color foreColor = (flag ? HeaderTextColor : FishBowlHighlights.Blend(SurfaceColor, 150));
-				FishBowlText.DrawText(e.Graphics, tabPage.Text, Font, new Rectangle(num, rectangle.Top, Math.Max(1, rectangle.Right - num - 5), rectangle.Height), foreColor, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter);
+				base.OnDrawItem(e);
 			}
-
+			else
+			{
+				if (e.Index < 0 || e.Index >= base.TabPages.Count)
+				{
+					return;
+				}
+				using (SolidBrush brush = new SolidBrush(SurfaceColor))
+				{
+					e.Graphics.FillRectangle(brush, e.Bounds);
+				}
+				e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+				for (int i = e.Index; i == e.Index; i++)
+				{
+					TabPage tabPage = base.TabPages[i];
+					Rectangle tabRect = GetTabRect(i);
+					Rectangle rectangle = Rectangle.Inflate(tabRect, -2, -2);
+					bool flag = base.SelectedIndex == i;
+					using (GraphicsPath path = FishBowlVisuals.Round(rectangle, 5f))
+					{
+						using (SolidBrush brush = new SolidBrush(flag ? FishBowlHighlights.Blend(SurfaceColor) : SurfaceColor))
+						{
+							e.Graphics.FillPath(brush, path);
+						}
+					}
+					if (flag)
+					{
+						using (SolidBrush brush = new SolidBrush(Color.FromArgb((int)(120f + 135f * SectionMotion.For(this).Progress), AccentColor)))
+						{
+							e.Graphics.FillRectangle(brush, rectangle.Left + 7, rectangle.Bottom - 3, Math.Max(1, rectangle.Width - 14), 2);
+						}
+					}
+					int num = rectangle.Left + 8;
+					if (base.ImageList != null && tabPage.ImageIndex >= 0 && tabPage.ImageIndex < base.ImageList.Images.Count)
+					{
+						e.Graphics.DrawImage(base.ImageList.Images[tabPage.ImageIndex], new Rectangle(num, rectangle.Top + (rectangle.Height - 18) / 2, 18, 18));
+						num += 24;
+					}
+					Color foreColor = (flag ? HeaderTextColor : FishBowlHighlights.Blend(SurfaceColor, 150));
+					FishBowlText.DrawText(e.Graphics, tabPage.Text, Font, new Rectangle(num, rectangle.Top, Math.Max(1, rectangle.Right - num - 5), rectangle.Height), foreColor, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter);
+				}
+			}
 		}
-        protected override void WndProc(ref Message m){
-            if(!NativeHeaders && !LegacyHeaders && m.Msg==0x14 && m.WParam!=IntPtr.Zero){using(var update=NativeSurfacePainting.UpdateRegion(Handle)){if(update!=null)using(var graphics=Graphics.FromHdc(m.WParam)){graphics.SetClip(update,System.Drawing.Drawing2D.CombineMode.Intersect);graphics.ExcludeClip(DisplayRectangle);using(var brush=new SolidBrush(SurfaceColor))graphics.FillRectangle(brush,ClientRectangle);}}m.Result=new IntPtr(1);return;}base.WndProc(ref m);
-        }
 
+		protected override void WndProc(ref Message m)
+		{
+			if (!NativeHeaders && !LegacyHeaders && m.Msg == 20 && m.WParam != IntPtr.Zero)
+			{
+				using (Region region = NativeSurfacePainting.UpdateRegion(base.Handle))
+				{
+					if (region != null)
+					{
+						using (Graphics graphics = Graphics.FromHdc(m.WParam))
+						{
+							graphics.SetClip(region, CombineMode.Intersect);
+							graphics.ExcludeClip(DisplayRectangle);
+							using (SolidBrush brush = new SolidBrush(SurfaceColor))
+							{
+								graphics.FillRectangle(brush, base.ClientRectangle);
+							}
+						}
+					}
+				}
+				m.Result = new IntPtr(1);
+			}
+			else
+			{
+				base.WndProc(ref m);
+			}
+		}
 	}
 	public class SmoothListView : ListView
 	{
@@ -13687,6 +16030,12 @@ namespace EmulatorHub
 
 		private static Color secondaryAccent = Color.FromArgb(67, 220, 187);
 
+		private static readonly object imageLock = new object();
+
+		private static Bitmap imageCache;
+
+		private static string imageCacheKey;
+
 		[DllImport("user32.dll", CharSet = CharSet.Auto)]
 		private static extern bool DestroyIcon(IntPtr handle);
 
@@ -13697,8 +16046,35 @@ namespace EmulatorHub
 			secondaryAccent = currentSecondaryAccent;
 		}
 
-        static readonly object imageLock=new object();static Bitmap imageCache;static string imageCacheKey;
-        public static Image CreateImage(){lock(imageLock){Color light,deep;GetColors(out light,out deep);string key=light.ToArgb()+"|"+deep.ToArgb();if(imageCache==null||imageCacheKey!=key){using(var next=BuildImage()){if(next==null)return null;var replacement=new Bitmap(next);if(imageCache!=null)imageCache.Dispose();imageCache=replacement;imageCacheKey=key;}}return (Image)imageCache.Clone();}}
+		public static Image CreateImage()
+		{
+			lock (imageLock)
+			{
+				Color light;
+				Color deep;
+				GetColors(out light, out deep);
+				string text = light.ToArgb() + "|" + deep.ToArgb();
+				if (imageCache == null || imageCacheKey != text)
+				{
+					using (Image image = BuildImage())
+					{
+						if (image == null)
+						{
+							return null;
+						}
+						Bitmap bitmap = new Bitmap(image);
+						if (imageCache != null)
+						{
+							imageCache.Dispose();
+						}
+						imageCache = bitmap;
+						imageCacheKey = text;
+					}
+				}
+				return (Image)imageCache.Clone();
+			}
+		}
+
 		private static Image BuildImage()
 		{
 			try
@@ -13895,6 +16271,8 @@ namespace EmulatorHub
 	public static class FishBowlPalette
 	{
 		private static readonly HashSet<Form> styledForms = new HashSet<Form>();
+		private static readonly Dictionary<Form, int> styledRevisions = new Dictionary<Form, int>();
+		private static int paletteRevision;
 
 		private static Color ink = Color.FromArgb(231, 241, 255);
 
@@ -14008,6 +16386,7 @@ namespace EmulatorHub
 
 		public static void Configure(Color newInk, Color newTop, Color newBottom, Color newSurface, Color newSubtle, Color newAccent, Color newSecondaryAccent)
 		{
+			if (ink != newInk || top != newTop || bottom != newBottom || surface != newSurface || subtle != EnsureReadable(newSubtle, newSurface) || accent != newAccent || secondaryAccent != newSecondaryAccent) paletteRevision++;
 			ink = newInk;
 			top = newTop;
 			bottom = newBottom;
@@ -14020,24 +16399,38 @@ namespace EmulatorHub
 		public static void StyleOpenWindows()
 		{
 			Form[] array = Application.OpenForms.Cast<Form>().ToArray();
-			foreach (Form form in array)
+			Form[] array2 = array;
+			foreach (Form form in array2)
 			{
-				StyleWindow(form);
+				int revision;
+				if (!styledRevisions.TryGetValue(form, out revision) || revision != paletteRevision) StyleWindow(form);
 			}
 		}
 
 		public static void StyleWindow(Form form)
 		{
-			if (form == null) return;
-            if (!styledForms.Add(form)) { StyleControl(form); form.Invalidate(true); return; }
-            if (form != null)
+			if (form == null || form.IsDisposed || form.Disposing)
+			{
+				return;
+			}
+			styledRevisions[form] = paletteRevision;
+			if (!styledForms.Add(form))
+			{
+				StyleControl(form);
+				form.Invalidate(true);
+			}
+			else if (form != null)
 			{
 				ApplyAppIcon(form);
 				StyleControl(form);
-				if(!(form is FishBowlDialog)) form.Paint += DrawOceanZones;
+				if (!(form is FishBowlDialog))
+				{
+					form.Paint += DrawOceanZones;
+				}
 				form.Disposed += delegate
 				{
 					styledForms.Remove(form);
+					styledRevisions.Remove(form);
 				};
 				form.ControlAdded += delegate(object sender, ControlEventArgs e)
 				{
@@ -14054,19 +16447,24 @@ namespace EmulatorHub
 			{
 				return;
 			}
-			var paintState=e.Graphics.Save();
-            try {
-            NativeSurfacePainting.ExcludeChildren(e.Graphics,form);
-			using (LinearGradientBrush brush = new LinearGradientBrush(form.ClientRectangle, top, bottom, LinearGradientMode.Vertical))
+			GraphicsState gstate = e.Graphics.Save();
+			try
 			{
-				e.Graphics.FillRectangle(brush, form.ClientRectangle);
+				NativeSurfacePainting.ExcludeChildren(e.Graphics, form);
+				using (LinearGradientBrush brush = new LinearGradientBrush(form.ClientRectangle, top, bottom, LinearGradientMode.Vertical))
+				{
+					e.Graphics.FillRectangle(brush, form.ClientRectangle);
+				}
+				CosmeticRuntime.DrawBackdrop(e.Graphics, form.ClientRectangle);
+				using (SolidBrush brush2 = new SolidBrush(Color.FromArgb(18, accent)))
+				{
+					e.Graphics.FillEllipse(brush2, new Rectangle(form.ClientSize.Width / 3, -form.ClientSize.Height / 5, form.ClientSize.Width * 2 / 3, form.ClientSize.Height / 2));
+				}
 			}
-            CosmeticRuntime.DrawBackdrop(e.Graphics,form.ClientRectangle);
-			using (SolidBrush brush2 = new SolidBrush(Color.FromArgb(18, accent)))
+			finally
 			{
-				e.Graphics.FillEllipse(brush2, new Rectangle(form.ClientSize.Width / 3, -form.ClientSize.Height / 5, form.ClientSize.Width * 2 / 3, form.ClientSize.Height / 2));
+				e.Graphics.Restore(gstate);
 			}
-            }finally{e.Graphics.Restore(paintState);}
 		}
 
 		private static void ApplyAppIcon(Form form)
@@ -14085,10 +16483,6 @@ namespace EmulatorHub
 				form.Icon = ownedIcon;
 				form.Disposed += delegate
 				{
-					if (form.Icon == ownedIcon)
-					{
-						form.Icon = null;
-					}
 					ownedIcon.Dispose();
 				};
 			}
@@ -14099,41 +16493,74 @@ namespace EmulatorHub
 
 		private static void StyleControl(Control control)
 		{
+			ConsistentInputs.Watch(control, StyleControl);
+			SmoothPainting.Enable(control);
 			control.BackColor = ReplaceBackground(control.BackColor);
 			control.ForeColor = ReplaceForeground(control.ForeColor);
-            if (control is Button) { control.BackColor = MenuSelection; control.ForeColor = ink; }
-            else if (control is TextBoxBase || control is ComboBox || control is NumericUpDown || control is ListBox || control is ListView) {
-                control.BackColor = DeepSeaSurface; control.ForeColor = ink;
-            }
-            ComboBox choice = control as ComboBox;
-            if (choice != null) {
-                choice.FlatStyle = FlatStyle.Standard;
-                choice.DrawMode = DrawMode.Normal;
-            }
-
-            ListView list = control as ListView;
-            if (list != null && !list.OwnerDraw) {
-                list.OwnerDraw = true;
-                list.DrawColumnHeader += delegate(object sender, DrawListViewColumnHeaderEventArgs e) {
-                    using (SolidBrush brush = new SolidBrush(ThemeSurface)) e.Graphics.FillRectangle(brush,e.Bounds);
-                    FishBowlText.DrawText(e.Graphics,e.Header.Text,list.Font,new Rectangle(e.Bounds.X+6,e.Bounds.Y,e.Bounds.Width-8,e.Bounds.Height),EnsureReadable(ThemeInk,ThemeSurface),TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
-                };
-                list.DrawItem += delegate(object sender, DrawListViewItemEventArgs e) { e.DrawDefault = list.View != View.Details || list.CheckBoxes || list.SmallImageList != null; };
-                list.DrawSubItem += delegate(object sender, DrawListViewSubItemEventArgs e) {
-                    if (list.CheckBoxes || list.SmallImageList != null) { e.DrawDefault=true; return; }
-                    Color fill=e.Item.Selected ? CosmeticRuntime.Selection : list.BackColor;
-                    using (SolidBrush brush = new SolidBrush(fill)) e.Graphics.FillRectangle(brush,e.Bounds);
-                    if (CosmeticRuntime.Badge(e.Graphics,e.Bounds,e.SubItem.Text,list.Font)) return;
-                    FishBowlText.DrawText(e.Graphics,e.SubItem.Text,list.Font,new Rectangle(e.Bounds.X+5,e.Bounds.Y,e.Bounds.Width-7,e.Bounds.Height),EnsureReadable(list.ForeColor,fill),TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
-                };
-            }
-            Color background = control.BackColor;
-            if (background.A < 255) {
-                Control parent = control.Parent;
-                while (parent != null && parent.BackColor.A < 255) parent = parent.Parent;
-                background = parent == null ? bottom : parent.BackColor;
-            }
-            control.ForeColor = EnsureReadable(control.ForeColor, background);
+			if (control is Button)
+			{
+				control.BackColor = MenuSelection;
+				control.ForeColor = ink;
+			}
+			else if (control is TextBoxBase || control is ComboBox || control is NumericUpDown || control is ListBox || control is ListView)
+			{
+				control.BackColor = DeepSeaSurface;
+				control.ForeColor = ink;
+			}
+			ComboBox comboBox = control as ComboBox;
+			if (comboBox != null)
+			{
+				comboBox.FlatStyle = FlatStyle.Standard;
+				comboBox.DrawMode = DrawMode.Normal;
+			}
+			ListView list = control as ListView;
+			if (list != null && !list.OwnerDraw)
+			{
+				list.OwnerDraw = true;
+				list.DrawColumnHeader += delegate(object sender, DrawListViewColumnHeaderEventArgs e)
+				{
+					using (SolidBrush brush2 = new SolidBrush(ThemeSurface))
+					{
+						e.Graphics.FillRectangle(brush2, e.Bounds);
+					}
+					FishBowlText.DrawText(e.Graphics, e.Header.Text, list.Font, new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height), EnsureReadable(ThemeInk, ThemeSurface), TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+				};
+				list.DrawItem += delegate(object sender, DrawListViewItemEventArgs e)
+				{
+					e.DrawDefault = list.View != View.Details || list.CheckBoxes || list.SmallImageList != null;
+				};
+				list.DrawSubItem += delegate(object sender, DrawListViewSubItemEventArgs e)
+				{
+					if (list.CheckBoxes || list.SmallImageList != null)
+					{
+						e.DrawDefault = true;
+					}
+					else
+					{
+						Color color = (e.Item.Selected ? CosmeticRuntime.Selection : list.BackColor);
+						using (SolidBrush brush = new SolidBrush(color))
+						{
+							e.Graphics.FillRectangle(brush, e.Bounds);
+						}
+						if (!CosmeticRuntime.Badge(e.Graphics, e.Bounds, e.SubItem.Text, list.Font))
+						{
+							FishBowlText.DrawText(e.Graphics, e.SubItem.Text, list.Font, new Rectangle(e.Bounds.X + 5, e.Bounds.Y, e.Bounds.Width - 7, e.Bounds.Height), EnsureReadable(list.ForeColor, color), TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+						}
+					}
+				};
+			}
+			ConsistentInputs.Style(control);
+			Color background = control.BackColor;
+			if (background.A < byte.MaxValue)
+			{
+				Control parent = control.Parent;
+				while (parent != null && parent.BackColor.A < byte.MaxValue)
+				{
+					parent = parent.Parent;
+				}
+				background = ((parent == null) ? bottom : parent.BackColor);
+			}
+			control.ForeColor = EnsureReadable(control.ForeColor, background);
 			foreach (Control control2 in control.Controls)
 			{
 				StyleControl(control2);
@@ -14206,26 +16633,43 @@ namespace EmulatorHub
 			return color;
 		}
 
-		public static double Contrast(Color first, Color second) {
-            double a = Luminance(first), b = Luminance(second);
-            return (Math.Max(a,b)+0.05)/(Math.Min(a,b)+0.05);
-        }
-        private static double Luminance(Color color) {
-            return 0.2126*Linear(color.R)+0.7152*Linear(color.G)+0.0722*Linear(color.B);
-        }
-        private static double Linear(byte value) {
-            double c=value/255.0; return c<=0.04045 ? c/12.92 : Math.Pow((c+0.055)/1.055,2.4);
-        }
-        public static Color EnsureReadable(Color foreground, Color background) {
-            if (Contrast(foreground,background)>=4.5) return foreground;
-            Color target = Contrast(Color.Black,background)>Contrast(Color.White,background) ? Color.Black : Color.White;
-            for (int weight=5; weight<=100; weight+=5) {
-                Color candidate=Blend(foreground,target,weight);
-                if (Contrast(candidate,background)>=4.5) return candidate;
-            }
-            return target;
-        }
-        private static bool Is(Color color, int red, int green, int blue)
+		public static double Contrast(Color first, Color second)
+		{
+			double val = Luminance(first);
+			double val2 = Luminance(second);
+			return (Math.Max(val, val2) + 0.05) / (Math.Min(val, val2) + 0.05);
+		}
+
+		private static double Luminance(Color color)
+		{
+			return 0.2126 * Linear(color.R) + 0.7152 * Linear(color.G) + 0.0722 * Linear(color.B);
+		}
+
+		private static double Linear(byte value)
+		{
+			double num = (double)(int)value / 255.0;
+			return (num <= 0.04045) ? (num / 12.92) : Math.Pow((num + 0.055) / 1.055, 2.4);
+		}
+
+		public static Color EnsureReadable(Color foreground, Color background)
+		{
+			if (Contrast(foreground, background) >= 4.5)
+			{
+				return foreground;
+			}
+			Color color = ((Contrast(Color.Black, background) > Contrast(Color.White, background)) ? Color.Black : Color.White);
+			for (int i = 5; i <= 100; i += 5)
+			{
+				Color color2 = Blend(foreground, color, i);
+				if (Contrast(color2, background) >= 4.5)
+				{
+					return color2;
+				}
+			}
+			return color;
+		}
+
+		private static bool Is(Color color, int red, int green, int blue)
 		{
 			return color.R == red && color.G == green && color.B == blue;
 		}
@@ -14258,8 +16702,7 @@ namespace EmulatorHub
 		protected override void OnPaint(PaintEventArgs e)
 		{
 			base.OnPaint(e);
-            if (!CosmeticRuntime.Current.ShowFooter) return;
-			if (base.Width < 80 || base.Height < 20)
+			if (!CosmeticRuntime.Current.ShowFooter || base.Width < 80 || base.Height < 20)
 			{
 				return;
 			}
@@ -14328,7 +16771,8 @@ namespace EmulatorHub
 				770, 874, 982, 1102, 1230
 			};
 			int[] array2 = array;
-			foreach (int num in array2)
+			int[] array3 = array2;
+			foreach (int num in array3)
 			{
 				int num2 = num % Math.Max(1, base.Width + 30) - 14;
 				int num3 = top + num / 7 % 5;
@@ -14363,9 +16807,7 @@ namespace EmulatorHub
 	}
 	public class FishBowlActionButton : Button
 	{
-		public bool IconOnly {get;set;}
-        public void RefreshCosmeticIcon() {iconKind=null; RefreshIcon();}
-        public static bool StrongFocus = true;
+		public static bool StrongFocus = true;
 
 		private bool hovering;
 
@@ -14376,6 +16818,14 @@ namespace EmulatorHub
 		private string iconKind;
 
 		private int iconColor;
+
+		public bool IconOnly { get; set; }
+
+		public void RefreshCosmeticIcon()
+		{
+			iconKind = null;
+			RefreshIcon();
+		}
 
 		public FishBowlActionButton()
 		{
@@ -14424,8 +16874,11 @@ namespace EmulatorHub
 
 		public override Size GetPreferredSize(Size proposedSize)
 		{
-			if (IconOnly) return new Size(40,34);
-            Size preferredSize = base.GetPreferredSize(proposedSize);
+			if (IconOnly)
+			{
+				return new Size(40, 34);
+			}
+			Size preferredSize = base.GetPreferredSize(proposedSize);
 			return new Size(preferredSize.Width + 4, Math.Max(34, preferredSize.Height));
 		}
 
@@ -14513,20 +16966,27 @@ namespace EmulatorHub
 			{
 				using (SolidBrush brush = new SolidBrush(color2))
 				{
-					using (Pen pen = new Pen(color3, (Focused && base.Enabled && StrongFocus) ? Math.Max(1,CosmeticRuntime.Current.FocusWidth) : 1f))
+					using (Pen pen = new Pen(color3, (Focused && base.Enabled && StrongFocus) ? ((float)Math.Max(1, CosmeticRuntime.Current.FocusWidth)) : 1f))
 					{
 						e.Graphics.FillPath(brush, path);
 						e.Graphics.DrawPath(pen, path);
 					}
 				}
 			}
-			if (IconOnly && base.Image != null) {
-                Rectangle iconBounds = new Rectangle((Width-20)/2,(Height-20)/2,20,20);
-                if (Enabled) e.Graphics.DrawImage(base.Image,iconBounds);
-                else ControlPaint.DrawImageDisabled(e.Graphics,base.Image,iconBounds.X,iconBounds.Y,color2);
-                return;
-            }
-            Color foreColor = FishBowlPalette.EnsureReadable(base.Enabled ? ForeColor : FishBowlPalette.DisabledText, color2);
+			if (IconOnly && base.Image != null)
+			{
+				Rectangle rect = new Rectangle((base.Width - 20) / 2, (base.Height - 20) / 2, 20, 20);
+				if (base.Enabled)
+				{
+					e.Graphics.DrawImage(base.Image, rect);
+				}
+				else
+				{
+					ControlPaint.DrawImageDisabled(e.Graphics, base.Image, rect.X, rect.Y, color2);
+				}
+				return;
+			}
+			Color foreColor = FishBowlPalette.EnsureReadable(base.Enabled ? ForeColor : FishBowlPalette.DisabledText, color2);
 			Size size = TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
 			bool flag2 = base.Image != null && base.Width >= 56;
 			int num = (flag2 ? 20 : 0);
@@ -14554,7 +17014,8 @@ namespace EmulatorHub
 				}
 				num4 += num + num2;
 			}
-			FishBowlText.DrawText(bounds: new Rectangle(num4 + num5, num5, Math.Max(1, base.Width - num4 - 7), base.Height - 2 * num5), dc: e.Graphics, text: Text, font: Font, foreColor: foreColor, flags: TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter);
+			Rectangle bounds = new Rectangle(num4 + num5, num5, Math.Max(1, base.Width - num4 - 7), base.Height - 2 * num5);
+			FishBowlText.DrawText(e.Graphics, Text, Font, bounds, foreColor, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter);
 		}
 
 		protected override void Dispose(bool disposing)
@@ -14572,9 +17033,25 @@ namespace EmulatorHub
 	public static class FishBowlHighlights
 	{
 		private static bool reducedMotion;
-        public static bool ReducedMotion {get{return reducedMotion;}set{value=value||Environment.GetCommandLineArgs().Contains("--pause-ui-animation");if(reducedMotion==value)return;reducedMotion=value;FluidStyle.NotifyMotionChange();}}
 
 		private static readonly ConditionalWeakTable<Control, object> Attached = new ConditionalWeakTable<Control, object>();
+
+		public static bool ReducedMotion
+		{
+			get
+			{
+				return reducedMotion;
+			}
+			set
+			{
+				value = value || Environment.GetCommandLineArgs().Contains("--pause-ui-animation");
+				if (reducedMotion != value)
+				{
+					reducedMotion = value;
+					FluidStyle.NotifyMotionChange();
+				}
+			}
+		}
 
 		public static Color Blend(Color background, int opacity = 24)
 		{
@@ -14666,11 +17143,15 @@ namespace EmulatorHub
 
 		protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
 		{
-            var strip=e.ToolStrip??e.Item.Owner;Color menuBackground=strip==null?FishBowlPalette.ThemeSurface:strip.BackColor;
-            using(var background=new SolidBrush(menuBackground))e.Graphics.FillRectangle(background,new Rectangle(Point.Empty,e.Item.Size));
+			ToolStrip toolStrip = e.ToolStrip ?? e.Item.Owner;
+			Color color = ((toolStrip == null) ? FishBowlPalette.ThemeSurface : toolStrip.BackColor);
+			using (SolidBrush brush = new SolidBrush(color))
+			{
+				e.Graphics.FillRectangle(brush, new Rectangle(Point.Empty, e.Item.Size));
+			}
 			if (e.Item.Enabled && (e.Item.Selected || e.Item.Pressed))
 			{
-				FishBowlHighlights.Draw(e.Graphics, new Rectangle(1, 1, Math.Max(1, e.Item.Width - 2), Math.Max(1, e.Item.Height - 2)), menuBackground, e.Item.Pressed);
+				FishBowlHighlights.Draw(e.Graphics, new Rectangle(1, 1, Math.Max(1, e.Item.Width - 2), Math.Max(1, e.Item.Height - 2)), color, e.Item.Pressed);
 			}
 			else
 			{
@@ -14680,11 +17161,15 @@ namespace EmulatorHub
 
 		protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
 		{
-            string tagged=e.Item.Tag as string;
-            if (tagged!=null && tagged.StartsWith("CosmeticIcon:")) {
-                using (Image icon=FishBowlVisuals.Icon(tagged.Substring(13),Math.Max(16,e.ImageRectangle.Width),FishBowlPalette.ThemeInk,FishBowlPalette.IconAccent)) e.Graphics.DrawImage(icon,e.ImageRectangle);
-                return;
-            }
+			string text = e.Item.Tag as string;
+			if (text != null && text.StartsWith("CosmeticIcon:"))
+			{
+				using (Image image = FishBowlVisuals.Icon(text.Substring(13), Math.Max(16, e.ImageRectangle.Width), FishBowlPalette.ThemeInk, FishBowlPalette.IconAccent))
+				{
+					e.Graphics.DrawImage(image, e.ImageRectangle);
+					return;
+				}
+			}
 			base.OnRenderItemImage(e);
 		}
 
@@ -14930,9 +17415,12 @@ namespace EmulatorHub
 				profile.SetupChecklist = new List<SetupChecklistItem>();
 			}
 			string[] defaultLabels = DefaultLabels;
-			foreach (string label in defaultLabels)
+			string[] array = defaultLabels;
+			foreach (string label in array)
 			{
-				if (!profile.SetupChecklist.Any((SetupChecklistItem item) => string.Equals(item.Label, label, StringComparison.OrdinalIgnoreCase)))
+				List<SetupChecklistItem> setupChecklist = profile.SetupChecklist;
+				Func<SetupChecklistItem, bool> predicate = (SetupChecklistItem item) => string.Equals(item.Label, label, StringComparison.OrdinalIgnoreCase);
+				if (!setupChecklist.Any(predicate))
 				{
 					profile.SetupChecklist.Add(new SetupChecklistItem
 					{
@@ -14952,7 +17440,8 @@ namespace EmulatorHub
 	}
 	public class GameEntry
 	{
-        public GameExtras Extras {get;set;}
+		public GameExtras Extras { get; set; }
+
 		public string Id { get; set; }
 
 		public string EmulatorId { get; set; }
@@ -15107,7 +17596,8 @@ namespace EmulatorHub
 	}
 	public class GameCollection
 	{
-        public string ParentId {get;set;}
+		public string ParentId { get; set; }
+
 		public string Id { get; set; }
 
 		public string Name { get; set; }
@@ -15389,11 +17879,16 @@ namespace EmulatorHub
 	}
 	public class LibraryData
 	{
-        public HubSettings Hub {get;set;}
-        public UserToolSettings UserTools {get;set;}
-        public CosmeticSettings Cosmetics {get;set;}
-        public List<SmartLibraryList> SmartLists { get; set; }
-        public List<string> PlayQueue { get; set; }
+		public HubSettings Hub { get; set; }
+
+		public UserToolSettings UserTools { get; set; }
+
+		public CosmeticSettings Cosmetics { get; set; }
+
+		public List<SmartLibraryList> SmartLists { get; set; }
+
+		public List<string> PlayQueue { get; set; }
+
 		public int Version { get; set; }
 
 		public List<EmulatorProfile> Emulators { get; set; }
@@ -15738,8 +18233,11 @@ namespace EmulatorHub
 
 		public static void Save(LibraryData data)
 		{
-            if (UserTools.Guest) return;
-            UserTools.SaveActive(data);
+			if (UserTools.Guest)
+			{
+				return;
+			}
+			UserTools.SaveActive(data);
 			Directory.CreateDirectory(DataDirectory);
 			string text = FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
 			try
@@ -15784,7 +18282,10 @@ namespace EmulatorHub
 
 		public static void Log(string message)
 		{
-            if (UserTools.Guest) return;
+			if (UserTools.Guest)
+			{
+				return;
+			}
 			try
 			{
 				Directory.CreateDirectory(DataDirectory);
@@ -16235,7 +18736,8 @@ namespace EmulatorHub
 				Notice = "Folder detection could not finish: " + ex.Message;
 			}
 			string[] array = new string[5] { "ConfigFolder|Configuration", "InGameSaveFolder|In-game saves", "SaveStateFolder|Save states", "ScreenshotFolder|Screenshots", "LogFolder|Logs" };
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				string[] parts = text.Split('|');
 				string value = profile.GetType().GetProperty(parts[0]).GetValue(profile, null) as string;
@@ -16301,39 +18803,40 @@ namespace EmulatorHub
 					Notice = "DeSmuME for Linux keeps its save paths in its own settings. Choose in-game save and save-state folders manually.";
 					break;
 				}
-				string file = P(program, "desmume.ini");
-				Dictionary<string, string> settings = ReadSettings(file, false);
+				string text4 = P(program, "desmume.ini");
+				Dictionary<string, string> settings = ReadSettings(text4, false);
 				Add("ConfigFolder", "Configuration", program, "desmume.ini");
-				Configured(settings, "PathSettings/Battery", "InGameSaveFolder", "In-game saves (Battery)", program, "Battery", file);
-				Configured(settings, "PathSettings/StateSlots", "SaveStateFolder", "Save states (slots)", program, "StateSlots", file);
-				Configured(settings, "PathSettings/States", "SaveStateFolder", "Save states (manual files)", program, "States", file);
-				Configured(settings, "PathSettings/Screenshots", "ScreenshotFolder", "Screenshots", program, "Screenshots", file);
+				Configured(settings, "PathSettings/Battery", "InGameSaveFolder", "In-game saves (Battery)", program, "Battery", text4);
+				Configured(settings, "PathSettings/StateSlots", "SaveStateFolder", "Save states (slots)", program, "StateSlots", text4);
+				Configured(settings, "PathSettings/States", "SaveStateFolder", "Save states (manual files)", program, "States", text4);
+				Configured(settings, "PathSettings/Screenshots", "ScreenshotFolder", "Screenshots", program, "Screenshots", text4);
 				break;
 			}
 			case "Dolphin":
 			{
-				string text4;
-				string text3 = DolphinRoot(out text4);
-				string file = P(text4, "Dolphin.ini");
-				Dictionary<string, string> settings = ReadSettings(file, false);
-				Add("ConfigFolder", "Configuration", text4, "Dolphin user directory");
+				string configDir;
+				string text3 = DolphinRoot(out configDir);
+				string text4 = P(configDir, "Dolphin.ini");
+				Dictionary<string, string> settings = ReadSettings(text4, false);
+				Add("ConfigFolder", "Configuration", configDir, "Dolphin user directory");
 				Add("InGameSaveFolder", "In-game saves (GameCube)", P(text3, "GC"), "Dolphin memory-card storage");
-				string[] array2 = new string[4] { "Core/MemcardAPath", "Core/MemcardBPath", "Core/GCIFolderAPath", "Core/GCIFolderBPath" };
-				foreach (string text8 in array2)
+				string[] array = new string[4] { "Core/MemcardAPath", "Core/MemcardBPath", "Core/GCIFolderAPath", "Core/GCIFolderBPath" };
+				string[] array2 = array;
+				foreach (string text5 in array2)
 				{
-					string value2 = Get(settings, text8);
-					if (!string.IsNullOrWhiteSpace(value2))
+					string value = Get(settings, text5);
+					if (!string.IsNullOrWhiteSpace(value))
 					{
-						string text9 = Resolve(value2, program);
-						if (text8.IndexOf("card", StringComparison.OrdinalIgnoreCase) >= 0)
+						string text6 = Resolve(value, program);
+						if (text5.IndexOf("card", StringComparison.OrdinalIgnoreCase) >= 0)
 						{
-							text9 = Path.GetDirectoryName(text9);
+							text6 = Path.GetDirectoryName(text6);
 						}
-						Add("InGameSaveFolder", "In-game saves (custom GameCube)", text9, "Dolphin.ini");
+						Add("InGameSaveFolder", "In-game saves (custom GameCube)", text6, "Dolphin.ini");
 					}
 				}
-				string text10 = SettingPath(settings, "General/NANDRootPath", program, P(text3, "Wii"));
-				Add("InGameSaveFolder", "In-game saves (Wii titles)", P(text10, "title"), string.IsNullOrWhiteSpace(Get(settings, "General/NANDRootPath")) ? "Dolphin Wii storage" : "Dolphin.ini");
+				string text7 = SettingPath(settings, "General/NANDRootPath", program, P(text3, "Wii"));
+				Add("InGameSaveFolder", "In-game saves (Wii titles)", P(text7, "title"), string.IsNullOrWhiteSpace(Get(settings, "General/NANDRootPath")) ? "Dolphin Wii storage" : "Dolphin.ini");
 				Add("SaveStateFolder", "Save states", P(text3, "StateSaves"), "Dolphin user directory");
 				Add("ScreenshotFolder", "Screenshots", P(text3, "ScreenShots"), "Dolphin user directory");
 				Add("LogFolder", "Logs", P(text3, "Logs"), "Dolphin user directory");
@@ -16342,18 +18845,19 @@ namespace EmulatorHub
 			}
 			case "Azahar Plus":
 			{
-				string text3 = (Directory.Exists(P(program, "user")) ? P(program, "user") : (Platform.IsWindows ? P(roaming, "Azahar") : DataRoot("azahar-emu")));
-				string text4 = ((Directory.Exists(P(program, "user")) || Platform.IsWindows) ? P(text3, "config") : ConfigRoot("azahar-emu"));
-				string file = P(text4, "qt-config.ini");
-				Dictionary<string, string> settings = ReadSettings(file, true);
-				Add("ConfigFolder", "Configuration", text4, "Azahar Plus user directory");
+				string text3 = (Platform.IsWindows ? ThreeDsStorage.UserRoot(profile, roaming) : (Directory.Exists(P(program, "user")) ? P(program, "user") : DataRoot("azahar-emu")));
+				string configDir = ((Directory.Exists(P(program, "user")) || Platform.IsWindows) ? P(text3, "config") : ConfigRoot("azahar-emu"));
+				if (Platform.IsWindows) configDir = ThreeDsStorage.ConfigDirectory(profile, roaming, text3); else if (!string.IsNullOrWhiteSpace(profile.ConfigFolder)) configDir = profile.ConfigFolder;
+				string text4 = P(configDir, "qt-config.ini");
+				Dictionary<string, string> settings = ReadSettings(text4, true);
+				Add("ConfigFolder", "Configuration", configDir, "Azahar Plus user directory");
 				bool flag = IsTrue(Get(settings, "Data Storage/use_custom_storage")) && !IsTrue(Get(settings, "Data Storage/use_custom_storage/default"));
-				string text11 = (flag ? SettingPath(settings, "Data Storage/sdmc_directory", program, P(text3, "sdmc")) : P(text3, "sdmc"));
-				string text10 = (flag ? SettingPath(settings, "Data Storage/nand_directory", program, P(text3, "nand")) : P(text3, "nand"));
-				Add("InGameSaveFolder", "In-game saves (3DS SD storage)", P(text11, "Nintendo 3DS"), flag ? "qt-config.ini" : "Azahar Plus user directory");
-				Add("InGameSaveFolder", "In-game saves (3DS NAND data)", P(text10, "data"), flag ? "qt-config.ini" : "Azahar Plus user directory");
+				string text8 = (flag ? SettingPath(settings, "Data Storage/sdmc_directory", program, P(text3, "sdmc")) : P(text3, "sdmc"));
+				string text7 = (flag ? SettingPath(settings, "Data Storage/nand_directory", program, P(text3, "nand")) : P(text3, "nand"));
+				Add("InGameSaveFolder", "In-game saves (3DS SD storage)", P(text8, "Nintendo 3DS"), flag ? "qt-config.ini" : "Azahar Plus user directory");
+				Add("InGameSaveFolder", "In-game saves (3DS NAND data)", P(text7, "data"), flag ? "qt-config.ini" : "Azahar Plus user directory");
 				Add("SaveStateFolder", "Save states", P(text3, "states"), "Azahar Plus user directory");
-				Configured(settings, "Paths/screenshotPath", "ScreenshotFolder", "Screenshots", program, "", file);
+				Configured(settings, "Paths/screenshotPath", "ScreenshotFolder", "Screenshots", program, "", text4);
 				Add("LogFolder", "Logs", P(text3, "log"), "Azahar Plus user directory");
 				Notice = "3DS saves live inside SD/NAND storage, which also contains installed content.";
 				break;
@@ -16361,24 +18865,24 @@ namespace EmulatorHub
 			case "PCSX2":
 			{
 				string text3 = ((File.Exists(P(program, "portable.txt")) || File.Exists(P(program, "portable.ini"))) ? program : (Platform.IsWindows ? P(documents, "PCSX2") : ConfigRoot("PCSX2")));
-				string file = P(text3, "inis", "PCSX2.ini");
-				Dictionary<string, string> settings = ReadSettings(file, false);
+				string text4 = P(text3, "inis", "PCSX2.ini");
+				Dictionary<string, string> settings = ReadSettings(text4, false);
 				Add("ConfigFolder", "Configuration", P(text3, "inis"), "PCSX2 data directory");
-				Configured(settings, "Folders/MemoryCards", "InGameSaveFolder", "In-game saves (memory cards)", text3, "memcards", file);
-				Configured(settings, "Folders/Savestates", "SaveStateFolder", "Save states", text3, "sstates", file);
-				Configured(settings, "Folders/Snapshots", "ScreenshotFolder", "Screenshots", text3, "snaps", file);
-				Configured(settings, "Folders/Logs", "LogFolder", "Logs", text3, "logs", file);
+				Configured(settings, "Folders/MemoryCards", "InGameSaveFolder", "In-game saves (memory cards)", text3, "memcards", text4);
+				Configured(settings, "Folders/Savestates", "SaveStateFolder", "Save states", text3, "sstates", text4);
+				Configured(settings, "Folders/Snapshots", "ScreenshotFolder", "Screenshots", text3, "snaps", text4);
+				Configured(settings, "Folders/Logs", "LogFolder", "Logs", text3, "logs", text4);
 				break;
 			}
 			case "DuckStation":
 			{
 				string text3 = (File.Exists(P(program, "portable.txt")) ? program : ((!Platform.IsWindows) ? DataRoot("duckstation") : (Directory.Exists(P(local, "DuckStation")) ? P(local, "DuckStation") : (Directory.Exists(P(documents, "DuckStation")) ? P(documents, "DuckStation") : P(local, "DuckStation")))));
-				string file = P(text3, "settings.ini");
-				Dictionary<string, string> settings = ReadSettings(file, false);
+				string text4 = P(text3, "settings.ini");
+				Dictionary<string, string> settings = ReadSettings(text4, false);
 				Add("ConfigFolder", "Configuration", text3, "DuckStation data directory");
-				Configured(settings, "MemoryCards/Directory", "InGameSaveFolder", "In-game saves (memory cards)", text3, "memcards", file);
-				Configured(settings, "Folders/SaveStates", "SaveStateFolder", "Save states", text3, "savestates", file);
-				Configured(settings, "Folders/Screenshots", "ScreenshotFolder", "Screenshots", text3, "screenshots", file);
+				Configured(settings, "MemoryCards/Directory", "InGameSaveFolder", "In-game saves (memory cards)", text3, "memcards", text4);
+				Configured(settings, "Folders/SaveStates", "SaveStateFolder", "Save states", text3, "savestates", text4);
+				Configured(settings, "Folders/Screenshots", "ScreenshotFolder", "Screenshots", text3, "screenshots", text4);
 				if (File.Exists(P(text3, "duckstation.log")))
 				{
 					Add("LogFolder", "Logs", text3, "duckstation.log");
@@ -16397,27 +18901,27 @@ namespace EmulatorHub
 					Notice = "Open melonDS once to create its configuration, then refresh folders.";
 					break;
 				}
-				string file = (File.Exists(P(text3, "melonDS.toml")) ? P(text3, "melonDS.toml") : P(text3, "melonDS.ini"));
-				Dictionary<string, string> settings = ReadSettings(file, true);
-				Add("ConfigFolder", "Configuration", text3, Path.GetFileName(file));
-				Configured(settings, FirstKey(settings, "Instance0/SaveFilePath", "SaveFilePath"), "InGameSaveFolder", "In-game saves", program, "", file);
-				Configured(settings, FirstKey(settings, "Instance0/SavestatePath", "SavestatePath"), "SaveStateFolder", "Save states", program, "", file);
+				string text4 = (File.Exists(P(text3, "melonDS.toml")) ? P(text3, "melonDS.toml") : P(text3, "melonDS.ini"));
+				Dictionary<string, string> settings = ReadSettings(text4, true);
+				Add("ConfigFolder", "Configuration", text3, Path.GetFileName(text4));
+				Configured(settings, FirstKey(settings, "Instance0/SaveFilePath", "SaveFilePath"), "InGameSaveFolder", "In-game saves", program, "", text4);
+				Configured(settings, FirstKey(settings, "Instance0/SavestatePath", "SavestatePath"), "SaveStateFolder", "Save states", program, "", text4);
 				Notice = "melonDS instance 0 paths are shown. Empty save paths store saves beside each ROM; no single hub folder applies.";
 				break;
 			}
 			case "Cemu":
 			{
 				string text3 = (Directory.Exists(P(program, "portable")) ? P(program, "portable") : (File.Exists(P(program, "settings.xml")) ? program : (Platform.IsWindows ? P(roaming, "Cemu") : DataRoot("Cemu"))));
-				string text4 = ((Platform.IsWindows || text3 != DataRoot("Cemu")) ? text3 : ConfigRoot("Cemu"));
-				string file = P(text4, "settings.xml");
-				Add("ConfigFolder", "Configuration", text4, "Cemu user directory");
+				string configDir = ((Platform.IsWindows || text3 != DataRoot("Cemu")) ? text3 : ConfigRoot("Cemu"));
+				string text4 = P(configDir, "settings.xml");
+				Add("ConfigFolder", "Configuration", configDir, "Cemu user directory");
 				XmlDocument xmlDocument = new XmlDocument();
 				xmlDocument.XmlResolver = null;
 				XmlDocument xmlDocument2 = xmlDocument;
-				string value4 = "";
-				if (File.Exists(file))
+				string value3 = "";
+				if (File.Exists(text4))
 				{
-					using (XmlReader reader = XmlReader.Create(new StringReader(ReadText(file)), new XmlReaderSettings
+					using (XmlReader reader = XmlReader.Create(new StringReader(ReadText(text4)), new XmlReaderSettings
 					{
 						DtdProcessing = DtdProcessing.Prohibit,
 						XmlResolver = null
@@ -16428,11 +18932,11 @@ namespace EmulatorHub
 					XmlNode xmlNode = xmlDocument2.SelectSingleNode("//mlc_path");
 					if (xmlNode != null)
 					{
-						value4 = xmlNode.InnerText;
+						value3 = xmlNode.InnerText;
 					}
 				}
-				string text16 = (string.IsNullOrWhiteSpace(value4) ? P(text3, "mlc01") : Resolve(value4, program));
-				Add("InGameSaveFolder", "In-game saves (Wii U)", P(text16, "usr", "save"), string.IsNullOrWhiteSpace(value4) ? "Cemu default MLC" : "settings.xml - mlc_path");
+				string text13 = (string.IsNullOrWhiteSpace(value3) ? P(text3, "mlc01") : Resolve(value3, program));
+				Add("InGameSaveFolder", "In-game saves (Wii U)", P(text13, "usr", "save"), string.IsNullOrWhiteSpace(value3) ? "Cemu default MLC" : "settings.xml - mlc_path");
 				Add("SaveStateFolder", "Save states", "", "No save-state folder detected for Cemu");
 				if (Directory.Exists(P(text3, "screenshots")))
 				{
@@ -16443,50 +18947,51 @@ namespace EmulatorHub
 			}
 			case "Vita3K":
 			{
-				string text4 = (Platform.IsWindows ? program : (FindConfigRoot(new string[3]
+				string configDir = (Platform.IsWindows ? program : (FindConfigRoot(new string[3]
 				{
 					program,
 					ConfigRoot("Vita3K"),
 					P(DataRoot("Vita3K"), "Vita3K")
 				}, new string[1] { "config.yml" }) ?? ConfigRoot("Vita3K")));
-				string file = P(text4, "config.yml");
-				Dictionary<string, string> settings = ReadYaml(file);
-				Add("ConfigFolder", "Configuration", text4, "config.yml");
-				string value = Get(settings, "pref-path");
-				string text3 = ((!string.IsNullOrWhiteSpace(value)) ? Resolve(value, program) : (Platform.IsWindows ? P(roaming, "Vita3K", "Vita3K") : P(DataRoot("Vita3K"), "Vita3K")));
-				string text5 = Get(settings, "user-id");
-				if (string.IsNullOrWhiteSpace(text5))
+				string text4 = P(configDir, "config.yml");
+				Dictionary<string, string> settings = ReadYaml(text4);
+				Add("ConfigFolder", "Configuration", configDir, "config.yml");
+				string value4 = Get(settings, "pref-path");
+				string text3 = ((!string.IsNullOrWhiteSpace(value4)) ? Resolve(value4, program) : (Platform.IsWindows ? P(roaming, "Vita3K", "Vita3K") : P(DataRoot("Vita3K"), "Vita3K")));
+				string text14 = Get(settings, "user-id");
+				if (string.IsNullOrWhiteSpace(text14))
 				{
-					text5 = "00";
+					text14 = "00";
 				}
-				string text6 = P(text3, "ux0", "user");
-				string[] array = (Directory.Exists(text6) ? Directory.GetDirectories(text6).Take(64).ToArray() : new string[1] { P(text6, text5) });
+				string text15 = P(text3, "ux0", "user");
+				string[] array3 = (Directory.Exists(text15) ? Directory.GetDirectories(text15).Take(64).ToArray() : new string[1] { P(text15, text14) });
+				string[] array = array3;
 				string[] array2 = array;
-				foreach (string text7 in array2)
+				foreach (string text16 in array2)
 				{
-					Add("InGameSaveFolder", "In-game saves (Vita user " + Path.GetFileName(text7) + ")", P(text7, "savedata"), "config.yml - pref-path");
+					Add("InGameSaveFolder", "In-game saves (Vita user " + Path.GetFileName(text16) + ")", P(text16, "savedata"), "config.yml - pref-path");
 				}
 				if (Directory.Exists(P(text3, "screenshots")))
 				{
 					Add("ScreenshotFolder", "Screenshots", P(text3, "screenshots"), "Vita3K storage");
 				}
-				if (File.Exists(P(text4, "vita3k.log")))
+				if (File.Exists(P(configDir, "vita3k.log")))
 				{
-					Add("LogFolder", "Logs", text4, "vita3k.log");
+					Add("LogFolder", "Logs", configDir, "vita3k.log");
 				}
 				Notice = "Vita3K's pref-path determines save storage. No save-state directory is assumed.";
 				break;
 			}
 			case "PPSSPP":
 			{
-				string text15 = P(program, "installed.txt");
-				string value3 = (File.Exists(text15) ? ReadText(text15).Trim().Trim('\ufeff') : "");
-				string text3 = ((!File.Exists(text15)) ? P(program, "memstick") : (string.IsNullOrWhiteSpace(value3) ? P(documents, "PPSSPP") : Resolve(value3, program)));
+				string text12 = P(program, "installed.txt");
+				string value2 = (File.Exists(text12) ? ReadText(text12).Trim().Trim('\ufeff') : "");
+				string text3 = ((!File.Exists(text12)) ? P(program, "memstick") : (string.IsNullOrWhiteSpace(value2) ? P(documents, "PPSSPP") : Resolve(value2, program)));
 				if (!Directory.Exists(text3) && Directory.Exists(P(documents, "PPSSPP")))
 				{
 					text3 = P(documents, "PPSSPP");
 				}
-				if (!Platform.IsWindows && !File.Exists(text15) && !Directory.Exists(P(program, "memstick")))
+				if (!Platform.IsWindows && !File.Exists(text12) && !Directory.Exists(P(program, "memstick")))
 				{
 					text3 = ConfigRoot("ppsspp");
 				}
@@ -16508,13 +19013,13 @@ namespace EmulatorHub
 					Notice = "Open RetroArch once to create retroarch.cfg, then refresh folders.";
 					break;
 				}
-				string file = P(text3, "retroarch.cfg");
-				Dictionary<string, string> settings = ReadSettings(file, true);
+				string text4 = P(text3, "retroarch.cfg");
+				Dictionary<string, string> settings = ReadSettings(text4, true);
 				Add("ConfigFolder", "Configuration", text3, "retroarch.cfg");
-				Configured(settings, "savefile_directory", "InGameSaveFolder", "In-game saves (base directory)", program, "", file);
-				Configured(settings, "savestate_directory", "SaveStateFolder", "Save states (base directory)", program, "", file);
-				Configured(settings, "screenshot_directory", "ScreenshotFolder", "Screenshots", program, "", file);
-				Configured(settings, "log_dir", "LogFolder", "Logs", program, "", file);
+				Configured(settings, "savefile_directory", "InGameSaveFolder", "In-game saves (base directory)", program, "", text4);
+				Configured(settings, "savestate_directory", "SaveStateFolder", "Save states (base directory)", program, "", text4);
+				Configured(settings, "screenshot_directory", "ScreenshotFolder", "Screenshots", program, "", text4);
+				Configured(settings, "log_dir", "LogFolder", "Logs", program, "", text4);
 				Notice = "RetroArch core/content overrides may use other folders. These are global paths; blank/default can depend on loaded content.";
 				break;
 			}
@@ -16526,19 +19031,20 @@ namespace EmulatorHub
 				{
 					text3 = Resolve(environmentVariable, program);
 				}
-				string file = (File.Exists(P(text3, "config", "vfs.yml")) ? P(text3, "config", "vfs.yml") : P(text3, "vfs.yml"));
-				Dictionary<string, string> settings = ReadYaml(file);
+				string text4 = (File.Exists(P(text3, "config", "vfs.yml")) ? P(text3, "config", "vfs.yml") : P(text3, "vfs.yml"));
+				Dictionary<string, string> settings = ReadYaml(text4);
 				Add("ConfigFolder", "Configuration", Directory.Exists(P(text3, "config")) ? P(text3, "config") : text3, "RPCS3 configuration");
 				string value5 = Get(settings, "$(EmulatorDir)");
 				value5 = (string.IsNullOrWhiteSpace(value5) ? text3 : Resolve(value5, program));
 				string text18 = Get(settings, "/dev_hdd0/");
 				text18 = (string.IsNullOrWhiteSpace(text18) ? P(value5, "dev_hdd0") : Resolve(text18.Replace("$(EmulatorDir)", value5.TrimEnd('\\', '/') + Path.DirectorySeparatorChar), program));
 				string text19 = P(text18, "home");
-				string[] array3 = (Directory.Exists(text19) ? Directory.GetDirectories(text19).Take(64).ToArray() : new string[1] { P(text19, "00000001") });
-				string[] array2 = array3;
-				foreach (string text7 in array2)
+				string[] array4 = (Directory.Exists(text19) ? Directory.GetDirectories(text19).Take(64).ToArray() : new string[1] { P(text19, "00000001") });
+				string[] array = array4;
+				string[] array2 = array;
+				foreach (string text16 in array2)
 				{
-					Add("InGameSaveFolder", "In-game saves (PS3 user " + Path.GetFileName(text7) + ")", P(text7, "savedata"), "RPCS3 virtual HDD / vfs.yml");
+					Add("InGameSaveFolder", "In-game saves (PS3 user " + Path.GetFileName(text16) + ")", P(text16, "savedata"), "RPCS3 virtual HDD / vfs.yml");
 				}
 				Add("SaveStateFolder", "Save states", P(text3, "savestates"), "RPCS3 configuration root");
 				Add("ScreenshotFolder", "Screenshots", P(text3, "screenshots"), "RPCS3 configuration root");
@@ -16554,44 +19060,44 @@ namespace EmulatorHub
 					Dictionary<string, string> settings2 = ReadSettings(P(program, "portable.ini"), false);
 					text3 = SettingPath(settings2, "portable/path", program, program);
 				}
-				string file = P(text3, "config.ini");
-				Dictionary<string, string> settings = ReadSettings(file, false);
+				string text4 = P(text3, "config.ini");
+				Dictionary<string, string> settings = ReadSettings(text4, false);
 				Add("ConfigFolder", "Configuration", text3, "mGBA config.ini / qt.ini");
-				Configured(settings, FirstKey(settings, "ports/qt/savegamePath", "savegamePath"), "InGameSaveFolder", "In-game saves", text3, "", file);
-				Configured(settings, FirstKey(settings, "ports/qt/savestatePath", "savestatePath"), "SaveStateFolder", "Save states", text3, "", file);
-				Configured(settings, FirstKey(settings, "ports/qt/screenshotPath", "screenshotPath"), "ScreenshotFolder", "Screenshots", text3, "", file);
+				Configured(settings, FirstKey(settings, "ports/qt/savegamePath", "savegamePath"), "InGameSaveFolder", "In-game saves", text3, "", text4);
+				Configured(settings, FirstKey(settings, "ports/qt/savestatePath", "savestatePath"), "SaveStateFolder", "Save states", text3, "", text4);
+				Configured(settings, FirstKey(settings, "ports/qt/screenshotPath", "screenshotPath"), "ScreenshotFolder", "Screenshots", text3, "", text4);
 				Notice = "Empty mGBA save paths store files beside each ROM. Explicit paths are resolved relative to mGBA's configuration directory.";
 				break;
 			}
 			case "MAME":
 			{
-				string text12 = ((Platform.IsWindows || File.Exists(P(program, "mame.ini"))) ? program : ((flatpak != null) ? P(home, ".var", "app", flatpak, ".mame") : P(home, ".mame")));
-				string file = P(text12, "mame.ini");
-				Dictionary<string, string> settings = ReadMame(file);
-				string text13 = Get(settings, "inipath");
-				if (string.IsNullOrWhiteSpace(text13))
+				string text9 = ((Platform.IsWindows || File.Exists(P(program, "mame.ini"))) ? program : ((flatpak != null) ? P(home, ".var", "app", flatpak, ".mame") : P(home, ".mame")));
+				string text4 = P(text9, "mame.ini");
+				Dictionary<string, string> settings = ReadMame(text4);
+				string text10 = Get(settings, "inipath");
+				if (string.IsNullOrWhiteSpace(text10))
 				{
-					text13 = ".;ini";
+					text10 = ".;ini";
 				}
-				foreach (string item in text13.Split(';').Take(8))
+				foreach (string item in text10.Split(';').Take(8))
 				{
-					string text14 = P(Resolve(item, text12), "mame.ini");
-					if (string.Equals(text14, file, StringComparison.OrdinalIgnoreCase))
+					string text11 = P(Resolve(item, text9), "mame.ini");
+					if (string.Equals(text11, text4, StringComparison.OrdinalIgnoreCase))
 					{
 						continue;
 					}
-					foreach (KeyValuePair<string, string> item2 in ReadMame(text14))
+					foreach (KeyValuePair<string, string> item2 in ReadMame(text11))
 					{
 						settings[item2.Key] = item2.Value;
 					}
 				}
-				Configured(settings, "cfg_directory", "ConfigFolder", "Configuration (system settings)", text12, "cfg", file);
-				Configured(settings, "nvram_directory", "InGameSaveFolder", "In-game saves (NVRAM)", text12, "nvram", file);
-				Configured(settings, "state_directory", "SaveStateFolder", "Save states", text12, "sta", file);
-				Configured(settings, "snapshot_directory", "ScreenshotFolder", "Screenshots", text12, "snap", file);
-				if (File.Exists(P(text12, "error.log")))
+				Configured(settings, "cfg_directory", "ConfigFolder", "Configuration (system settings)", text9, "cfg", text4);
+				Configured(settings, "nvram_directory", "InGameSaveFolder", "In-game saves (NVRAM)", text9, "nvram", text4);
+				Configured(settings, "state_directory", "SaveStateFolder", "Save states", text9, "sta", text4);
+				Configured(settings, "snapshot_directory", "ScreenshotFolder", "Screenshots", text9, "snap", text4);
+				if (File.Exists(P(text9, "error.log")))
 				{
-					Add("LogFolder", "Logs", text12, "MAME error.log");
+					Add("LogFolder", "Logs", text9, "MAME error.log");
 				}
 				Notice = "MAME global directory settings are shown. System-specific INI overrides may change locations.";
 				break;
@@ -16599,12 +19105,12 @@ namespace EmulatorHub
 			case "Eden":
 			{
 				string text3 = (Directory.Exists(P(program, "user")) ? P(program, "user") : (Platform.IsWindows ? P(roaming, "eden") : DataRoot("eden")));
-				string text4 = ((Directory.Exists(P(program, "user")) || Platform.IsWindows) ? P(text3, "config") : ConfigRoot("eden"));
-				string file = P(text4, "qt-config.ini");
-				Dictionary<string, string> settings = ReadSettings(file, true);
-				Add("ConfigFolder", "Configuration", text4, "Eden user directory");
-				string text10 = SettingPath(settings, "Data Storage/nand_directory", program, P(text3, "nand"));
-				string text17 = SettingPath(settings, "Data Storage/save_directory", program, text10);
+				string configDir = ((Directory.Exists(P(program, "user")) || Platform.IsWindows) ? P(text3, "config") : ConfigRoot("eden"));
+				string text4 = P(configDir, "qt-config.ini");
+				Dictionary<string, string> settings = ReadSettings(text4, true);
+				Add("ConfigFolder", "Configuration", configDir, "Eden user directory");
+				string text7 = SettingPath(settings, "Data Storage/nand_directory", program, P(text3, "nand"));
+				string text17 = SettingPath(settings, "Data Storage/save_directory", program, text7);
 				Add("InGameSaveFolder", "In-game saves (Switch users)", P(text17, "user", "save"), "Eden storage / qt-config.ini");
 				Add("InGameSaveFolder", "In-game saves (Switch system)", P(text17, "system", "save"), "Eden storage / qt-config.ini");
 				Add("LogFolder", "Logs", P(text3, "log"), "Eden user directory");
@@ -16830,7 +19336,8 @@ namespace EmulatorHub
 			Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 			string text = "";
 			string[] array = ReadText(file).Split('\n');
-			foreach (string text2 in array)
+			string[] array2 = array;
+			foreach (string text2 in array2)
 			{
 				string text3 = text2.Trim().TrimStart('\ufeff');
 				if (text3.Length == 0 || text3.StartsWith("#") || text3.StartsWith(";"))
@@ -16873,7 +19380,8 @@ namespace EmulatorHub
 		{
 			Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 			string[] array = ReadText(file).Split('\n');
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				string text2 = text.Trim();
 				if (text2.Length == 0 || text2.StartsWith("#"))
@@ -16911,7 +19419,8 @@ namespace EmulatorHub
 		{
 			Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 			string[] array = ReadText(file).Split('\n');
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				if (text.StartsWith(" ") || text.StartsWith("\t"))
 				{
@@ -17018,7 +19527,8 @@ namespace EmulatorHub
 				throw new InvalidDataException("An archive contains an invalid path.");
 			}
 			string[] array = relative.Split('\\');
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				switch (text)
 				{
@@ -17295,17 +19805,19 @@ namespace EmulatorHub
 			}
 			string[] array = EmulatorCatalog.Presets.SelectMany((EmulatorPreset p) => p.UnixExecutables).Distinct().ToArray();
 			string[] array2;
+			string[] array3;
 			foreach (string item2 in (from d in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
 				where d.Length > 0
 				select d).Distinct())
 			{
 				array2 = array;
-				foreach (string path2 in array2)
+				array3 = array2;
+				foreach (string path2 in array3)
 				{
-					string current2 = Path.Combine(item2, path2);
-					if (Platform.IsExecutableFile(current2))
+					string text = Path.Combine(item2, path2);
+					if (Platform.IsExecutableFile(text))
 					{
-						action(current2);
+						action(text);
 					}
 				}
 			}
@@ -17316,16 +19828,17 @@ namespace EmulatorHub
 				"Downloads",
 				Path.Combine(".local", "bin")
 			};
-			foreach (string path3 in array2)
+			array3 = array2;
+			foreach (string path3 in array3)
 			{
-				string current3 = Path.Combine(Platform.Home, path3);
+				string path4 = Path.Combine(Platform.Home, path3);
 				try
 				{
-					if (!Directory.Exists(current3))
+					if (!Directory.Exists(path4))
 					{
 						continue;
 					}
-					foreach (string item3 in (from f in Directory.EnumerateFiles(current3)
+					foreach (string item3 in (from f in Directory.EnumerateFiles(path4)
 						where f.EndsWith(".AppImage", StringComparison.OrdinalIgnoreCase) || Platform.IsExecutableFile(f)
 						select f).Take(500))
 					{
@@ -17548,15 +20061,16 @@ namespace EmulatorHub
 				EmulatorReference.For(profile).Releases,
 				EmulatorCatalog.Find(profile.Preset).Website
 			};
-			foreach (string uriString in array)
+			string[] array2 = array;
+			foreach (string uriString in array2)
 			{
 				Uri result;
 				if (Uri.TryCreate(uriString, UriKind.Absolute, out result) && result.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase))
 				{
-					string[] array2 = result.AbsolutePath.Trim('/').Split('/');
-					if (array2.Length >= 2 && ValidRepo(array2[0] + "/" + array2[1]))
+					string[] array3 = result.AbsolutePath.Trim('/').Split('/');
+					if (array3.Length >= 2 && ValidRepo(array3[0] + "/" + array3[1]))
 					{
-						return array2[0] + "/" + array2[1];
+						return array3[0] + "/" + array3[1];
 					}
 				}
 			}
@@ -17699,7 +20213,8 @@ namespace EmulatorHub
 			}
 			List<int> list = new List<int>();
 			string[] array = match.Value.Split('.');
-			foreach (string s in array)
+			string[] array2 = array;
+			foreach (string s in array2)
 			{
 				int result;
 				if (!int.TryParse(s, out result))
@@ -17922,7 +20437,8 @@ namespace EmulatorHub
 						continue;
 					}
 					string[] directories = Directory.GetDirectories(tuple.Item1);
-					foreach (string text in directories)
+					string[] array = directories;
+					foreach (string text in array)
 					{
 						if (!new string[3] { "content", "contents", "registered" }.Contains(Path.GetFileName(text), StringComparer.OrdinalIgnoreCase))
 						{
@@ -18106,10 +20622,10 @@ namespace EmulatorHub
 							token.ThrowIfCancellationRequested();
 							List<BackupRoot> roots = plan.Roots;
 							Func<BackupRoot, bool> predicate = (BackupRoot r) => r.Key == file.RootKey;
-							BackupRoot current = roots.Single(predicate);
-							string text3 = HubPaths.SafeChild(current.Source, file.Relative);
-							HubPaths.CheckParents(current.Source, text3);
-							if (!AllowedFile(current, file.Relative) || HubPaths.IsLink(text3))
+							BackupRoot backupRoot = roots.Single(predicate);
+							string text3 = HubPaths.SafeChild(backupRoot.Source, file.Relative);
+							HubPaths.CheckParents(backupRoot.Source, text3);
+							if (!AllowedFile(backupRoot, file.Relative) || HubPaths.IsLink(text3))
 							{
 								throw new IOException("A backup source no longer matches its preview.");
 							}
@@ -18327,26 +20843,25 @@ namespace EmulatorHub
 				Detail = Platform.LaunchFileDescription
 			});
 			RuntimeState runtimeState = EmulatorRuntime.State(profile.Executable);
-			HealthCheck healthCheck = new HealthCheck
-			{
-				Name = "Running status"
-			};
-			object status;
+			HealthCheck healthCheck = new HealthCheck();
+			healthCheck.Name = "Running status";
+			HealthCheck healthCheck2 = healthCheck;
+			object obj;
 			switch (runtimeState)
 			{
 			default:
-				status = "Stopped";
+				obj = "Stopped";
 				break;
 			case RuntimeState.Unknown:
-				status = "Unknown";
+				obj = "Unknown";
 				break;
 			case RuntimeState.Running:
-				status = "Running";
+				obj = "Running";
 				break;
 			}
-			healthCheck.Status = (string)status;
-			healthCheck.Detail = ((runtimeState == RuntimeState.Unknown) ? "Wrappers and inaccessible processes cannot always be tracked." : "Matched using the executable's full path.");
-			list.Add(healthCheck);
+			healthCheck2.Status = (string)obj;
+			healthCheck2.Detail = ((runtimeState == RuntimeState.Unknown) ? "Wrappers and inaccessible processes cannot always be tracked." : "Matched using the executable's full path.");
+			list.Add(healthCheck2);
 			list.Add(new HealthCheck
 			{
 				Name = "Installed version",
@@ -18701,6 +21216,7 @@ namespace EmulatorHub
 							AddedAt = DateTime.UtcNow.ToString("o"),
 							Tags = new List<string>()
 						});
+						GameRecognition.Apply(library.Games.Last(), library.Emulators, true);
 						num++;
 					}
 				}
@@ -19296,7 +21812,8 @@ namespace EmulatorHub
 				return File.Exists(command) ? command : null;
 			}
 			string[] array = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator);
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				if (text.Length != 0)
 				{
@@ -19400,7 +21917,7 @@ namespace EmulatorHub
 				using (Process process = Process.Start(processStartInfo2))
 				{
 					bool lockTaken = false;
-					HashSet<int> obj = default(HashSet<int>);
+					HashSet<int> obj = null;
 					try
 					{
 						Monitor.Enter(obj = helpers, ref lockTaken);
@@ -19473,7 +21990,8 @@ namespace EmulatorHub
 				}
 				bool flag = false;
 				Process[] processesByName = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(executable));
-				foreach (Process process in processesByName)
+				Process[] array = processesByName;
+				foreach (Process process in array)
 				{
 					using (process)
 					{
@@ -19504,7 +22022,8 @@ namespace EmulatorHub
 			if (IsWindows)
 			{
 				Process[] processesByName = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(executable));
-				foreach (Process process in processesByName)
+				Process[] array = processesByName;
+				foreach (Process process in array)
 				{
 					using (process)
 					{
@@ -19554,7 +22073,8 @@ namespace EmulatorHub
 			{
 				obj = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
 				string[] array2 = array;
-				foreach (string text in array2)
+				string[] array3 = array2;
+				foreach (string text in array3)
 				{
 					if (File.Exists(text))
 					{
@@ -19630,7 +22150,8 @@ namespace EmulatorHub
 				DesktopEntry desktopEntry = new DesktopEntry();
 				bool flag = false;
 				string[] array = File.ReadAllLines(path);
-				foreach (string text in array)
+				string[] array2 = array;
+				foreach (string text in array2)
 				{
 					string text2 = text.Trim();
 					if (text2.StartsWith("[", StringComparison.Ordinal))
@@ -19709,22 +22230,22 @@ namespace EmulatorHub
 				case '"':
 					flag = true;
 					flag2 = true;
-					break;
+					continue;
 				default:
 					if (c != '\t')
 					{
 						stringBuilder.Append(c);
-						break;
-					}
-					goto case ' ';
-				case ' ':
-					if (flag2 || stringBuilder.Length > 0)
-					{
-						list.Add(stringBuilder.ToString());
-						stringBuilder.Clear();
-						flag2 = false;
+						continue;
 					}
 					break;
+				case ' ':
+					break;
+				}
+				if (flag2 || stringBuilder.Length > 0)
+				{
+					list.Add(stringBuilder.ToString());
+					stringBuilder.Clear();
+					flag2 = false;
 				}
 			}
 			if (flag2 || stringBuilder.Length > 0)
@@ -19810,7 +22331,8 @@ namespace EmulatorHub
 		{
 			List<string> list = new List<string>();
 			string[] array = waiting.Keys.ToArray();
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				Sample sample = waiting[text];
 				if (now - sample.Since > TimeSpan.FromMinutes(2.0))
@@ -19934,13 +22456,13 @@ namespace EmulatorHub
 			};
 			games.SelectedIndexChanged += delegate
 			{
-				copy.Enabled = saveCopyPromptDialog.games.SelectedItem != null;
+				copy.Enabled = games.SelectedItem != null;
 			};
 			copy.Click += delegate
 			{
 				try
 				{
-					GameEntry gameEntry = saveCopyPromptDialog.games.SelectedItem as GameEntry;
+					GameEntry gameEntry = games.SelectedItem as GameEntry;
 					if (gameEntry != null)
 					{
 						using (new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -19954,12 +22476,12 @@ namespace EmulatorHub
 							Store.Save(library);
 							Store.Log("In-game save copied for " + gameEntry.Title + ": " + text);
 						}
-						saveCopyPromptDialog.DialogResult = DialogResult.OK;
+						DialogResult = DialogResult.OK;
 					}
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(saveCopyPromptDialog, "The save could not be copied. Wait for the emulator to finish saving, then retry.\n\n" + ex.Message, "FishBowl Game Saves", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					MessageBox.Show(this, "The save could not be copied. Wait for the emulator to finish saving, then retry.\n\n" + ex.Message, "FishBowl Game Saves", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 			};
 			base.Controls.Add(copy);
@@ -20148,7 +22670,10 @@ namespace EmulatorHub
 
 		public static EmulatorProfile Emulator(LibraryData library, GameEntry game)
 		{
-			if (Hub.Native(game)) return Hub.NativeProfile(game);
+			if (Hub.Native(game))
+			{
+				return Hub.NativeProfile(game);
+			}
 			return library.Emulators.FirstOrDefault((EmulatorProfile p) => p.Id == (string.IsNullOrWhiteSpace(game.PreferredEmulatorId) ? game.EmulatorId : game.PreferredEmulatorId)) ?? ((library.Emulators.Count == 1) ? library.Emulators[0] : null);
 		}
 
@@ -20165,7 +22690,7 @@ namespace EmulatorHub
 			{
 				return false;
 			}
-			return (quietStartHour >= quietEndHour) ? (now.Hour >= quietStartHour || now.Hour < quietEndHour) : (now.Hour >= quietStartHour && now.Hour < quietEndHour);
+			return (quietStartHour < quietEndHour) ? (now.Hour >= quietStartHour && now.Hour < quietEndHour) : (now.Hour >= quietStartHour || now.Hour < quietEndHour);
 		}
 	}
 	public static class SafeFiles
@@ -20424,13 +22949,20 @@ namespace EmulatorHub
 			{
 				throw new IOException("Assign the game to a directly registered emulator before restoring.");
 			}
-			if (Hub.Native(gameEntry)) {
-				if (!Platform.IsDirectProgram(assigned.Executable) || EmulatorRuntime.State(assigned.Executable) != RuntimeState.Stopped) throw new IOException("Close the PC game before restoring. Shortcut launcher state cannot be verified; use a directly registered executable.");
+			if (Hub.Native(gameEntry))
+			{
+				if (!Platform.IsDirectProgram(assigned.Executable) || EmulatorRuntime.State(assigned.Executable) != 0)
+				{
+					throw new IOException("Close the PC game before restoring. Shortcut launcher state cannot be verified; use a directly registered executable.");
+				}
 				return;
 			}
-			foreach (string program in library.Emulators.Where(p=>p.Id==assigned.Id).SelectMany(p=>new[]{p.Executable}.Concat((p.Builds??new List<EmulatorBuild>()).Where(b=>File.Exists(b.Executable)).Select(b=>b.Executable))).Concat(new[]{assigned.Executable}).Distinct(StringComparer.OrdinalIgnoreCase))
+			foreach (string item in library.Emulators.Where((EmulatorProfile p) => p.Id == assigned.Id).SelectMany((EmulatorProfile p) => new string[1] { p.Executable }.Concat(from b in p.Builds ?? new List<EmulatorBuild>()
+				where File.Exists(b.Executable)
+				select b.Executable)).Concat(new string[1] { assigned.Executable })
+				.Distinct(StringComparer.OrdinalIgnoreCase))
 			{
-				switch (EmulatorRuntime.State(program))
+				switch (EmulatorRuntime.State(item))
 				{
 				case RuntimeState.Running:
 					throw new IOException("Close " + assigned.Name + " and its registered builds before restoring a save.");
@@ -20762,16 +23294,19 @@ namespace EmulatorHub
 	{
 		public static string Validate(LibraryData library, GameEntry game)
 		{
-            if(Hub.Native(game))return Hub.NativeArguments(game);
+			if (Hub.Native(game))
+			{
+				return Hub.NativeArguments(game);
+			}
 			EmulatorProfile emulatorProfile = NextData.LaunchEmulator(library, game);
 			if (emulatorProfile == null || !File.Exists(emulatorProfile.Executable))
 			{
 				throw new IOException("Assign an available emulator.");
 			}
-			if (!File.Exists(NextData.LaunchPath(game)))
-			{
-				throw new IOException("Repair the selected game or disc path first.");
-			}
+			if (!File.Exists(NextData.LaunchPath(game)) && (!InstalledGames.IsPackage(emulatorProfile, NextData.LaunchPath(game)) || InstalledGames.Find(emulatorProfile, game.TitleId, NextData.LaunchPath(game)) == null))
+            {
+                throw new IOException("Repair the selected game or disc path first.");
+            }
 			if (EmulatorRuntime.State(emulatorProfile.Executable) == RuntimeState.Running)
 			{
 				throw new IOException("The emulator is already running. Close it before starting a tracked game session.");
@@ -20787,7 +23322,8 @@ namespace EmulatorHub
 				text = launchProfile.Arguments;
 			}
 			string text2 = string.Join(" ", new string[3] { emulatorProfile.Arguments, text, game.Arguments }.Where((string s) => !string.IsNullOrWhiteSpace(s)));
-			text2 = ((!text2.Contains("{game}")) ? (text2 + " \"" + NextData.LaunchPath(game) + "\"") : text2.Replace("{game}", "\"" + NextData.LaunchPath(game) + "\""));
+			string installedArguments = InstalledGames.ResolveArguments(emulatorProfile, game, text2, NextData.LaunchPath(game));
+			text2 = installedArguments ?? ((!text2.Contains("{game}")) ? (text2 + " \"" + NextData.LaunchPath(game) + "\"") : text2.Replace("{game}", "\"" + NextData.LaunchPath(game) + "\""));
 			if (text2.Contains("{") || text2.Contains("}"))
 			{
 				throw new IOException("Unsupported argument template. Use {game} for the game path.");
@@ -21002,6 +23538,7 @@ namespace EmulatorHub
 						gameEntry.Path = plan.Destination;
 					}
 					gameEntry.ConsoleLabel = plan.Console;
+                    GameRecognition.Apply(gameEntry, library.Emulators, gameEntry.Title == Path.GetFileNameWithoutExtension(plan.Source));
 					if (plan.Files.Count > 1)
 					{
 						gameEntry.Discs = (from m in list
@@ -21353,15 +23890,15 @@ namespace EmulatorHub
 			};
 			base.Shown += delegate
 			{
-				Task.Factory.StartNew(() => work(backgroundWork.cancellation.Token, delegate(string message)
+				Task.Factory.StartNew(() => work(cancellation.Token, delegate(string message)
 				{
-					if (!backgroundWork.IsDisposed)
+					if (!IsDisposed)
 					{
 						try
 						{
-							backgroundWork.BeginInvoke((Action)delegate
+							BeginInvoke((Action)delegate
 							{
-								backgroundWork.progress.Text = message;
+								progress.Text = message;
 							});
 						}
 						catch (InvalidOperationException)
@@ -21370,29 +23907,29 @@ namespace EmulatorHub
 					}
 				})).ContinueWith(delegate(Task<T> task)
 				{
-					if (backgroundWork.IsDisposed)
+					if (IsDisposed)
 					{
 						return;
 					}
 					try
 					{
-						backgroundWork.BeginInvoke((Action)delegate
+						BeginInvoke((Action)delegate
 						{
-							backgroundWork.finished = true;
+							finished = true;
 							if (task.IsFaulted)
 							{
-								backgroundWork.Error = task.Exception.GetBaseException();
-								backgroundWork.DialogResult = DialogResult.Cancel;
+								Error = task.Exception.GetBaseException();
+								DialogResult = DialogResult.Cancel;
 							}
 							else if (task.IsCanceled)
 							{
-								backgroundWork.Error = new OperationCanceledException();
-								backgroundWork.DialogResult = DialogResult.Cancel;
+								Error = new OperationCanceledException();
+								DialogResult = DialogResult.Cancel;
 							}
 							else
 							{
-								backgroundWork.Result = task.Result;
-								backgroundWork.DialogResult = DialogResult.OK;
+								Result = task.Result;
+								DialogResult = DialogResult.OK;
 							}
 						});
 					}
@@ -21451,9 +23988,34 @@ namespace EmulatorHub
 			Padding = new Padding(10, 4, 10, 4)
 		};
 
-        private int homeStamp;private DateTime homeBuilt;public int ContentRevision {get;private set;}
-        private int DataStamp(){unchecked{int hash=library.Games.Count+library.SaveReviews.Count*31+library.Emulators.Count*17;foreach(var g in library.Games){hash=hash*31+(g.Id??"").GetHashCode();hash=hash*31+(g.Title??"").GetHashCode();hash=hash*31+(g.ArtworkPath??"").GetHashCode();hash=hash*31+(g.Path??"").GetHashCode();hash=hash*31+(g.LastLaunched??"").GetHashCode();hash=hash*31+g.LaunchCount+(int)g.TotalPlaySeconds+(g.Favorite?97:0)+(g.Pinned?101:0);}foreach(var e in library.Emulators)hash=hash*31+(e.Name??"").GetHashCode()+(e.Executable??"").GetHashCode()+(e.Favorite?97:0);return hash*31+Json.Serialize(library.Experience).GetHashCode();}}
+		private int homeStamp;
+
+		private DateTime homeBuilt;
+
 		private float visualScale = 1f;
+
+		private bool layingOutCards;
+
+		public int ContentRevision { get; private set; }
+
+		private int DataStamp()
+		{
+			int num = library.Games.Count + library.SaveReviews.Count * 31 + library.Emulators.Count * 17;
+			foreach (GameEntry game in library.Games)
+			{
+				num = num * 31 + (game.Id ?? "").GetHashCode();
+				num = num * 31 + (game.Title ?? "").GetHashCode();
+				num = num * 31 + (game.ArtworkPath ?? "").GetHashCode();
+				num = num * 31 + (game.Path ?? "").GetHashCode();
+				num = num * 31 + (game.LastLaunched ?? "").GetHashCode();
+				num = num * 31 + game.LaunchCount + (int)game.TotalPlaySeconds + (game.Favorite ? 97 : 0) + (game.Pinned ? 101 : 0);
+			}
+			foreach (EmulatorProfile emulator in library.Emulators)
+			{
+				num = num * 31 + (emulator.Name ?? "").GetHashCode() + (emulator.Executable ?? "").GetHashCode() + (emulator.Favorite ? 97 : 0);
+			}
+			return num * 31 + Json.Serialize(library.Experience).GetHashCode();
+		}
 
 		public HomeSurface(LibraryData library, Action<string, GameEntry, EmulatorProfile> action)
 		{
@@ -21497,20 +24059,55 @@ namespace EmulatorHub
 			}
 		}
 
-        public void RefreshLayout(){LayoutCards();}
-        private bool layingOutCards;
-        private void LayoutCards(){
-            if(layingOutCards)return;
-            layingOutCards=true;
-            var layouts=Controls.Cast<Control>().Concat(cards.Controls.Cast<Control>()).Concat(cards.Controls.Cast<Control>().Select(c=>c.Tag as Control).Where(c=>c!=null)).Distinct().ToArray();
-            SuspendLayout();foreach(var layout in layouts)layout.SuspendLayout();
-            try{LayoutCardsCore();}
-            finally{foreach(var layout in layouts.Reverse())layout.ResumeLayout(true);ResumeLayout(true);layingOutCards=false;}
-        }
-        private void LayoutCardsCore()
-        {
-			float num = Math.Max(0.5f, visualScale*Math.Min(1.5f,Math.Max(1,NextUi.TextPercent/100f)));
-            foreach(Button actionButton in summary.Controls.OfType<Button>()){actionButton.AutoSize=false;actionButton.MinimumSize=new Size(140,42);actionButton.Width=Math.Max(140,TextRenderer.MeasureText(actionButton.Text,actionButton.Font).Width+60);actionButton.Height=Math.Max(42,actionButton.Font.Height+16);}
+		public void RefreshLayout()
+		{
+			LayoutCards();
+		}
+
+		private void LayoutCards()
+		{
+			if (layingOutCards)
+			{
+				return;
+			}
+			layingOutCards = true;
+			Control[] array = base.Controls.Cast<Control>().Concat(cards.Controls.Cast<Control>()).Concat(from Control c in cards.Controls
+				select c.Tag as Control into c
+				where c != null
+				select c)
+				.Distinct()
+				.ToArray();
+			SuspendLayout();
+			Control[] array2 = array;
+			foreach (Control control in array2)
+			{
+				control.SuspendLayout();
+			}
+			try
+			{
+				LayoutCardsCore();
+			}
+			finally
+			{
+				foreach (Control item in array.Reverse())
+				{
+					item.ResumeLayout(true);
+				}
+				ResumeLayout(true);
+				layingOutCards = false;
+			}
+		}
+
+		private void LayoutCardsCore()
+		{
+			float num = Math.Max(0.5f, visualScale * Math.Min(1.5f, Math.Max(1f, (float)NextUi.TextPercent / 100f)));
+			foreach (Button item in summary.Controls.OfType<Button>())
+			{
+				item.AutoSize = false;
+				item.MinimumSize = new Size(140, 42);
+				item.Width = Math.Max(140, TextRenderer.MeasureText(item.Text, item.Font).Width + 60);
+				item.Height = Math.Max(42, item.Font.Height + 16);
+			}
 			int num2 = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
 			int num3 = Math.Max(1, Math.Min(3, num2 / (int)(350f * num)));
 			foreach (Control control3 in cards.Controls)
@@ -21521,8 +24118,11 @@ namespace EmulatorHub
 				{
 					continue;
 				}
-				foreach(var heading in control3.Controls.OfType<Label>())heading.Height=Math.Max((int)(40*num),heading.Font.Height+14);
-                int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal-SystemInformation.VerticalScrollBarWidth-2);
+				foreach (Label item2 in control3.Controls.OfType<Label>())
+				{
+					item2.Height = Math.Max((int)(40f * num), item2.Font.Height + 14);
+				}
+				int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - 2);
 				foreach (Control control4 in flowLayoutPanel.Controls)
 				{
 					int num5 = Math.Max(1, num4 - control4.Margin.Horizontal);
@@ -21552,7 +24152,7 @@ namespace EmulatorHub
 					}
 				}
 				int val = flowLayoutPanel.Controls.Cast<Control>().Sum((Control item) => item.Height + item.Margin.Vertical) + (int)(32f * num) + control3.Padding.Vertical;
-				control3.Height = Math.Max((int)((Immersion.Ensure(library).Roomier?180f:120f) * num), Math.Min((int)((float)(Immersion.Ensure(library).Roomier ? 360 : (library.Experience.CompactHome ? 210 : 300)) * num), val));
+				control3.Height = Math.Max((int)((Immersion.Ensure(library).Roomier ? 180f : 120f) * num), Math.Min((int)((float)(Immersion.Ensure(library).Roomier ? 360 : (library.Experience.CompactHome ? 210 : 300)) * num), val));
 			}
 		}
 
@@ -21630,7 +24230,7 @@ namespace EmulatorHub
 				{
 					using (Image original = Image.FromFile(game.ArtworkPath))
 					{
-						art.Image = new Bitmap(original,new Size(56,56));
+						art.Image = new Bitmap(original, new Size(56, 56));
 					}
 				}
 			}
@@ -21654,8 +24254,11 @@ namespace EmulatorHub
 					art.Image.Dispose();
 				}
 			};
-			if (art.Image is Bitmap) CosmeticRuntime.DecorateArtwork((Bitmap)art.Image);
-            flowLayoutPanel3.Controls.Add(art);
+			if (art.Image is Bitmap)
+			{
+				CosmeticRuntime.DecorateArtwork((Bitmap)art.Image);
+			}
+			flowLayoutPanel3.Controls.Add(art);
 			FishBowlActionButton fishBowlActionButton = ExperienceUi.Button(game.Title, delegate
 			{
 				action("Game", game, null);
@@ -21674,9 +24277,17 @@ namespace EmulatorHub
 			flowLayoutPanel.Controls.Add(flowLayoutPanel3);
 		}
 
-		public void Reload(bool force=true)
+		public void Reload(bool force = true)
 		{
-            ExperienceData.Ensure(library);int stamp=DataStamp();if(!force&&homeStamp==stamp)return;ContentRevision++;homeStamp=stamp;homeBuilt=DateTime.UtcNow;
+			ExperienceData.Ensure(library);
+			int num = DataStamp();
+			if (!force && homeStamp == num)
+			{
+				return;
+			}
+			ContentRevision++;
+			homeStamp = num;
+			homeBuilt = DateTime.UtcNow;
 			Point autoScrollPosition = cards.AutoScrollPosition;
 			cards.SuspendLayout();
 			summary.SuspendLayout();
@@ -21687,8 +24298,8 @@ namespace EmulatorHub
 				{
 					cards.Controls[0].Dispose();
 				}
-				int num = library.Emulators.Count((EmulatorProfile p) => File.Exists(p.Executable));
-				int num2 = library.Games.Count((GameEntry g) => !File.Exists(g.Path));
+				int num2 = library.Emulators.Count((EmulatorProfile p) => File.Exists(p.Executable));
+				int num3 = library.Games.Count((GameEntry g) => !File.Exists(g.Path));
 				while (summary.Controls.Count > 0)
 				{
 					summary.Controls[0].Dispose();
@@ -21697,7 +24308,7 @@ namespace EmulatorHub
 				{
 					action("Library", null, null);
 				}));
-				summary.Controls.Add(ExperienceUi.Button(num + " ready emulator" + ((num == 1) ? "" : "s"), delegate
+				summary.Controls.Add(ExperienceUi.Button(num2 + " ready emulator" + ((num2 == 1) ? "" : "s"), delegate
 				{
 					action("Emulators", null, null);
 				}));
@@ -21705,7 +24316,7 @@ namespace EmulatorHub
 				{
 					action("Review saves", null, null);
 				}));
-				summary.Controls.Add(ExperienceUi.Button(num2 + " missing game paths", delegate
+				summary.Controls.Add(ExperienceUi.Button(num3 + " missing game paths", delegate
 				{
 					action("Missing games", null, null);
 				}));
@@ -21778,9 +24389,9 @@ namespace EmulatorHub
 						break;
 					case "Attention":
 					{
-						TextLine(card, num2 + " missing game paths; " + (library.Emulators.Count - num) + " missing emulator paths");
-						int num3 = library.Games.SelectMany((GameEntry g) => g.Saves ?? new List<GameSaveEntry>()).Count((GameSaveEntry s) => !File.Exists(s.Path) && !Directory.Exists(s.Path));
-						TextLine(card, num3 + " unavailable linked saves");
+						TextLine(card, num3 + " missing game paths; " + (library.Emulators.Count - num2) + " missing emulator paths");
+						int num4 = library.Games.SelectMany((GameEntry g) => g.Saves ?? new List<GameSaveEntry>()).Count((GameSaveEntry s) => !File.Exists(s.Path) && !Directory.Exists(s.Path));
+						TextLine(card, num4 + " unavailable linked saves");
 						Add(card, "Repair game paths", "Relink");
 						Add(card, "Setup readiness", "Readiness");
 						Add(card, "Monitoring status", "Monitor");
@@ -21803,13 +24414,14 @@ namespace EmulatorHub
 					case "Recent activity":
 						try
 						{
-							string[] array2 = (File.Exists(Store.LogFileName) ? LibraryJobs.LogTail(5) : new string[0]);
-							string[] array = array2;
-							foreach (string text in array)
+							string[] array3 = (File.Exists(Store.LogFileName) ? LibraryJobs.LogTail(5) : new string[0]);
+							string[] array = array3;
+							string[] array2 = array;
+							foreach (string text in array2)
 							{
 								TextLine(card, text);
 							}
-							if (array2.Length == 0)
+							if (array3.Length == 0)
 							{
 								TextLine(card, "Your launches, imports and backups will appear here.");
 							}
@@ -21823,7 +24435,8 @@ namespace EmulatorHub
 					case "Quick actions":
 					{
 						string[] array = new string[6] { "Add emulator", "Organize games", "Library", "Save history", "Readiness", "Customize Home" };
-						foreach (string command in array)
+						string[] array2 = array;
+						foreach (string command in array2)
 						{
 							Add(card, command, command);
 						}
@@ -21937,7 +24550,8 @@ namespace EmulatorHub
 			list.ForeColor = Color.White;
 			list.AccessibleName = "Linked saves and snapshots";
 			string[] array = new string[5] { "Type", "Date / location", "Size", "Emulator / version", "Note" };
-			foreach (string text2 in array)
+			string[] array2 = array;
+			foreach (string text2 in array2)
 			{
 				list.Columns.Add(text2, (text2 == "Date / location") ? 320 : ((text2 == "Emulator / version") ? 185 : 130));
 			}
@@ -21947,7 +24561,8 @@ namespace EmulatorHub
 				"Link file", "Link folder", "Create snapshot", "Restore", "Export", "Import", "Pin", "Note / core", "Copy preference", "Cleanup",
 				"Open location", "Close"
 			};
-			foreach (string text3 in array)
+			array2 = array;
+			foreach (string text3 in array2)
 			{
 				string text = text3;
 				flowLayoutPanel2.Controls.Add(ExperienceUi.Button(text, delegate
@@ -22033,7 +24648,8 @@ namespace EmulatorHub
 					if (openFileDialog2.ShowDialog(this) == DialogResult.OK)
 					{
 						string[] fileNames = openFileDialog2.FileNames;
-						foreach (string text in fileNames)
+						string[] array = fileNames;
+						foreach (string text in array)
 						{
 							GameSaves.Link(Game, text, kind.Text);
 						}
@@ -22043,9 +24659,9 @@ namespace EmulatorHub
 			}
 			case "Link folder":
 			{
-				FolderBrowserDialog folderBrowserDialog3 = new FolderBrowserDialog();
-				folderBrowserDialog3.Description = "Choose this game's complete original save folder";
-				using (FolderBrowserDialog folderBrowserDialog2 = folderBrowserDialog3)
+				FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
+				folderBrowserDialog.Description = "Choose this game's complete original save folder";
+				using (FolderBrowserDialog folderBrowserDialog2 = folderBrowserDialog)
 				{
 					if (folderBrowserDialog2.ShowDialog(this) == DialogResult.OK)
 					{
@@ -22078,9 +24694,9 @@ namespace EmulatorHub
 				{
 					if (snapshot.IsFolder)
 					{
-						FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
-						folderBrowserDialog.Description = "Choose the local emulator save folder to restore into";
-						using (FolderBrowserDialog folderBrowserDialog2 = folderBrowserDialog)
+						FolderBrowserDialog folderBrowserDialog3 = new FolderBrowserDialog();
+						folderBrowserDialog3.Description = "Choose the local emulator save folder to restore into";
+						using (FolderBrowserDialog folderBrowserDialog2 = folderBrowserDialog3)
 						{
 							if (folderBrowserDialog2.ShowDialog(this) != DialogResult.OK)
 							{
@@ -22105,10 +24721,13 @@ namespace EmulatorHub
 						}
 					}
 				}
-				string preview = BackgroundWork<string>.Run(this,"Preview save restore",(token,progress)=>Hub.RestorePreview(snapshot,token));
-                if(preview==null || !Polish.Review(this,"Review save file changes",preview))return;
-                string text2 = "Restore " + Game.Title + "?\n\nDestination: " + snapshot.Source + "\n\n" + SaveHistory.Compatibility(library, snapshot) + "\n\nClose the emulator first. Current contents will be backed up and retained.";
-				if (MessageBox.Show(this, text2, "Review save restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes)
+				string text2 = BackgroundWork<string>.Run(this, "Preview save restore", (CancellationToken token, Action<string> progress) => Hub.RestorePreview(snapshot, token));
+				if (text2 == null || !Polish.Review(this, "Review save file changes", text2))
+				{
+					return;
+				}
+				string text3 = "Restore " + Game.Title + "?\n\nDestination: " + snapshot.Source + "\n\n" + SaveHistory.Compatibility(library, snapshot) + "\n\nClose the emulator first. Current contents will be backed up and retained.";
+				if (MessageBox.Show(this, text3, "Review save restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes)
 				{
 					return;
 				}
@@ -22308,7 +24927,8 @@ namespace EmulatorHub
 				"Launch", "Preview launch", "Saves", "Progress", "Edit game", "Manual", "Compatibility", "Controller", "Launch profile", "Core / title ID",
 				"Discs", "Preferred build", "Artwork editor", "Screenshot gallery", "Close"
 			};
-			foreach (string text in array)
+			string[] array2 = array;
+			foreach (string text in array2)
 			{
 				string command = text;
 				flowLayoutPanel.Controls.Add(ExperienceUi.Button(command, delegate
@@ -22452,32 +25072,47 @@ namespace EmulatorHub
 		public static void Launch(IWin32Window owner, LibraryData library, GameEntry game)
 		{
 			string text;
-            try { text = GameSessions.Validate(library, game); } catch (Exception ex) { UserTools.Troubleshoot(owner, library, game, ex.Message); return; }
+			try
+			{
+				text = GameSessions.Validate(library, game);
+			}
+			catch (Exception ex)
+			{
+				UserTools.Troubleshoot(owner, library, game, ex.Message);
+				return;
+			}
 			EmulatorProfile emulatorProfile = NextData.LaunchEmulator(library, game);
 			ControllerProfile controllerProfile = (library.ControllerProfiles ?? new List<ControllerProfile>()).FirstOrDefault((ControllerProfile p) => p.Id == game.ControllerProfileId);
 			if (controllerProfile != null)
 			{
 				MessageBox.Show(owner, controllerProfile.Name + "\n\n" + controllerProfile.Notes, "Controller reminder");
 			}
-			if (library.Theme.ConfirmBeforeGameLaunch && MessageBox.Show(owner, "Launch " + game.Title + "?\n\n" + emulatorProfile.Executable + "\n" + text, "Launch game", MessageBoxButtons.YesNo) != DialogResult.Yes)
+			if ((library.Theme.ConfirmBeforeGameLaunch && MessageBox.Show(owner, "Launch " + game.Title + "?\n\n" + emulatorProfile.Executable + "\n" + text, "Launch game", MessageBoxButtons.YesNo) != DialogResult.Yes) || !Immersion.PreLaunch(owner, library, game))
 			{
 				return;
 			}
-            if(!Immersion.PreLaunch(owner,library,game))return;
 			UserSaveRoutes.Arguments(library, emulatorProfile, true);
-            ProcessStartInfo processStartInfo = Platform.StartInfo(emulatorProfile.Executable, text);
-			processStartInfo.WorkingDirectory = Hub.Native(game)&&!string.IsNullOrWhiteSpace(game.Extras.WorkingDirectory)?game.Extras.WorkingDirectory:Path.GetDirectoryName(emulatorProfile.Executable);
+			ProcessStartInfo processStartInfo = Platform.StartInfo(emulatorProfile.Executable, text);
+			processStartInfo.WorkingDirectory = ((Hub.Native(game) && !string.IsNullOrWhiteSpace(game.Extras.WorkingDirectory)) ? game.Extras.WorkingDirectory : Path.GetDirectoryName(emulatorProfile.Executable));
 			Process process;
-            try { process = Process.Start(processStartInfo); } catch (Exception ex) { UserTools.Troubleshoot(owner, library, game, ex.Message); return; }
-            Immersion.Sound(library,true);
+			try
+			{
+				process = Process.Start(processStartInfo);
+			}
+			catch (Exception ex)
+			{
+				UserTools.Troubleshoot(owner, library, game, ex.Message);
+				return;
+			}
+			Immersion.Sound(library, true);
 			game.LastLaunched = DateTime.Now.ToString("g");
 			game.LaunchCount++;
 			bool flag = Platform.IsDirectProgram(emulatorProfile.Executable) && process != null;
 			PlaySession session = NextData.BeginSession(library, game, emulatorProfile.Executable, flag);
 			game.SessionTrackingNote = (flag ? "Tracking the launched emulator process; game changes inside that process cannot be distinguished." : "Time not tracked: launcher or wrapper process is uncertain.");
-			Hub.Record(library,"Launched "+game.Title);
-            Store.Save(library);
-            Store.Log("Game launched: " + game.Title);
+			Hub.Record(library, "Launched " + game.Title);
+			Store.Save(library);
+			Store.Log("Game launched: " + game.Title + " | Emulator: " + emulatorProfile.Executable + " | Arguments: " + text);
 			if (!Store.PortableMode && !UserTools.Guest)
 			{
 				try
@@ -22492,9 +25127,9 @@ namespace EmulatorHub
 			if (flag)
 			{
 				UserTools.ActiveLaunches++;
-                UserTools.ActiveSessions.TryAdd(session.Id, 0);
-                bool completionQueued = false;
-                Stopwatch clock = Stopwatch.StartNew();
+				UserTools.ActiveSessions.TryAdd(session.Id, 0);
+				bool completionQueued = false;
+				Stopwatch clock = Stopwatch.StartNew();
 				Task.Factory.StartNew(delegate
 				{
 					try
@@ -22504,17 +25139,24 @@ namespace EmulatorHub
 						Control control = owner as Control;
 						Action method = delegate
 						{
-							try {
-NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSeconds);
-							game.SessionTrackingNote = "Recorded emulator session: " + clock.Elapsed.ToString();
-							Store.Save(library);
-                            } finally { System.Threading.Interlocked.Decrement(ref UserTools.ActiveLaunches); byte ignored; UserTools.ActiveSessions.TryRemove(session.Id, out ignored); }
-                            Immersion.AfterSession(owner,library,game,session);
+							try
+							{
+								NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSeconds);
+								game.SessionTrackingNote = "Recorded emulator session: " + clock.Elapsed.ToString();
+								Store.Save(library);
+							}
+							finally
+							{
+								Interlocked.Decrement(ref UserTools.ActiveLaunches);
+								byte value2;
+								UserTools.ActiveSessions.TryRemove(session.Id, out value2);
+							}
+							Immersion.AfterSession(owner, library, game, session);
 						};
 						if (control != null && !control.IsDisposed && control.IsHandleCreated)
 						{
 							control.BeginInvoke(method);
-                            completionQueued = true;
+							completionQueued = true;
 						}
 						else
 						{
@@ -22535,8 +25177,13 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					}
 					finally
 					{
-						if (!completionQueued) { System.Threading.Interlocked.Decrement(ref UserTools.ActiveLaunches); byte ignored; UserTools.ActiveSessions.TryRemove(session.Id, out ignored); }
-                        process.Dispose();
+						if (!completionQueued)
+						{
+							Interlocked.Decrement(ref UserTools.ActiveLaunches);
+							byte value;
+							UserTools.ActiveSessions.TryRemove(session.Id, out value);
+						}
+						process.Dispose();
 					}
 				});
 			}
@@ -23232,7 +25879,7 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					}
 					if (Polish.Review(dialog, "Review bulk edits", Polish.BulkSummary(selected, emulator.Text, status.Text, favorite.Text, pinned.Text, tags.Text, art.Text, collection.Text)))
 					{
-						var undoRecord = UserTools.BeforeBulk(library, selected);
+						BulkUndoRecord r = UserTools.BeforeBulk(library, selected);
 						foreach (GameEntry item in selected)
 						{
 							if (emulator.Text != "Keep current")
@@ -23284,8 +25931,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 								}
 							}
 						}
-						UserTools.AfterBulk(library, undoRecord, selected);
-                        Store.Save(library);
+						UserTools.AfterBulk(library, r, selected);
+						Store.Save(library);
 						dialog.Close();
 					}
 				}));
@@ -23680,7 +26327,7 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 				{
 					throw new IOException("Confirm the game first.");
 				}
-				BackgroundWork<bool>.Run(saveGroupPromptDialog, "Copy and verify save group", delegate(CancellationToken token, Action<string> progress)
+				BackgroundWork<bool>.Run(this, "Copy and verify save group", delegate(CancellationToken token, Action<string> progress)
 				{
 					foreach (string path in paths)
 					{
@@ -23692,7 +26339,7 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					return true;
 				});
 				Store.Save(library);
-				saveGroupPromptDialog.DialogResult = DialogResult.OK;
+				DialogResult = DialogResult.OK;
 			});
 			copy.Enabled = gameChoice.SelectedItem != null;
 			gameChoice.SelectedIndexChanged += delegate
@@ -23871,7 +26518,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 				select @group).ToArray();
 			List<string> list = new List<string>();
 			IGrouping<long, GameEntry>[] array2 = array;
-			foreach (IGrouping<long, GameEntry> grouping in array2)
+			IGrouping<long, GameEntry>[] array3 = array2;
+			foreach (IGrouping<long, GameEntry> grouping in array3)
 			{
 				Dictionary<string, List<GameEntry>> dictionary = new Dictionary<string, List<GameEntry>>();
 				foreach (GameEntry item in grouping)
@@ -24171,7 +26819,10 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 
 		public static EmulatorProfile LaunchEmulator(LibraryData data, GameEntry game)
 		{
-            if(Hub.Native(game))return Hub.NativeProfile(game);
+			if (Hub.Native(game))
+			{
+				return Hub.NativeProfile(game);
+			}
 			EmulatorProfile emulatorProfile = ExperienceData.Emulator(data, game);
 			if (emulatorProfile == null)
 			{
@@ -24626,9 +27277,12 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 						if (openFileDialog.ShowDialog(dialog) == DialogResult.OK)
 						{
 							string[] fileNames = openFileDialog.FileNames;
-							foreach (string path in fileNames)
+							string[] array = fileNames;
+							foreach (string path in array)
 							{
-								if (!data.GameScreenshots.Any((GameScreenshot p) => p.GameId == current.Id && string.Equals(p.Path, path, StringComparison.OrdinalIgnoreCase)))
+								List<GameScreenshot> gameScreenshots = data.GameScreenshots;
+								Func<GameScreenshot, bool> predicate = (GameScreenshot p) => p.GameId == current.Id && string.Equals(p.Path, path, StringComparison.OrdinalIgnoreCase);
+								if (!gameScreenshots.Any(predicate))
 								{
 									data.GameScreenshots.Add(new GameScreenshot
 									{
@@ -24843,7 +27497,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					ForeColor = FishBowlPalette.ThemeInk
 				};
 				string[] array = new string[5] { "Game", "Started", "Minutes", "Tracking", "Notes" };
-				foreach (string text in array)
+				string[] array2 = array;
+				foreach (string text in array2)
 				{
 					list.Columns.Add(text, (text == "Notes") ? 300 : 170);
 				}
@@ -24891,6 +27546,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 				};
 				dialog.Body.Controls.Add(list);
 				dialog.Body.Controls.Add(chart);
+				NumericUpDown minutes;
+				TextBox note;
 				dialog.Action("Edit time and note", delegate
 				{
 					if (list.SelectedItems.Count == 0)
@@ -24902,9 +27559,9 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					try
 					{
 						TableLayoutPanel table = NextDialog.Fields(editor.Body);
-						NumericUpDown minutes = NextDialog.Number((decimal)((double)session2.Seconds / 60.0), 0m, 525600m);
+						minutes = NextDialog.Number((decimal)((double)session2.Seconds / 60.0), 0m, 525600m);
 						minutes.DecimalPlaces = 1;
-						TextBox note = new TextBox
+						note = new TextBox
 						{
 							Text = session2.Note,
 							Multiline = true
@@ -25002,7 +27659,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					ForeColor = FishBowlPalette.ThemeInk
 				};
 				string[] array = new string[5] { "Date", "Kind", "Files", "Size", "Note" };
-				foreach (string text in array)
+				string[] array2 = array;
+				foreach (string text in array2)
 				{
 					list.Columns.Add(text, (text == "Note") ? 320 : 150);
 				}
@@ -25054,8 +27712,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 						where s.GameId == after.GameId && s.Kind == after.Kind && s.Source == after.Source && string.CompareOrdinal(s.CreatedAt, after.CreatedAt) < 0
 						orderby s.CreatedAt descending
 						select s).FirstOrDefault();
-					string[] array2 = BackgroundWork<string[]>.Run(dialog, "Compare snapshot files", (CancellationToken token, Action<string> progress) => NextData.SnapshotChanges(before, after, token));
-					using (ResultsDialog resultsDialog = new ResultsDialog("Changed snapshot files", (array2.Length == 0) ? new string[1] { "No file-content changes found." } : array2))
+					string[] array3 = BackgroundWork<string[]>.Run(dialog, "Compare snapshot files", (CancellationToken token, Action<string> progress) => NextData.SnapshotChanges(before, after, token));
+					using (ResultsDialog resultsDialog = new ResultsDialog("Changed snapshot files", (array3.Length == 0) ? new string[1] { "No file-content changes found." } : array3))
 					{
 						resultsDialog.ShowDialog(dialog);
 					}
@@ -25225,7 +27883,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					long num = Directory.GetFiles(text, "*.zip").Sum((string p) => new FileInfo(p).Length);
 					int num2 = 0;
 					SaveSnapshot[] array = data.SaveSnapshots.ToArray();
-					foreach (SaveSnapshot saveSnapshot in array)
+					SaveSnapshot[] array2 = array;
+					foreach (SaveSnapshot saveSnapshot in array2)
 					{
 						token.ThrowIfCancellationRequested();
 						string text2 = Path.Combine(text, SafeId(saveSnapshot.Id) + ".zip");
@@ -25364,7 +28023,6 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 	}
 	public class GlobalSearchDialog : NextDialog
 	{
-        public Action SelectedAction {get;private set;}
 		private readonly List<SearchResult> all;
 
 		private readonly ListBox results = new ListBox
@@ -25377,6 +28035,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 			Dock = DockStyle.Top,
 			AccessibleName = "Search games, emulators, collections, settings and help"
 		};
+
+		public Action SelectedAction { get; private set; }
 
 		public GlobalSearchDialog(IEnumerable<SearchResult> entries)
 			: base("Search everything", 780, 520)
@@ -25448,9 +28108,9 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 			SearchResult searchResult = results.SelectedItem as SearchResult;
 			if (searchResult != null)
 			{
-				SelectedAction=searchResult.Open;
-                DialogResult=DialogResult.OK;
-                Close();
+				SelectedAction = searchResult.Open;
+				base.DialogResult = DialogResult.OK;
+				Close();
 			}
 		}
 	}
@@ -25487,7 +28147,7 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 
 		public static void Responsive(FlowLayoutPanel bar)
 		{
-			if (bar.Tag as string == "FishBowl overflow")
+			if (bar.Tag as string== "FishBowl overflow")
 			{
 				return;
 			}
@@ -25554,7 +28214,10 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					layout = false;
 				}
 			};
-            more.SizeChanged += delegate { fit(); };
+			more.SizeChanged += delegate
+			{
+				fit();
+			};
 			bar.SizeChanged += delegate
 			{
 				fit();
@@ -25565,7 +28228,10 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 				{
 					fit();
 				};
-                item2.SizeChanged += delegate { fit(); };
+				item2.SizeChanged += delegate
+				{
+					fit();
+				};
 			}
 			bar.Disposed += delegate
 			{
@@ -25896,7 +28562,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 								throw new IOException("Choose a saved rollback folder under Updates/Rollback.");
 							}
 							string[] runtimeFiles = RuntimeFiles;
-							foreach (string path in runtimeFiles)
+							string[] array = runtimeFiles;
+							foreach (string path in array)
 							{
 								if (!File.Exists(Path.Combine(folderBrowserDialog.SelectedPath, path)))
 								{
@@ -26061,9 +28728,9 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 			base.Controls.Add(hint);
 			Action reload = delegate
 			{
-				controllerLauncher.games.BeginUpdate();
-				controllerLauncher.games.Items.Clear();
-				controllerLauncher.artwork.Images.Clear();
+				games.BeginUpdate();
+				games.Items.Clear();
+				artwork.Images.Clear();
 				IEnumerable<GameEntry> source = data.Games.Where((GameEntry g) => (g.Title ?? "").IndexOf(search.Text, StringComparison.OrdinalIgnoreCase) >= 0);
 				if (filter.Text == "Favorites")
 				{
@@ -26097,18 +28764,18 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 					}
 					using (bitmap)
 					{
-						controllerLauncher.artwork.Images.Add(bitmap);
+						artwork.Images.Add(bitmap);
 					}
-					controllerLauncher.games.Items.Add(new ListViewItem(item.Title + (File.Exists(NextData.LaunchPath(item)) ? "" : " (missing)"), controllerLauncher.artwork.Images.Count - 1)
+					games.Items.Add(new ListViewItem(item.Title + (File.Exists(NextData.LaunchPath(item)) ? "" : " (missing)"), artwork.Images.Count - 1)
 					{
 						Tag = item
 					});
 				}
-				controllerLauncher.games.EndUpdate();
-				if (controllerLauncher.games.Items.Count > 0)
+				games.EndUpdate();
+				if (games.Items.Count > 0)
 				{
-					controllerLauncher.games.Items[0].Selected = true;
-					controllerLauncher.games.Items[0].Focused = true;
+					games.Items[0].Selected = true;
+					games.Items[0].Focused = true;
 				}
 			};
 			search.TextChanged += delegate
@@ -26303,8 +28970,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 		}
 
 		[ComImport]
-		[Guid("92CA9DCD-5622-4bba-A805-5E9F541BD8C9")]
 		[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+		[Guid("92CA9DCD-5622-4bba-A805-5E9F541BD8C9")]
 		private interface IObjectArray
 		{
 			void GetCount(out uint count);
@@ -26313,8 +28980,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 		}
 
 		[ComImport]
-		[Guid("5632B1A4-E38A-400A-928A-D4CD63230295")]
 		[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+		[Guid("5632B1A4-E38A-400A-928A-D4CD63230295")]
 		private interface IObjectCollection
 		{
 			void GetCount(out uint count);
@@ -26331,8 +28998,8 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 		}
 
 		[ComImport]
-		[Guid("6332DEBF-87B5-4670-90C0-5E57B408A49E")]
 		[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+		[Guid("6332DEBF-87B5-4670-90C0-5E57B408A49E")]
 		private interface IDestinationList
 		{
 			void SetAppID([MarshalAs(UnmanagedType.LPWStr)] string id);
@@ -26499,6 +29166,7889 @@ NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSecond
 			}
 			tasks.AddObject(shellLink);
 			return shellLink;
+		}
+	}
+	public class SmartLibraryList
+	{
+		public string Name { get; set; }
+
+		public string Search { get; set; }
+
+		public string Platform { get; set; }
+
+		public string Status { get; set; }
+
+		public bool FavoritesOnly { get; set; }
+
+		public bool UnplayedOnly { get; set; }
+	}
+	public static class LibraryAdditions
+	{
+		private static readonly Random random = new Random();
+
+		public static void Ensure(LibraryData data)
+		{
+			if (data.SmartLists == null)
+			{
+				data.SmartLists = new List<SmartLibraryList>();
+			}
+			if (data.PlayQueue == null)
+			{
+				data.PlayQueue = new List<string>();
+			}
+		}
+
+		public static List<GameEntry> Match(LibraryData data, SmartLibraryList rule)
+		{
+			return (from g in data.Games
+				where (string.IsNullOrWhiteSpace(rule.Search) || Hub.SearchText(g).IndexOf(rule.Search.Trim(), StringComparison.OrdinalIgnoreCase) >= 0) && (string.IsNullOrWhiteSpace(rule.Platform) || rule.Platform == "Any" || string.Equals(g.ConsoleLabel, rule.Platform, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(rule.Status) || rule.Status == "Any" || string.Equals(g.PlayStatus, rule.Status, StringComparison.OrdinalIgnoreCase)) && (!rule.FavoritesOnly || g.Favorite) && (!rule.UnplayedOnly || g.LaunchCount == 0)
+				orderby g.Title
+				select g).ToList();
+		}
+
+		public static List<GameEntry> QueueGames(LibraryData data)
+		{
+			Ensure(data);
+			return (from id in data.PlayQueue
+				select data.Games.FirstOrDefault((GameEntry g) => g.Id == id) into g
+				where g != null
+				select g).ToList();
+		}
+
+		public static void Enqueue(LibraryData data, GameEntry game)
+		{
+			Ensure(data);
+			if (game != null && !data.PlayQueue.Contains(game.Id))
+			{
+				data.PlayQueue.Add(game.Id);
+			}
+		}
+
+		public static bool MoveQueue(LibraryData data, string id, int delta)
+		{
+			Ensure(data);
+			int num = data.PlayQueue.IndexOf(id);
+			int num2 = num + delta;
+			if (num < 0 || num2 < 0 || num2 >= data.PlayQueue.Count)
+			{
+				return false;
+			}
+			data.PlayQueue.RemoveAt(num);
+			data.PlayQueue.Insert(num2, id);
+			return true;
+		}
+
+		private static ListView GameList()
+		{
+			ListView listView = new ListView();
+			listView.Dock = DockStyle.Fill;
+			listView.View = View.Details;
+			listView.FullRowSelect = true;
+			listView.HideSelection = false;
+			listView.MultiSelect = false;
+			listView.AccessibleName = "Games";
+			ListView listView2 = listView;
+			listView2.Columns.Add("Game", 300);
+			listView2.Columns.Add("Platform", 150);
+			listView2.Columns.Add("Progress", 120);
+			listView2.Columns.Add("Launches", 85);
+			return listView2;
+		}
+
+		private static void Fill(ListView list, IEnumerable<GameEntry> games)
+		{
+			string text = ((list.SelectedItems.Count == 0) ? null : ((GameEntry)list.SelectedItems[0].Tag).Id);
+			list.BeginUpdate();
+			list.Items.Clear();
+			foreach (GameEntry game in games)
+			{
+				ListViewItem listViewItem = new ListViewItem(new string[4]
+				{
+					game.Title ?? "Untitled",
+					game.ConsoleLabel ?? "",
+					game.PlayStatus ?? "",
+					game.LaunchCount.ToString()
+				});
+				listViewItem.Tag = game;
+				ListViewItem listViewItem2 = listViewItem;
+				list.Items.Add(listViewItem2);
+				if (game.Id == text)
+				{
+					listViewItem2.Selected = true;
+				}
+			}
+			list.EndUpdate();
+		}
+
+		private static GameEntry Selected(ListView list)
+		{
+			if (list.SelectedItems.Count == 0)
+			{
+				throw new InvalidOperationException("Select a game first.");
+			}
+			return (GameEntry)list.SelectedItems[0].Tag;
+		}
+
+		public static void Show(IWin32Window owner, LibraryData data, GameEntry selected, List<GameEntry> visible)
+		{
+			NextDialog dialog = new NextDialog("More Library tools", 720, 440);
+			try
+			{
+				dialog.Body.Controls.Add(ExperienceUi.Label("Save dynamic smart lists, organize what to play next, discover a game, or export your current Library view.", 90));
+				dialog.Action("Smart lists", delegate
+				{
+					SmartLists(dialog, data);
+				});
+				dialog.Action("Play queue", delegate
+				{
+					Queue(dialog, data, selected);
+				});
+				dialog.Action("Surprise me", delegate
+				{
+					Surprise(dialog, data);
+				});
+				dialog.Action("Export current view", delegate
+				{
+					Export(dialog, visible);
+				});
+				dialog.Action("Close", dialog.Close);
+				dialog.ShowDialog(owner);
+			}
+			finally
+			{
+				if (dialog != null)
+				{
+					((IDisposable)dialog).Dispose();
+				}
+			}
+		}
+
+		public static void SmartLists(IWin32Window owner, LibraryData data)
+		{
+			Ensure(data);
+			NextDialog dialog = new NextDialog("Smart Library lists", 1000, 620);
+			try
+			{
+				ComboBox choices = new ComboBox
+				{
+					Dock = DockStyle.Top,
+					DropDownStyle = ComboBoxStyle.DropDownList,
+					DisplayMember = "Name",
+					AccessibleName = "Saved smart list"
+				};
+				ListView list = GameList();
+				Label count = ExperienceUi.Label("", 30);
+				dialog.Body.Controls.Add(list);
+				dialog.Body.Controls.Add(count);
+				dialog.Body.Controls.Add(choices);
+				Action refresh = delegate
+				{
+					SmartLibraryList smartLibraryList7 = choices.SelectedItem as SmartLibraryList;
+					List<GameEntry> list2 = ((smartLibraryList7 == null) ? new List<GameEntry>() : Match(data, smartLibraryList7));
+					Fill(list, list2);
+					count.Text = list2.Count + " matching games — updates as your Library changes";
+				};
+				Action reload = delegate
+				{
+					SmartLibraryList smartLibraryList6 = choices.SelectedItem as SmartLibraryList;
+					choices.Items.Clear();
+					choices.Items.AddRange(data.SmartLists.Cast<object>().ToArray());
+					if (smartLibraryList6 != null && data.SmartLists.Contains(smartLibraryList6))
+					{
+						choices.SelectedItem = smartLibraryList6;
+					}
+					else if (choices.Items.Count > 0)
+					{
+						choices.SelectedIndex = 0;
+					}
+					refresh();
+				};
+				choices.SelectedIndexChanged += delegate
+				{
+					refresh();
+				};
+				dialog.Action("New list", delegate
+				{
+					SmartLibraryList smartLibraryList5 = EditRule(dialog, data, null);
+					if (smartLibraryList5 != null)
+					{
+						data.SmartLists.Add(smartLibraryList5);
+						Store.Save(data);
+						reload();
+						choices.SelectedItem = smartLibraryList5;
+					}
+				});
+				dialog.Action("Edit list", delegate
+				{
+					SmartLibraryList smartLibraryList3 = choices.SelectedItem as SmartLibraryList;
+					if (smartLibraryList3 == null)
+					{
+						throw new InvalidOperationException("Create or choose a list first.");
+					}
+					SmartLibraryList smartLibraryList4 = EditRule(dialog, data, smartLibraryList3);
+					if (smartLibraryList4 != null)
+					{
+						data.SmartLists[data.SmartLists.IndexOf(smartLibraryList3)] = smartLibraryList4;
+						Store.Save(data);
+						reload();
+						choices.SelectedItem = smartLibraryList4;
+					}
+				});
+				dialog.Action("Delete list", delegate
+				{
+					SmartLibraryList smartLibraryList2 = choices.SelectedItem as SmartLibraryList;
+					if (smartLibraryList2 != null && MessageBox.Show(dialog, "Delete this smart list? Games stay in your Library.", "FishBowl", MessageBoxButtons.YesNo) == DialogResult.Yes)
+					{
+						data.SmartLists.Remove(smartLibraryList2);
+						Store.Save(data);
+						reload();
+					}
+				});
+				dialog.Action("Add to queue", delegate
+				{
+					Enqueue(data, Selected(list));
+					Store.Save(data);
+					count.Text = "Added to play queue.";
+				});
+				dialog.Action("Launch", delegate
+				{
+					ExperienceTools.Launch(dialog, data, Selected(list));
+					refresh();
+				});
+				dialog.Action("Export list", delegate
+				{
+					SmartLibraryList smartLibraryList = choices.SelectedItem as SmartLibraryList;
+					if (smartLibraryList == null)
+					{
+						throw new InvalidOperationException("Choose a smart list first.");
+					}
+					Export(dialog, Match(data, smartLibraryList));
+				});
+				dialog.Action("Refresh", refresh);
+				dialog.Action("Close", dialog.Close);
+				reload();
+				dialog.ShowDialog(owner);
+			}
+			finally
+			{
+				if (dialog != null)
+				{
+					((IDisposable)dialog).Dispose();
+				}
+			}
+		}
+
+		private static SmartLibraryList EditRule(IWin32Window owner, LibraryData data, SmartLibraryList existing)
+		{
+			SmartLibraryList smartLibraryList = existing;
+			if (smartLibraryList == null)
+			{
+				SmartLibraryList smartLibraryList2 = new SmartLibraryList();
+				smartLibraryList2.Name = "New smart list";
+				smartLibraryList2.Platform = "Any";
+				smartLibraryList2.Status = "Any";
+				smartLibraryList = smartLibraryList2;
+			}
+			SmartLibraryList smartLibraryList3 = smartLibraryList;
+			NextDialog editor = new NextDialog((existing == null) ? "New smart list" : "Edit smart list", 760, 550);
+			try
+			{
+				TableLayoutPanel table = NextDialog.Fields(editor.Body);
+				TextBox name = new TextBox
+				{
+					Text = smartLibraryList3.Name
+				};
+				TextBox search = new TextBox
+				{
+					Text = smartLibraryList3.Search
+				};
+				IEnumerable<string> items = new string[1] { "Any" }.Concat(from s in (from g in data.Games
+						select g.ConsoleLabel into s
+						where !string.IsNullOrWhiteSpace(s)
+						select s).Distinct()
+					orderby s
+					select s);
+				ComboBox platform = NextDialog.Choice(items, smartLibraryList3.Platform);
+				ComboBox status = NextDialog.Choice(new string[1] { "Any" }.Concat((from g in data.Games
+					select g.PlayStatus into s
+					where !string.IsNullOrWhiteSpace(s)
+					select s).Distinct()).Concat(new string[3] { "Playing", "Completed", "Backlog" }).Distinct(), smartLibraryList3.Status);
+				CheckBox favorite = new CheckBox
+				{
+					Text = "Favorites only",
+					Checked = smartLibraryList3.FavoritesOnly
+				};
+				CheckBox unplayed = new CheckBox
+				{
+					Text = "Never launched through FishBowl",
+					Checked = smartLibraryList3.UnplayedOnly
+				};
+				NextDialog.Field(table, "List name", name);
+				NextDialog.Field(table, "Search title, genre, developer or tags", search, 64);
+				NextDialog.Field(table, "Platform", platform);
+				NextDialog.Field(table, "Progress", status);
+				NextDialog.Field(table, "Favorites", favorite);
+				NextDialog.Field(table, "Unplayed", unplayed);
+				SmartLibraryList result = null;
+				editor.Action("Save", delegate
+				{
+					if (string.IsNullOrWhiteSpace(name.Text))
+					{
+						throw new InvalidOperationException("Enter a list name.");
+					}
+					if (data.SmartLists.Any((SmartLibraryList x) => x != existing && string.Equals(x.Name, name.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+					{
+						throw new InvalidOperationException("A list with that name already exists.");
+					}
+					result = new SmartLibraryList
+					{
+						Name = name.Text.Trim(),
+						Search = search.Text.Trim(),
+						Platform = platform.Text,
+						Status = status.Text,
+						FavoritesOnly = favorite.Checked,
+						UnplayedOnly = unplayed.Checked
+					};
+					editor.Close();
+				});
+				editor.Action("Cancel", editor.Close);
+				editor.ShowDialog(owner);
+				return result;
+			}
+			finally
+			{
+				if (editor != null)
+				{
+					((IDisposable)editor).Dispose();
+				}
+			}
+		}
+
+		public static void Queue(IWin32Window owner, LibraryData data, GameEntry selected)
+		{
+			Ensure(data);
+			NextDialog dialog = new NextDialog("Play queue", 1000, 620);
+			try
+			{
+				ComboBox picker = NextTools.Games(data, selected);
+				ListView list = GameList();
+				Label value = ExperienceUi.Label("Choose games for later. Launching keeps them queued until you remove them.", 38);
+				dialog.Body.Controls.Add(list);
+				dialog.Body.Controls.Add(value);
+				dialog.Body.Controls.Add(picker);
+				Action refresh = delegate
+				{
+					Fill(list, QueueGames(data));
+				};
+				dialog.Action("Add game", delegate
+				{
+					Enqueue(data, picker.SelectedItem as GameEntry);
+					Store.Save(data);
+					refresh();
+				});
+				dialog.Action("Move up", delegate
+				{
+					MoveQueue(data, Selected(list).Id, -1);
+					Store.Save(data);
+					refresh();
+				});
+				dialog.Action("Move down", delegate
+				{
+					MoveQueue(data, Selected(list).Id, 1);
+					Store.Save(data);
+					refresh();
+				});
+				dialog.Action("Remove", delegate
+				{
+					data.PlayQueue.Remove(Selected(list).Id);
+					Store.Save(data);
+					refresh();
+				});
+				dialog.Action("Launch", delegate
+				{
+					ExperienceTools.Launch(dialog, data, Selected(list));
+				});
+				dialog.Action("Details", delegate
+				{
+					GameEntry game = Selected(list);
+					using (GameDetailsDialog gameDetailsDialog = new GameDetailsDialog(game, ExperienceData.Emulator(data, game)))
+					{
+						gameDetailsDialog.ShowDialog(dialog);
+					}
+				});
+				dialog.Action("Export queue", delegate
+				{
+					Export(dialog, QueueGames(data));
+				});
+				dialog.Action("Close", dialog.Close);
+				refresh();
+				dialog.ShowDialog(owner);
+			}
+			finally
+			{
+				if (dialog != null)
+				{
+					((IDisposable)dialog).Dispose();
+				}
+			}
+		}
+
+		public static List<GameEntry> SurpriseCandidates(LibraryData data, bool unplayed)
+		{
+			return data.Games.Where((GameEntry g) => (!unplayed || g.LaunchCount == 0) && File.Exists(g.Path)).Where(delegate(GameEntry g)
+			{
+				try
+				{
+					GameSessions.Validate(data, g);
+					return true;
+				}
+				catch
+				{
+					return false;
+				}
+			}).ToList();
+		}
+
+		public static void Surprise(IWin32Window owner, LibraryData data)
+		{
+			NextDialog dialog = new NextDialog("Surprise me", 760, 460);
+			try
+			{
+				CheckBox unplayed = new CheckBox
+				{
+					Text = "Only games never launched through FishBowl",
+					Dock = DockStyle.Top,
+					Height = 40,
+					Checked = true,
+					AccessibleName = "Unplayed games only"
+				};
+				Label title = ExperienceUi.Label("", 80);
+				Label detail = ExperienceUi.Label("", 100);
+				GameEntry picked = null;
+				dialog.Body.Controls.Add(detail);
+				dialog.Body.Controls.Add(title);
+				dialog.Body.Controls.Add(unplayed);
+				Action roll = delegate
+				{
+					List<GameEntry> list = SurpriseCandidates(data, unplayed.Checked);
+					picked = ((list.Count == 0) ? null : list[random.Next(list.Count)]);
+					title.Text = ((picked == null) ? "No launch-ready games match." : picked.Title);
+					detail.Text = ((picked == null) ? "Add games or adjust the unplayed filter. Missing game files and invalid launch settings are excluded." : ((picked.ConsoleLabel ?? "Platform not set") + "\r\n" + (picked.Genre ?? "Genre not set") + "\r\n" + list.Count + " eligible games"));
+				};
+				unplayed.CheckedChanged += delegate
+				{
+					roll();
+				};
+				dialog.Action("Pick another", roll);
+				dialog.Action("Launch", delegate
+				{
+					if (picked == null)
+					{
+						throw new InvalidOperationException("No game selected.");
+					}
+					ExperienceTools.Launch(dialog, data, picked);
+					roll();
+				});
+				dialog.Action("Add to queue", delegate
+				{
+					if (picked == null)
+					{
+						throw new InvalidOperationException("No game selected.");
+					}
+					Enqueue(data, picked);
+					Store.Save(data);
+					detail.Text = "Added to play queue.";
+				});
+				dialog.Action("Close", dialog.Close);
+				roll();
+				dialog.ShowDialog(owner);
+			}
+			finally
+			{
+				if (dialog != null)
+				{
+					((IDisposable)dialog).Dispose();
+				}
+			}
+		}
+
+		public static string CsvCell(string text)
+		{
+			text = text ?? "";
+			string text2 = text.TrimStart();
+			if (text2.Length > 0 && "=+-@".IndexOf(text2[0]) >= 0)
+			{
+				text = "'" + text;
+			}
+			return "\"" + text.Replace("\"", "\"\"") + "\"";
+		}
+
+		public static string Csv(IEnumerable<GameEntry> games)
+		{
+			StringBuilder stringBuilder = new StringBuilder("Title,Platform,Genre,Developer,Year,Progress,Favorite,Launches,Play hours,Last launched,Path,Tags\r\n");
+			foreach (GameEntry game in games)
+			{
+				stringBuilder.AppendLine(string.Join(",", new string[12]
+				{
+					game.Title,
+					game.ConsoleLabel,
+					game.Genre,
+					game.Developer,
+					game.ReleaseYear,
+					game.PlayStatus,
+					game.Favorite ? "Yes" : "No",
+					game.LaunchCount.ToString(CultureInfo.InvariantCulture),
+					((double)game.TotalPlaySeconds / 3600.0).ToString("0.00", CultureInfo.InvariantCulture),
+					game.LastLaunched,
+					game.Path,
+					string.Join("; ", game.Tags ?? new List<string>())
+				}.Select(CsvCell)));
+			}
+			return stringBuilder.ToString();
+		}
+
+		public static void Export(IWin32Window owner, IEnumerable<GameEntry> games)
+		{
+			List<GameEntry> list = games.ToList();
+			SaveFileDialog saveFileDialog = new SaveFileDialog();
+			saveFileDialog.Filter = "CSV spreadsheet|*.csv";
+			saveFileDialog.DefaultExt = "csv";
+			saveFileDialog.FileName = "FishBowl Library.csv";
+			saveFileDialog.OverwritePrompt = true;
+			using (SaveFileDialog saveFileDialog2 = saveFileDialog)
+			{
+				if (saveFileDialog2.ShowDialog(owner) == DialogResult.OK)
+				{
+					File.WriteAllText(saveFileDialog2.FileName, Csv(list), new UTF8Encoding(true));
+					MessageBox.Show(owner, "Exported " + list.Count + " games.", "FishBowl");
+				}
+			}
+		}
+	}
+	public static class CompactMenus
+	{
+		public static void Group(ToolStripMenuItem parent, Func<string, string> category, params string[] order)
+		{
+			ToolStripItem[] array = parent.DropDownItems.Cast<ToolStripItem>().ToArray();
+			parent.DropDownItems.Clear();
+			Dictionary<string, ToolStripMenuItem> dictionary = new Dictionary<string, ToolStripMenuItem>();
+			foreach (string text in order)
+			{
+				dictionary[text] = new ToolStripMenuItem(text);
+			}
+			ToolStripItem[] array2 = array;
+			foreach (ToolStripItem toolStripItem in array2)
+			{
+				if (toolStripItem is ToolStripSeparator)
+				{
+					toolStripItem.Dispose();
+					continue;
+				}
+				string text2 = category(toolStripItem.Text);
+				if (string.IsNullOrEmpty(text2))
+				{
+					parent.DropDownItems.Add(toolStripItem);
+					continue;
+				}
+				if (!dictionary.ContainsKey(text2))
+				{
+					dictionary[text2] = new ToolStripMenuItem(text2);
+				}
+				dictionary[text2].DropDownItems.Add(toolStripItem);
+			}
+			foreach (ToolStripMenuItem value in dictionary.Values)
+			{
+				if (value.DropDownItems.Count > 0)
+				{
+					parent.DropDownItems.Add(value);
+				}
+				else
+				{
+					value.Dispose();
+				}
+			}
+		}
+
+		public static void Arrange(ToolStripMenuItem library, ToolStripMenuItem tools, ToolStripMenuItem emulators, ToolStripMenuItem view)
+		{
+			ToolStripMenuItem toolStripMenuItem = tools.DropDownItems.OfType<ToolStripMenuItem>().FirstOrDefault((ToolStripMenuItem i) => i.Text == "Selected emulator");
+			ToolStripMenuItem toolStripMenuItem2 = emulators.DropDownItems.OfType<ToolStripMenuItem>().FirstOrDefault((ToolStripMenuItem i) => i.Text == "Selected emulator");
+			if (toolStripMenuItem != null && toolStripMenuItem2 != null)
+			{
+				tools.DropDownItems.Remove(toolStripMenuItem);
+				toolStripMenuItem.Text = "Edit and folders";
+				toolStripMenuItem2.DropDownItems.Insert(0, toolStripMenuItem);
+			}
+			ToolStripMenuItem toolStripMenuItem3 = tools.DropDownItems.OfType<ToolStripMenuItem>().FirstOrDefault((ToolStripMenuItem i) => i.Text == "Profile transfer");
+			if (toolStripMenuItem3 != null)
+			{
+				tools.DropDownItems.Remove(toolStripMenuItem3);
+				emulators.DropDownItems.Add(toolStripMenuItem3);
+			}
+			ToolStripMenuItem[] array = (from i in view.DropDownItems.OfType<ToolStripMenuItem>()
+				where i.Text.StartsWith("Controller launcher") || i.Text == "Reopen last game"
+				select i).ToArray();
+			foreach (ToolStripMenuItem value in array)
+			{
+				view.DropDownItems.Remove(value);
+				tools.DropDownItems.Add(value);
+			}
+			array = (from i in tools.DropDownItems.OfType<ToolStripMenuItem>()
+				where i.Text == "FishBowl" || i.Text == "Maintenance"
+				select i).ToArray();
+			foreach (ToolStripMenuItem toolStripMenuItem4 in array)
+			{
+				ToolStripItem[] toolStripItems = toolStripMenuItem4.DropDownItems.Cast<ToolStripItem>().ToArray();
+				toolStripMenuItem4.DropDownItems.Clear();
+				tools.DropDownItems.Remove(toolStripMenuItem4);
+				tools.DropDownItems.AddRange(toolStripItems);
+				toolStripMenuItem4.Dispose();
+			}
+			Group(library, LibraryCategory, "Play", "Organize", "Saves", "Artwork and activity", "Backup and transfer");
+			Group(tools, delegate(string text)
+			{
+				string text2 = text.ToLowerInvariant();
+				if (text2 == "controllers" || text2 == "multiplayer")
+				{
+					return null;
+				}
+				if (text2.Contains("search") || text2.Contains("command palette"))
+				{
+					return "Search and commands";
+				}
+				if (text2.Contains("launcher") || text2.Contains("reopen"))
+				{
+					return "Launchers";
+				}
+				return (text2.Contains("settings") || text2.Contains("preferences") || text2.Contains("shortcut") || text2.Contains("portable mode")) ? "Settings" : "Maintenance";
+			}, "Search and commands", "Launchers", "Maintenance", "Settings");
+			Group(view, (string text) => (text.Contains("appearance") || text.Contains("Customize Home") || text.Contains("Cosmetic styles")) ? "Appearance and layout" : null, "Appearance and layout");
+		}
+
+		public static string LibraryCategory(string text)
+		{
+			string text2 = text.ToLowerInvariant();
+			if (text2.StartsWith("game library"))
+			{
+				return null;
+			}
+			if (text2.Contains("queue") || text2.Contains("surprise"))
+			{
+				return "Play";
+			}
+			if (text2.Contains("backup") || text2.Contains("restore point") || text2.Contains("export") || text2.Contains("import fishbowl"))
+			{
+				return "Backup and transfer";
+			}
+			if (text2.Contains("save"))
+			{
+				return "Saves";
+			}
+			if (text2.Contains("artwork") || text2.Contains("screenshot") || text2.Contains("session journal"))
+			{
+				return "Artwork and activity";
+			}
+			return "Organize";
+		}
+
+		public static ContextMenuStrip Menu()
+		{
+			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
+			contextMenuStrip.Renderer = new FishBowlMenuRenderer();
+			contextMenuStrip.BackColor = FishBowlPalette.ThemeSurface;
+			contextMenuStrip.ForeColor = FishBowlPalette.ThemeInk;
+			return contextMenuStrip;
+		}
+	}
+	public class CosmeticSettings
+	{
+		public string LibrarySpacing { get; set; }
+
+		public bool PlatformLabels { get; set; }
+
+		public bool DetailPreview { get; set; }
+
+		public bool CustomPalette { get; set; }
+
+		public string TextColor { get; set; }
+
+		public string MutedColor { get; set; }
+
+		public string TopColor { get; set; }
+
+		public string BottomColor { get; set; }
+
+		public string SurfaceColor { get; set; }
+
+		public string AccentColor { get; set; }
+
+		public string SecondaryColor { get; set; }
+
+		public int CornerRadius { get; set; }
+
+		public string IconStyle { get; set; }
+
+		public bool IconOnlyToolbars { get; set; }
+
+		public string BackgroundStyle { get; set; }
+
+		public string WallpaperPath { get; set; }
+
+		public string WallpaperLayout { get; set; }
+
+		public int WallpaperOpacity { get; set; }
+
+		public string ArtworkFrame { get; set; }
+
+		public bool ArtworkShadow { get; set; }
+
+		public string SelectionColor { get; set; }
+
+		public string FocusColor { get; set; }
+
+		public int FocusWidth { get; set; }
+
+		public string BadgeStyle { get; set; }
+
+		public string ReadyColor { get; set; }
+
+		public string RunningColor { get; set; }
+
+		public string WarningColor { get; set; }
+
+		public bool ShowFooter { get; set; }
+
+		public CosmeticSettings()
+		{
+			TextColor = "#F1F7FF";
+			MutedColor = "#BED3F0";
+			TopColor = "#051F4E";
+			BottomColor = "#030D26";
+			SurfaceColor = "#0C3B7A";
+			AccentColor = "#59BEFF";
+			SecondaryColor = "#43DCBB";
+			LibrarySpacing = "Comfortable";
+			CornerRadius = 6;
+			IconStyle = "Outline";
+			BackgroundStyle = "Plain";
+			WallpaperLayout = "Fill";
+			WallpaperOpacity = 15;
+			ArtworkFrame = "None";
+			FocusWidth = 2;
+			BadgeStyle = "Text";
+			ShowFooter = true;
+		}
+	}
+	public class CosmeticCardPanel : FlowLayoutPanel
+	{
+		public CosmeticCardPanel()
+		{
+			DoubleBuffered = true;
+		}
+
+		protected override void OnPaintBackground(PaintEventArgs e)
+		{
+			base.OnPaintBackground(e);
+			CosmeticRuntime.DrawBackdrop(e.Graphics, base.ClientRectangle);
+		}
+	}
+	public static class CosmeticRuntime
+	{
+		private class ButtonSize
+		{
+			public int Width;
+
+			public bool AutoSize;
+
+			public Size Minimum;
+		}
+
+		public static CosmeticSettings Current = new CosmeticSettings();
+
+		private static Image wallpaper;
+
+		private static string wallpaperKey;
+
+		private static readonly ToolTip tips = new ToolTip();
+
+		private static readonly ConditionalWeakTable<Button, ButtonSize> sizes = new ConditionalWeakTable<Button, ButtonSize>();
+
+		public static Color Selection
+		{
+			get
+			{
+				return Optional(Current.SelectionColor, FishBowlPalette.MenuSelection);
+			}
+		}
+
+		public static Color Parse(string hex)
+		{
+			if (!Regex.IsMatch(hex ?? "", "^#[0-9a-fA-F]{6}$"))
+			{
+				throw new ArgumentException("Use colors in #RRGGBB format, such as #59BEFF.");
+			}
+			return ColorTranslator.FromHtml(hex);
+		}
+
+		public static void Validate(CosmeticSettings settings)
+		{
+			string[] array;
+			if (settings.CustomPalette)
+			{
+				array = new string[7] { settings.TextColor, settings.MutedColor, settings.TopColor, settings.BottomColor, settings.SurfaceColor, settings.AccentColor, settings.SecondaryColor };
+				foreach (string hex in array)
+				{
+					Parse(hex);
+				}
+			}
+			array = new string[5] { settings.SelectionColor, settings.FocusColor, settings.ReadyColor, settings.RunningColor, settings.WarningColor };
+			foreach (string hex in array)
+			{
+				if (!string.IsNullOrWhiteSpace(hex))
+				{
+					Parse(hex);
+				}
+			}
+			if (settings.BackgroundStyle == "Wallpaper" && !File.Exists(settings.WallpaperPath))
+			{
+				throw new IOException("Choose an existing wallpaper image before using the Wallpaper background.");
+			}
+		}
+
+		public static void Configure(CosmeticSettings settings)
+		{
+			Current = settings ?? new CosmeticSettings();
+			string text = Current.WallpaperPath ?? "";
+			if (text == wallpaperKey)
+			{
+				return;
+			}
+			Image image = null;
+			try
+			{
+				if (File.Exists(text))
+				{
+					using (Image original = Image.FromFile(text))
+					{
+						image = new Bitmap(original);
+					}
+				}
+			}
+			catch
+			{
+			}
+			if (wallpaper != null)
+			{
+				wallpaper.Dispose();
+			}
+			wallpaper = image;
+			wallpaperKey = text;
+		}
+
+		public static Color Optional(string value, Color fallback)
+		{
+			try
+			{
+				return string.IsNullOrWhiteSpace(value) ? fallback : Parse(value);
+			}
+			catch
+			{
+				return fallback;
+			}
+		}
+
+		public static Color Focus(Color background)
+		{
+			return FishBowlPalette.EnsureReadable(Optional(Current.FocusColor, FishBowlPalette.IconAccent), background);
+		}
+
+		public static Color Status(string text, Color fallback)
+		{
+			string text2 = (text ?? "").ToLowerInvariant();
+			if (text2 == "ready")
+			{
+				return Optional(Current.ReadyColor, fallback);
+			}
+			if (text2 == "running" || text2 == "playing")
+			{
+				return Optional(Current.RunningColor, fallback);
+			}
+			if (text2.Contains("missing") || text2.Contains("attention") || text2.Contains("warning"))
+			{
+				return Optional(Current.WarningColor, fallback);
+			}
+			return fallback;
+		}
+
+		public static bool Badge(Graphics graphics, Rectangle bounds, string text, Font font)
+		{
+			string text2 = (text ?? "").ToLowerInvariant();
+			if (!(Current.BadgeStyle == "Text"))
+			{
+				switch (text2)
+				{
+				default:
+					if (!text2.Contains("missing") && !text2.Contains("attention"))
+					{
+						break;
+					}
+					goto case "ready";
+				case "ready":
+				case "running":
+				case "playing":
+				{
+					Color color = Status(text, FishBowlPalette.IconAccent);
+					int num = Math.Min(bounds.Width - 6, TextRenderer.MeasureText(text, font).Width + 16);
+					if (num < 8)
+					{
+						return false;
+					}
+					Rectangle rectangle = new Rectangle(bounds.X + 3, bounds.Y + 3, num, Math.Max(12, bounds.Height - 6));
+					using (GraphicsPath path = Shape(rectangle, (Current.BadgeStyle == "Pill") ? ((float)rectangle.Height / 2f) : 0f))
+					{
+						using (SolidBrush brush = new SolidBrush(color))
+						{
+							graphics.FillPath(brush, path);
+						}
+					}
+					FishBowlText.DrawText(graphics, text, font, rectangle, FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, color), TextFormatFlags.EndEllipsis | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter);
+					return true;
+				}
+				}
+			}
+			return false;
+		}
+
+		private static GraphicsPath Shape(RectangleF rect, float radius)
+		{
+			GraphicsPath graphicsPath = new GraphicsPath();
+			float num = Math.Min(radius * 2f, Math.Min(rect.Width, rect.Height));
+			if (num <= 0f)
+			{
+				graphicsPath.AddRectangle(rect);
+			}
+			else
+			{
+				graphicsPath.AddArc(rect.X, rect.Y, num, num, 180f, 90f);
+				graphicsPath.AddArc(rect.Right - num, rect.Y, num, num, 270f, 90f);
+				graphicsPath.AddArc(rect.Right - num, rect.Bottom - num, num, num, 0f, 90f);
+				graphicsPath.AddArc(rect.X, rect.Bottom - num, num, num, 90f, 90f);
+				graphicsPath.CloseFigure();
+			}
+			return graphicsPath;
+		}
+
+		public static void DrawBackdrop(Graphics graphics, Rectangle bounds)
+		{
+			if (bounds.Width < 1 || bounds.Height < 1)
+			{
+				return;
+			}
+			if (Current.BackgroundStyle == "Gradient")
+			{
+				using (LinearGradientBrush brush = new LinearGradientBrush(bounds, Color.FromArgb(50, FishBowlPalette.IconAccent), Color.Transparent, LinearGradientMode.ForwardDiagonal))
+				{
+					graphics.FillRectangle(brush, bounds);
+				}
+			}
+			if (Current.BackgroundStyle == "Dots")
+			{
+				using (SolidBrush brush2 = new SolidBrush(Color.FromArgb(30, FishBowlPalette.ThemeInk)))
+				{
+					for (int i = bounds.X + 8; i < bounds.Right; i += 22)
+					{
+						for (int j = bounds.Y + 8; j < bounds.Bottom; j += 22)
+						{
+							graphics.FillEllipse(brush2, i, j, 2, 2);
+						}
+					}
+				}
+			}
+			if (Current.BackgroundStyle == "Waves")
+			{
+				using (Pen pen = new Pen(Color.FromArgb(25, FishBowlPalette.IconAccent), 1f))
+				{
+					for (int j = 20; j < bounds.Height; j += 36)
+					{
+						graphics.DrawBezier(pen, bounds.Left, j, bounds.Width / 3, j - 20, bounds.Width * 2 / 3, j + 20, bounds.Right, j);
+					}
+				}
+			}
+			if (wallpaper == null || Current.BackgroundStyle != "Wallpaper")
+			{
+				return;
+			}
+			using (ImageAttributes imageAttributes = new ImageAttributes())
+			{
+				ColorMatrix colorMatrix = new ColorMatrix();
+				colorMatrix.Matrix33 = (float)Math.Max(0, Math.Min(40, Current.WallpaperOpacity)) / 100f;
+				imageAttributes.SetColorMatrix(colorMatrix);
+				if (Current.WallpaperLayout == "Tile")
+				{
+					for (int i = 0; i < bounds.Width; i += wallpaper.Width)
+					{
+						for (int j = 0; j < bounds.Height; j += wallpaper.Height)
+						{
+							graphics.DrawImage(wallpaper, new Rectangle(i, j, wallpaper.Width, wallpaper.Height), 0, 0, wallpaper.Width, wallpaper.Height, GraphicsUnit.Pixel, imageAttributes);
+						}
+					}
+				}
+				else
+				{
+					float num = ((Current.WallpaperLayout == "Fit") ? Math.Min((float)bounds.Width / (float)wallpaper.Width, (float)bounds.Height / (float)wallpaper.Height) : Math.Max((float)bounds.Width / (float)wallpaper.Width, (float)bounds.Height / (float)wallpaper.Height));
+					int num2 = (int)((float)wallpaper.Width * num);
+					int num3 = (int)((float)wallpaper.Height * num);
+					graphics.DrawImage(wallpaper, new Rectangle(bounds.X + (bounds.Width - num2) / 2, bounds.Y + (bounds.Height - num3) / 2, num2, num3), 0, 0, wallpaper.Width, wallpaper.Height, GraphicsUnit.Pixel, imageAttributes);
+				}
+			}
+		}
+
+		public static void DecorateArtwork(Bitmap bitmap)
+		{
+			if (Current.ArtworkFrame == "None" && !Current.ArtworkShadow)
+			{
+				return;
+			}
+			using (Bitmap image = new Bitmap(bitmap))
+			{
+				using (Graphics graphics = Graphics.FromImage(bitmap))
+				{
+					graphics.Clear(FishBowlPalette.ThemeSurface);
+					graphics.SmoothingMode = SmoothingMode.AntiAlias;
+					int num = (Current.ArtworkShadow ? 5 : 3);
+					Rectangle rectangle = new Rectangle(num, num, Math.Max(1, bitmap.Width - num * 2 - 2), Math.Max(1, bitmap.Height - num * 2 - 2));
+					if (Current.ArtworkShadow)
+					{
+						for (int num2 = 4; num2 >= 1; num2--)
+						{
+							using (SolidBrush brush = new SolidBrush(Color.FromArgb(10, Color.Black)))
+							{
+								using (GraphicsPath path = Shape(new Rectangle(rectangle.X + 2 - num2 / 2, rectangle.Y + 3 - num2 / 2, rectangle.Width + num2, rectangle.Height + num2), 6f))
+								{
+									graphics.FillPath(brush, path);
+								}
+							}
+						}
+					}
+					using (GraphicsPath path = Shape(rectangle, (Current.ArtworkFrame == "Rounded") ? 8 : 0))
+					{
+						GraphicsState gstate = graphics.Save();
+						graphics.SetClip(path);
+						graphics.DrawImage(image, rectangle);
+						graphics.Restore(gstate);
+						if (Current.ArtworkFrame != "None")
+						{
+							using (Pen pen = new Pen(FishBowlPalette.IconAccent, (!(Current.ArtworkFrame == "Accent")) ? 1 : 3))
+							{
+								graphics.DrawPath(pen, path);
+								return;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		public static void Apply(Control root)
+		{
+			foreach (FishBowlActionButton item in NextUi.Descendants(root).Concat(new Control[1] { root }).OfType<FishBowlActionButton>())
+			{
+				FlowLayoutPanel flowLayoutPanel = item.Parent as FlowLayoutPanel;
+				bool flag = flowLayoutPanel != null && flowLayoutPanel.Name == "FishBowlToolbar";
+				item.RefreshCosmeticIcon();
+				if (flag)
+				{
+					ButtonSize value;
+					if (!sizes.TryGetValue(item, out value))
+					{
+						ButtonSize buttonSize = new ButtonSize();
+						buttonSize.Width = item.Width;
+						buttonSize.AutoSize = item.AutoSize;
+						buttonSize.Minimum = item.MinimumSize;
+						value = buttonSize;
+						sizes.Add(item, value);
+					}
+					item.IconOnly = Current.IconOnlyToolbars;
+					if (item.IconOnly)
+					{
+						item.AutoSize = false;
+						item.MinimumSize = new Size(40, value.Minimum.Height);
+						item.Width = Math.Max(40, (int)((double)item.Font.Size * 4.5));
+						tips.SetToolTip(item, item.AccessibleName ?? item.Text);
+					}
+					else
+					{
+						item.MinimumSize = value.Minimum;
+						item.Width = value.Width;
+						item.AutoSize = value.AutoSize;
+						tips.SetToolTip(item, "");
+					}
+					item.Invalidate();
+				}
+			}
+			root.Invalidate(true);
+		}
+	}
+	public class PersonalGame
+	{
+		public string Id { get; set; }
+
+		public bool Favorite { get; set; }
+
+		public bool Pinned { get; set; }
+
+		public string PlayStatus { get; set; }
+
+		public int PersonalRating { get; set; }
+
+		public long TotalPlaySeconds { get; set; }
+
+		public int LaunchCount { get; set; }
+
+		public string LastLaunched { get; set; }
+	}
+	public class BowlUser
+	{
+		public Dictionary<string, LibraryNavigation> Views { get; set; }
+
+		public LibraryNavigation Navigation { get; set; }
+
+		public List<SaveRouting> SaveRoutes { get; set; }
+
+		public string Id { get; set; }
+
+		public string Name { get; set; }
+
+		public List<PersonalGame> Games { get; set; }
+
+		public ThemeSettings Theme { get; set; }
+
+		public CosmeticSettings Cosmetics { get; set; }
+
+		public NextSettings Enhancements { get; set; }
+
+		public ExperienceSettings Experience { get; set; }
+
+		public List<PlaySession> Sessions { get; set; }
+
+		public List<string> Queue { get; set; }
+
+		public List<SmartLibraryList> Lists { get; set; }
+
+		public int WeeklyMinutes { get; set; }
+
+		public int BreakMinutes { get; set; }
+
+		public bool Controller { get; set; }
+	}
+	public class UserToolSettings
+	{
+		public Dictionary<string, LibraryNavigation> Views { get; set; }
+
+		public LibraryNavigation Navigation { get; set; }
+
+		public List<SaveRouting> SaveRoutes { get; set; }
+
+		public string ActiveId { get; set; }
+
+		public List<BowlUser> Users { get; set; }
+
+		public int WeeklyMinutes { get; set; }
+
+		public int BreakMinutes { get; set; }
+
+		public bool Controller { get; set; }
+
+		public List<BulkUndoRecord> Undo { get; set; }
+	}
+	public class BulkUndoRecord
+	{
+		public string At { get; set; }
+
+		public string UserId { get; set; }
+
+		public List<GameEntry> Before { get; set; }
+
+		public List<GameEntry> After { get; set; }
+
+		public List<GameCollection> CollectionsBefore { get; set; }
+
+		public List<GameCollection> CollectionsAfter { get; set; }
+	}
+	public static class UserTools
+	{
+		public static int ActiveLaunches;
+
+		public static readonly ConcurrentDictionary<string, byte> ActiveSessions = new ConcurrentDictionary<string, byte>();
+
+		private static readonly string[] BulkFields = new string[7] { "PreferredEmulatorId", "EmulatorId", "PlayStatus", "Favorite", "Pinned", "Tags", "ArtworkPath" };
+
+		public static bool Guest { get; private set; }
+
+		public static T Copy<T>(T value)
+		{
+			return Json.Deserialize<T>(Json.Serialize(value));
+		}
+
+		public static UserToolSettings Ensure(LibraryData d)
+		{
+			ExperienceData.Ensure(d);
+			if (d.UserTools == null)
+			{
+				d.UserTools = new UserToolSettings();
+			}
+			UserToolSettings userTools = d.UserTools;
+			if (userTools.Users == null)
+			{
+				userTools.Users = new List<BowlUser>();
+			}
+			if (userTools.Undo == null)
+			{
+				userTools.Undo = new List<BulkUndoRecord>();
+			}
+			if (userTools.Users.Count == 0)
+			{
+				BowlUser bowlUser = Capture(d, "Default");
+				userTools.Users.Add(bowlUser);
+				userTools.ActiveId = bowlUser.Id;
+			}
+			return userTools;
+		}
+
+		public static BowlUser Capture(LibraryData d, string name)
+		{
+			UserToolSettings userToolSettings = d.UserTools ?? new UserToolSettings();
+			BowlUser bowlUser = new BowlUser();
+			bowlUser.Id = Guid.NewGuid().ToString("N");
+			bowlUser.Name = name;
+			bowlUser.Games = d.Games.Select((GameEntry g) => new PersonalGame
+			{
+				Id = g.Id,
+				Favorite = g.Favorite,
+				Pinned = g.Pinned,
+				PlayStatus = g.PlayStatus,
+				PersonalRating = g.PersonalRating,
+				TotalPlaySeconds = g.TotalPlaySeconds,
+				LaunchCount = g.LaunchCount,
+				LastLaunched = g.LastLaunched
+			}).ToList();
+			bowlUser.Theme = Copy(d.Theme);
+			bowlUser.Cosmetics = Copy(d.Cosmetics);
+			bowlUser.Enhancements = Copy(d.Enhancements);
+			bowlUser.Experience = Copy(d.Experience);
+			bowlUser.Sessions = Copy(d.PlaySessions);
+			bowlUser.Queue = Copy(d.PlayQueue);
+			bowlUser.Lists = Copy(d.SmartLists);
+			bowlUser.WeeklyMinutes = userToolSettings.WeeklyMinutes;
+			bowlUser.BreakMinutes = userToolSettings.BreakMinutes;
+			bowlUser.Controller = userToolSettings.Controller;
+			bowlUser.Views = Copy(userToolSettings.Views);
+			bowlUser.Navigation = Copy(userToolSettings.Navigation);
+			bowlUser.SaveRoutes = Copy(userToolSettings.SaveRoutes);
+			return bowlUser;
+		}
+
+		public static void SaveActive(LibraryData d)
+		{
+			UserToolSettings s = Ensure(d);
+			BowlUser bowlUser = s.Users.FirstOrDefault((BowlUser x) => x.Id == s.ActiveId);
+			if (bowlUser != null)
+			{
+				BowlUser bowlUser2 = Capture(d, bowlUser.Name);
+				bowlUser2.Id = bowlUser.Id;
+				s.Users[s.Users.IndexOf(bowlUser)] = bowlUser2;
+			}
+		}
+
+		public static BowlUser Create(LibraryData d, string name)
+		{
+			UserToolSettings userToolSettings = Ensure(d);
+			name = (name ?? "").Trim();
+			if (name.Length == 0 || name.Length > 60 || userToolSettings.Users.Any((BowlUser existing) => string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase)))
+			{
+				throw new IOException("Use a unique profile name of 1–60 characters.");
+			}
+			BowlUser bowlUser = Capture(d, name);
+			bowlUser.Games = new List<PersonalGame>();
+			bowlUser.Sessions = new List<PlaySession>();
+			bowlUser.Queue = new List<string>();
+			bowlUser.Lists = new List<SmartLibraryList>();
+			bowlUser.WeeklyMinutes = 0;
+			bowlUser.BreakMinutes = 0;
+			bowlUser.Navigation = null;
+			bowlUser.Views = null;
+			bowlUser.SaveRoutes = new List<SaveRouting>();
+			userToolSettings.Users.Add(bowlUser);
+			return bowlUser;
+		}
+
+		public static void Switch(LibraryData d, string id)
+		{
+			if (Guest || ActiveLaunches > 0 || WorkGate.Busy > 0)
+			{
+				throw new IOException("Finish launched emulator sessions before changing profiles.");
+			}
+			UserToolSettings userToolSettings = Ensure(d);
+			BowlUser bowlUser = userToolSettings.Users.FirstOrDefault((BowlUser x) => x.Id == id);
+			if (bowlUser == null)
+			{
+				throw new IOException("Profile unavailable.");
+			}
+			if (id == userToolSettings.ActiveId)
+			{
+				return;
+			}
+			SaveActive(d);
+			bowlUser = userToolSettings.Users.First((BowlUser x) => x.Id == id);
+			Dictionary<string, PersonalGame> dictionary = (from p in bowlUser.Games ?? new List<PersonalGame>()
+				group p by p.Id).ToDictionary((IGrouping<string, PersonalGame> group) => group.Key, (IGrouping<string, PersonalGame> group) => group.First());
+			foreach (GameEntry game in d.Games)
+			{
+				PersonalGame value;
+				dictionary.TryGetValue(game.Id, out value);
+				game.Favorite = value != null && value.Favorite;
+				game.Pinned = value != null && value.Pinned;
+				game.PlayStatus = ((value == null) ? "Not started" : value.PlayStatus);
+				game.PersonalRating = ((value != null) ? value.PersonalRating : 0);
+				game.TotalPlaySeconds = ((value == null) ? 0 : value.TotalPlaySeconds);
+				game.LaunchCount = ((value != null) ? value.LaunchCount : 0);
+				game.LastLaunched = ((value == null) ? null : value.LastLaunched);
+			}
+			d.Theme = Copy(bowlUser.Theme);
+			d.Cosmetics = Copy(bowlUser.Cosmetics);
+			d.Enhancements = Copy(bowlUser.Enhancements);
+			d.Experience = Copy(bowlUser.Experience);
+			d.PlaySessions = Copy(bowlUser.Sessions) ?? new List<PlaySession>();
+			d.PlayQueue = Copy(bowlUser.Queue) ?? new List<string>();
+			d.SmartLists = Copy(bowlUser.Lists) ?? new List<SmartLibraryList>();
+			userToolSettings.WeeklyMinutes = bowlUser.WeeklyMinutes;
+			userToolSettings.BreakMinutes = bowlUser.BreakMinutes;
+			userToolSettings.Controller = bowlUser.Controller;
+			userToolSettings.Navigation = Copy(bowlUser.Navigation);
+			userToolSettings.Views = Copy(bowlUser.Views);
+			userToolSettings.SaveRoutes = Copy(bowlUser.SaveRoutes);
+			userToolSettings.ActiveId = id;
+			ExperienceData.Ensure(d);
+			NextData.Ensure(d);
+		}
+
+		private static List<GameEntry> BulkSnapshot(List<GameEntry> games)
+		{
+			return games.Select((GameEntry g) => new GameEntry
+			{
+				Id = g.Id,
+				PreferredEmulatorId = g.PreferredEmulatorId,
+				EmulatorId = g.EmulatorId,
+				PlayStatus = g.PlayStatus,
+				Favorite = g.Favorite,
+				Pinned = g.Pinned,
+				Tags = ((g.Tags == null) ? null : new List<string>(g.Tags)),
+				ArtworkPath = g.ArtworkPath
+			}).ToList();
+		}
+
+		public static BulkUndoRecord BeforeBulk(LibraryData d, List<GameEntry> games)
+		{
+			BulkUndoRecord bulkUndoRecord = new BulkUndoRecord();
+			bulkUndoRecord.At = DateTime.Now.ToString("g");
+			bulkUndoRecord.UserId = Ensure(d).ActiveId;
+			bulkUndoRecord.Before = BulkSnapshot(games);
+			bulkUndoRecord.CollectionsBefore = Copy(d.Collections);
+			return bulkUndoRecord;
+		}
+
+		public static void AfterBulk(LibraryData d, BulkUndoRecord r, List<GameEntry> games)
+		{
+			r.After = BulkSnapshot(games);
+			r.CollectionsAfter = Copy(d.Collections);
+			UserToolSettings userToolSettings = Ensure(d);
+			userToolSettings.Undo.Add(r);
+			while (userToolSettings.Undo.Count > 10)
+			{
+				userToolSettings.Undo.RemoveAt(0);
+			}
+		}
+
+		private static bool Equal(object a, object b)
+		{
+			return Json.Serialize(a) == Json.Serialize(b);
+		}
+
+		public static string UndoBulk(LibraryData d)
+		{
+			UserToolSettings s = Ensure(d);
+			BulkUndoRecord bulkUndoRecord = s.Undo.LastOrDefault((BulkUndoRecord x) => x.UserId == s.ActiveId);
+			if (bulkUndoRecord == null)
+			{
+				return "No bulk edits to undo for this profile.";
+			}
+			List<Action> list2 = new List<Action>();
+			int num = 0;
+			foreach (GameEntry before in bulkUndoRecord.Before)
+			{
+				List<GameEntry> after = bulkUndoRecord.After;
+				Func<GameEntry, bool> predicate = (GameEntry x) => x.Id == before.Id;
+				GameEntry gameEntry = after.FirstOrDefault(predicate);
+				GameEntry gameEntry2 = d.Games.FirstOrDefault((GameEntry x) => x.Id == before.Id);
+				if (gameEntry2 == null || gameEntry == null)
+				{
+					num++;
+					continue;
+				}
+				string[] bulkFields = BulkFields;
+				foreach (string name in bulkFields)
+				{
+					PropertyInfo property = typeof(GameEntry).GetProperty(name);
+					object value2 = property.GetValue(before, null);
+					object value3 = property.GetValue(gameEntry, null);
+					if (Equal(value2, value3))
+					{
+						continue;
+					}
+					if (!Equal(property.GetValue(gameEntry2, null), value3))
+					{
+						num++;
+						continue;
+					}
+					GameEntry target = gameEntry2;
+					PropertyInfo prop = property;
+					object value = value2;
+					list2.Add(delegate
+					{
+						prop.SetValue(target, value, null);
+					});
+				}
+			}
+			foreach (GameCollection a in bulkUndoRecord.CollectionsAfter ?? new List<GameCollection>())
+			{
+				GameCollection gameCollection = (bulkUndoRecord.CollectionsBefore ?? new List<GameCollection>()).FirstOrDefault((GameCollection x) => x.Id == a.Id);
+				GameCollection gameCollection2 = d.Collections.FirstOrDefault((GameCollection x) => x.Id == a.Id);
+				List<string> list3 = (a.GameIds ?? new List<string>()).Except((gameCollection == null) ? new List<string>() : (gameCollection.GameIds ?? new List<string>())).ToList();
+				if (list3.Count > 0 && (gameCollection2 == null || !Equal(gameCollection2.GameIds, a.GameIds)))
+				{
+					num++;
+					continue;
+				}
+				foreach (string item in list3)
+				{
+					if (gameCollection2 != null && gameCollection2.GameIds != null)
+					{
+						List<string> list = gameCollection2.GameIds;
+						string key = item;
+						list2.Add(delegate
+						{
+							list.Remove(key);
+						});
+					}
+				}
+			}
+			if (num > 0)
+			{
+				return "Undo stopped: " + num + " fields changed again or games were removed. No changes made.";
+			}
+			foreach (Action item2 in list2)
+			{
+				item2();
+			}
+			s.Undo.Remove(bulkUndoRecord);
+			Store.Save(d);
+			return "Undid bulk edit from " + bulkUndoRecord.At + ". Unrelated edits were preserved.";
+		}
+
+		public static string Diagnose(LibraryData d, GameEntry g)
+		{
+			if (g == null)
+			{
+				return "Select a game first.";
+			}
+			StringBuilder stringBuilder = new StringBuilder();
+			EmulatorProfile emulatorProfile = NextData.LaunchEmulator(d, g);
+			string path = NextData.LaunchPath(g);
+			stringBuilder.AppendLine("Game: " + g.Title);
+			stringBuilder.AppendLine(File.Exists(path) ? "✓ Game file exists." : "Game file is missing. Use Library tools → Repair game paths, or Edit game to choose its location.");
+			if (emulatorProfile == null)
+			{
+				stringBuilder.AppendLine("Assign an emulator in Edit game.");
+			}
+			else
+			{
+				stringBuilder.AppendLine(File.Exists(emulatorProfile.Executable) ? "✓ Emulator executable exists." : "Emulator executable is missing. Edit its profile and choose the installed executable.");
+				stringBuilder.AppendLine("Try opening the emulator directly and loading this game. If that fails too, check the emulator's supported formats, BIOS requirements and log.");
+			}
+			try
+			{
+				stringBuilder.AppendLine("Launch validation: " + GameSessions.Validate(d, g));
+				stringBuilder.AppendLine("FishBowl's paths and arguments pass validation. If the emulator exits early, check its log and per-game settings.");
+			}
+			catch (Exception ex)
+			{
+				stringBuilder.AppendLine("Launch validation: " + ex.Message);
+				stringBuilder.AppendLine("Review emulator arguments, selected build, launch profile and working folder. Close any existing emulator instance, then retry.");
+			}
+			stringBuilder.AppendLine("This check does not change or download files.");
+			return stringBuilder.ToString();
+		}
+
+		public static long WeekSeconds(LibraryData d, DateTime utc)
+		{
+			long num = 0L;
+			foreach (PlaySession item in d.PlaySessions ?? new List<PlaySession>())
+			{
+				DateTime result;
+				if (DateTime.TryParse(item.StartedAt, null, DateTimeStyles.RoundtripKind, out result) && !(result.ToUniversalTime() < utc.AddDays(-7.0)) && !(result.ToUniversalTime() > utc))
+				{
+					num += Math.Max(0L, item.Seconds);
+				}
+			}
+			return num;
+		}
+
+		public static string Html(IEnumerable<GameEntry> games, bool paths, bool history)
+		{
+			return Html(games, paths, history, false);
+		}
+
+		public static string Html(IEnumerable<GameEntry> games, bool paths, bool history, bool artwork)
+		{
+			return Html(games, paths, history, artwork, CancellationToken.None);
+		}
+
+		public static string Html(IEnumerable<GameEntry> games, bool paths, bool history, bool artwork, CancellationToken token)
+		{
+			StringBuilder stringBuilder = new StringBuilder("<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width'><title>FishBowl catalog</title><style>body{font:16px system-ui;background:#182332;color:#eef3fa;margin:24px}main{max-width:900px;margin:auto}article{background:#253348;border-radius:12px;padding:16px;margin:12px 0}h2{margin-top:0}p{overflow-wrap:anywhere}input{font:inherit;padding:12px;width:90%;background:#fff;color:#172334}small{color:#c8d6e6}</style><main><h1>Game catalog</h1><label>Filter games <input id='filter' type='search'></label>");
+			foreach (GameEntry item in games.OrderBy((GameEntry x) => x.Title))
+			{
+				token.ThrowIfCancellationRequested();
+				if (stringBuilder.Length > 52428800)
+				{
+					throw new IOException("Catalog exceeds 50 MB. Export fewer games or turn off artwork.");
+				}
+				stringBuilder.Append("<article>");
+				if (artwork)
+				{
+					string text = CatalogArt(item.ArtworkPath);
+					if (text != null)
+					{
+						stringBuilder.Append("<img alt='' width='128' height='128' style='object-fit:contain;float:right' src='data:image/png;base64," + text + "'>");
+					}
+				}
+				stringBuilder.Append("<h2>" + Escape(item.Title) + "</h2><p>" + Escape(item.Genre) + " · " + Escape(item.ConsoleLabel) + "</p><p>" + Escape(item.Description) + "</p><small>" + Escape(string.Join(", ", item.Tags ?? new List<string>())) + "</small>");
+				if (item.Extras != null && Hub.Https(item.Extras.MetadataSource))
+				{
+					stringBuilder.Append("<p><a href=\"" + Escape(item.Extras.MetadataSource) + "\">Metadata source and licensing</a></p>");
+				}
+				if (paths)
+				{
+					stringBuilder.Append("<p>File: " + Escape(item.Path) + "</p>");
+				}
+				if (history)
+				{
+					stringBuilder.Append("<p>" + Escape(item.PlayStatus) + " · " + item.LaunchCount + " launches · " + item.TotalPlaySeconds / 60 + " minutes · Last played: " + Escape(item.LastLaunched) + "</p>");
+				}
+				stringBuilder.Append("</article>");
+			}
+			return stringBuilder.Append("</main><script>document.getElementById('filter').addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('article').forEach(function(a){a.hidden=a.textContent.toLowerCase().indexOf(q)<0;});});</script></html>").ToString();
+		}
+
+		private static string CatalogArt(string path)
+		{
+			try
+			{
+				if (string.IsNullOrWhiteSpace(path) || !File.Exists(path) || new FileInfo(path).Length > 10485760)
+				{
+					return null;
+				}
+				using (Image image = Image.FromFile(path))
+				{
+					if (image.Width > 12000 || image.Height > 12000)
+					{
+						return null;
+					}
+					using (Bitmap bitmap = new Bitmap(128, 128))
+					{
+						using (Graphics graphics = Graphics.FromImage(bitmap))
+						{
+							using (MemoryStream memoryStream = new MemoryStream())
+							{
+								graphics.Clear(Color.Transparent);
+								double num = Math.Min(128.0 / (double)image.Width, 128.0 / (double)image.Height);
+								graphics.DrawImage(image, (128 - (int)((double)image.Width * num)) / 2, (128 - (int)((double)image.Height * num)) / 2, (int)((double)image.Width * num), (int)((double)image.Height * num));
+								bitmap.Save(memoryStream, ImageFormat.Png);
+								return Convert.ToBase64String(memoryStream.ToArray());
+							}
+						}
+					}
+				}
+			}
+			catch
+			{
+				return null;
+			}
+		}
+
+		public static string Escape(string s)
+		{
+			return (s ?? "").Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;")
+				.Replace("\"", "&quot;")
+				.Replace("'", "&#39;");
+		}
+
+		public static void Report(IWin32Window owner, string title, string text)
+		{
+			using (NextDialog nextDialog = new NextDialog(title))
+			{
+				nextDialog.Body.Controls.Add(new TextBox
+				{
+					Dock = DockStyle.Fill,
+					Multiline = true,
+					ReadOnly = true,
+					ScrollBars = ScrollBars.Both,
+					Text = text,
+					WordWrap = true
+				});
+				nextDialog.Action("Close", nextDialog.Close);
+				nextDialog.ShowDialog(owner);
+			}
+		}
+
+		public static void Troubleshoot(IWin32Window owner, LibraryData d, GameEntry game, string error)
+		{
+			NextDialog f = new NextDialog("Launch troubleshooting");
+			try
+			{
+				TextBox text = new TextBox
+				{
+					Dock = DockStyle.Fill,
+					Multiline = true,
+					ReadOnly = true,
+					ScrollBars = ScrollBars.Vertical,
+					Text = (error ?? "") + "\r\n\r\n" + Diagnose(d, game)
+				};
+				f.Body.Controls.Add(text);
+				if (!Guest)
+				{
+					f.Action("Game path and assignment", delegate
+					{
+						using (GameDialog gameDialog = new GameDialog(game, d.Emulators))
+						{
+							if (gameDialog.ShowDialog(f) == DialogResult.OK)
+							{
+								int num = d.Games.FindIndex((GameEntry x) => x.Id == game.Id);
+								if (num >= 0)
+								{
+									d.Games[num] = gameDialog.Game;
+								}
+								game = gameDialog.Game;
+								Store.Save(d);
+								text.Text = Diagnose(d, game);
+							}
+						}
+					});
+					f.Action("Emulator settings", delegate
+					{
+						EmulatorProfile emulatorProfile = ExperienceData.Emulator(d, game);
+						if (emulatorProfile == null)
+						{
+							throw new IOException("Assign an emulator in Game path and assignment first.");
+						}
+						using (EmulatorDialog emulatorDialog = new EmulatorDialog(emulatorProfile))
+						{
+							if (emulatorDialog.ShowDialog(f) == DialogResult.OK)
+							{
+								emulatorDialog.Profile.Id = emulatorProfile.Id;
+								d.Emulators[d.Emulators.IndexOf(emulatorProfile)] = emulatorDialog.Profile;
+								Store.Save(d);
+								text.Text = Diagnose(d, game);
+							}
+						}
+					});
+				}
+				f.Action("Recheck", delegate
+				{
+					text.Text = Diagnose(d, game);
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		private static void Add(Control parent, string text, Action action)
+		{
+			parent.Controls.Add(ExperienceUi.Button(text, action));
+		}
+
+		public static void Show(IWin32Window owner, LibraryData d, Action refresh)
+		{
+			NextData.Ensure(d);
+			LibraryAdditions.Ensure(d);
+			UserToolSettings s = Ensure(d);
+			NextDialog f = new NextDialog("User tools", 860, 600);
+			try
+			{
+				FishBowlTabs tabs = new FishBowlTabs
+				{
+					Dock = DockStyle.Fill,
+					PreferredColumns = 3
+				};
+				f.Body.Controls.Add(tabs);
+				TabPage tabPage = new TabPage("Personal");
+				tabPage.AutoScroll = true;
+				TabPage tabPage2 = tabPage;
+				TabPage tabPage3 = new TabPage("Check and repair");
+				tabPage3.AutoScroll = true;
+				TabPage tabPage4 = tabPage3;
+				TabPage tabPage5 = new TabPage("Share");
+				tabPage5.AutoScroll = true;
+				TabPage tabPage6 = tabPage5;
+				tabs.TabPages.AddRange(new TabPage[3] { tabPage2, tabPage4, tabPage6 });
+				TableLayoutPanel table = NextDialog.Fields(tabPage2);
+				ComboBox users = NextDialog.Choice(s.Users.Select((BowlUser x) => x.Name), s.Users.First((BowlUser x) => x.Id == s.ActiveId).Name);
+				NextDialog.Field(table, "Active user profile", users);
+				FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel();
+				flowLayoutPanel.AutoSize = true;
+				flowLayoutPanel.WrapContents = true;
+				FlowLayoutPanel flowLayoutPanel2 = flowLayoutPanel;
+				NextDialog.Field(table, "Profiles (shared games / saves)", flowLayoutPanel2, 92);
+				Add(flowLayoutPanel2, "Switch", delegate
+				{
+					Switch(d, s.Users.First((BowlUser x) => x.Name == users.Text).Id);
+					Store.Save(d);
+					refresh();
+					f.Close();
+				});
+				TextBox t;
+				Add(flowLayoutPanel2, "New profile", delegate
+				{
+					NextDialog i = new NextDialog("New user profile", 660, 430);
+					try
+					{
+						t = new TextBox();
+						NextDialog.Field(NextDialog.Fields(i.Body), "Name", t);
+						i.Action("Create", delegate
+						{
+							BowlUser bowlUser = Create(d, t.Text);
+							Store.Save(d);
+							users.Items.Add(bowlUser.Name);
+							users.SelectedItem = bowlUser.Name;
+							i.Close();
+						});
+						i.Action("Cancel", i.Close);
+						i.ShowDialog(f);
+					}
+					finally
+					{
+						if (i != null)
+						{
+							((IDisposable)i).Dispose();
+						}
+					}
+				});
+				Add(flowLayoutPanel2, "Emulator saves", delegate
+				{
+					UserSaveRoutes.Show(f, d);
+				});
+				Add(flowLayoutPanel2, "Guest browser", delegate
+				{
+					GuestBrowser(f, d);
+					f.Close();
+				});
+				NumericUpDown goal = NextDialog.Number(s.WeeklyMinutes, 0m, 10080m);
+				NumericUpDown breaks = NextDialog.Number(s.BreakMinutes, 0m, 240m);
+				CheckBox controller = new CheckBox
+				{
+					Text = "Enable XInput navigation",
+					Checked = s.Controller
+				};
+				NextDialog.Field(table, "Rolling 7-day goal (minutes; 0 off)", goal);
+				NextDialog.Field(table, "Break reminder (minutes; 0 off)", breaks);
+				NextDialog.Field(table, "Controller navigation", controller);
+				long num = WeekSeconds(d, DateTime.UtcNow) / 60;
+				NextDialog.Field(table, "Recorded last 7 days", new Label
+				{
+					Text = num + " minutes" + ((s.WeeklyMinutes > 0) ? (" / " + s.WeeklyMinutes + " goal (" + Math.Min(100L, num * 100 / s.WeeklyMinutes) + "%)") : " — goal off") + ". Goals use recorded emulator time.",
+					AutoSize = true
+				}, 70);
+				NextDialog.Field(table, "Controller controls", new Label
+				{
+					Text = "D-pad: move selection/focus · A: activate · B: close dialogs · shoulders: tabs. Only while FishBowl is active. XInput controllers only.",
+					AutoSize = true
+				}, 80);
+				FishBowlActionButton control = ExperienceUi.Button("Save personal settings", delegate
+				{
+					s.WeeklyMinutes = (int)goal.Value;
+					s.BreakMinutes = (int)breaks.Value;
+					s.Controller = controller.Checked;
+					Store.Save(d);
+					refresh();
+				});
+				NextDialog.Field(table, "", control);
+				FlowLayoutPanel flowLayoutPanel3 = new FlowLayoutPanel();
+				flowLayoutPanel3.Dock = DockStyle.Fill;
+				flowLayoutPanel3.FlowDirection = FlowDirection.TopDown;
+				flowLayoutPanel3.WrapContents = false;
+				flowLayoutPanel3.AutoScroll = true;
+				FlowLayoutPanel flowLayoutPanel4 = flowLayoutPanel3;
+				tabPage4.Controls.Add(flowLayoutPanel4);
+				flowLayoutPanel4.Controls.Add(ExperienceUi.Label("Choose a game for diagnostics. Integrity checks compare raw files with a local XML DAT; archives and disc sets are not unpacked.", 80));
+				List<GameEntry> source = d.Games.OrderBy((GameEntry g) => g.Title).ToList();
+				ComboBox choice = new ComboBox
+				{
+					Width = 600,
+					DropDownStyle = ComboBoxStyle.DropDownList,
+					DisplayMember = "Title"
+				};
+				choice.Items.AddRange(source.Cast<object>().ToArray());
+				if (choice.Items.Count > 0)
+				{
+					choice.SelectedIndex = 0;
+				}
+				flowLayoutPanel4.Controls.Add(choice);
+				Add(flowLayoutPanel4, "Diagnose selected game", delegate
+				{
+					GameEntry gameEntry2 = choice.SelectedItem as GameEntry;
+					if (gameEntry2 == null)
+					{
+						throw new IOException("Choose a game.");
+					}
+					Troubleshoot(f, d, gameEntry2, null);
+				});
+				string dat;
+				string path;
+				Add(flowLayoutPanel4, "Check selected file against DAT", delegate
+				{
+					GameEntry gameEntry = choice.SelectedItem as GameEntry;
+					if (gameEntry == null)
+					{
+						throw new IOException("Choose a game.");
+					}
+					using (OpenFileDialog openFileDialog = new OpenFileDialog
+					{
+						Filter = "XML DAT files|*.dat;*.xml",
+						Title = "Choose local reference DAT"
+					})
+					{
+						if (openFileDialog.ShowDialog(f) == DialogResult.OK)
+						{
+							dat = openFileDialog.FileName;
+							path = NextData.LaunchPath(gameEntry);
+							string text2 = BackgroundWork<string>.Run(f, "ROM integrity check", (CancellationToken token, Action<string> progress) => RomIntegrity.Check(dat, path, token, progress));
+							if (text2 != null)
+							{
+								Report(f, "Integrity result", text2);
+							}
+						}
+					}
+				});
+				Add(flowLayoutPanel4, "Library health", delegate
+				{
+					Polish.HealthScreen(f, d);
+				});
+				Add(flowLayoutPanel4, "Devices and emulator checks", delegate
+				{
+					Report(f, "Device and emulator checks", Polish.DeviceReport(d));
+				});
+				Add(flowLayoutPanel4, "Undo last bulk edit", delegate
+				{
+					Report(f, "Bulk undo", UndoBulk(d));
+				});
+				flowLayoutPanel4.Controls.Add(ExperienceUi.Label("Undo keeps the last 10 bulk operations. It restores changed fields only and stops if later changes conflict.", 70));
+				TableLayoutPanel sf = NextDialog.Fields(tabPage6);
+				ComboBox scope = NextDialog.Choice(new string[4] { "All games", "Favorites", "Play queue", "Choose games" }, "All games");
+				NextDialog.Field(sf, "Games to share", scope);
+				CheckedListBox chosen = new CheckedListBox
+				{
+					CheckOnClick = true,
+					DisplayMember = "Title",
+					Visible = false
+				};
+				chosen.Items.AddRange(source.Cast<object>().ToArray());
+				NextDialog.Field(sf, "Select games", chosen, 140);
+				Control chosenLabel = sf.GetControlFromPosition(0, sf.RowCount - 1);
+				int chosenRow = sf.RowCount - 1;
+				sf.RowStyles[chosenRow].Height = 0f;
+				chosenLabel.Visible = false;
+				scope.SelectedIndexChanged += delegate
+				{
+					bool flag = scope.Text == "Choose games";
+					chosen.Visible = flag;
+					chosenLabel.Visible = flag;
+					sf.RowStyles[chosenRow].Height = (flag ? 140 : 0);
+				};
+				CheckBox paths = new CheckBox
+				{
+					Text = "Include local file paths (private)",
+					Checked = false
+				};
+				CheckBox history = new CheckBox
+				{
+					Text = "Include progress and play history",
+					Checked = false
+				};
+				CheckBox art = new CheckBox
+				{
+					Text = "Include local artwork thumbnails",
+					Checked = false
+				};
+				NextDialog.Field(sf, "Catalog privacy", paths);
+				NextDialog.Field(sf, "", history);
+				NextDialog.Field(sf, "Artwork", art);
+				NextDialog.Field(sf, "Included by default", new Label
+				{
+					Text = "Titles, platform, genre, descriptions and tags. Preview before sharing: those fields can also contain personal information.",
+					AutoSize = true
+				}, 90);
+				bool includePaths;
+				bool includeHistory;
+				bool includeArt;
+				NextDialog.Field(sf, "", ExperienceUi.Button("Export HTML catalog", delegate
+				{
+					IEnumerable<GameEntry> source2 = d.Games;
+					if (scope.Text == "Favorites")
+					{
+						source2 = d.Games.Where((GameEntry g) => g.Favorite);
+					}
+					else if (scope.Text == "Play queue")
+					{
+						source2 = d.Games.Where((GameEntry g) => d.PlayQueue.Contains(g.Id));
+					}
+					else if (scope.Text == "Choose games")
+					{
+						source2 = chosen.CheckedItems.Cast<GameEntry>();
+					}
+					List<GameEntry> selected = source2.ToList();
+					if (selected.Count == 0)
+					{
+						throw new IOException("Choose at least one game to export.");
+					}
+					using (SaveFileDialog saveFileDialog = new SaveFileDialog
+					{
+						Filter = "HTML catalog|*.html",
+						FileName = "FishBowl catalog.html"
+					})
+					{
+						if (saveFileDialog.ShowDialog(f) == DialogResult.OK)
+						{
+							includePaths = paths.Checked;
+							includeHistory = history.Checked;
+							includeArt = art.Checked;
+							string text = BackgroundWork<string>.Run(f, "Build catalog", delegate(CancellationToken token, Action<string> progress)
+							{
+								token.ThrowIfCancellationRequested();
+								progress("Preparing " + selected.Count + " games…");
+								return Html(selected, includePaths, includeHistory, includeArt, token);
+							});
+							if (text != null)
+							{
+								File.WriteAllText(saveFileDialog.FileName, text, new UTF8Encoding(false));
+								Report(f, "Catalog exported", "Saved to " + saveFileDialog.FileName + "\r\nOpen it in a browser to preview. It works offline and contains no remote resources.");
+							}
+						}
+					}
+				}));
+				f.Shown += delegate
+				{
+					foreach (Control item in NextUi.Descendants(tabs))
+					{
+						if (item is TabPage || item is Panel || item is TableLayoutPanel || item is Label || item is CheckBox)
+						{
+							item.BackColor = FishBowlPalette.ThemeSurface;
+							item.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, item.BackColor);
+						}
+					}
+					foreach (TableLayoutPanel item2 in NextUi.Descendants(f).OfType<TableLayoutPanel>())
+					{
+						foreach (Control control2 in item2.Controls)
+						{
+							int row = item2.GetRow(control2);
+							if (row >= 0 && item2.GetColumn(control2) == 0 && control2.Visible)
+							{
+								int val = TextRenderer.MeasureText(control2.Text, control2.Font, new Size(Math.Max(60, control2.Width), 1000), TextFormatFlags.WordBreak).Height + 18;
+								item2.RowStyles[row].Height = Math.Max(item2.RowStyles[row].Height, Math.Max(val, control2.Font.Height + 28));
+							}
+						}
+					}
+				};
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static LibraryData BeginGuest(LibraryData d)
+		{
+			if (Guest || ActiveLaunches > 0 || WorkGate.Busy > 0)
+			{
+				throw new IOException("Finish emulator sessions before entering guest mode.");
+			}
+			LibraryData result = Copy(d);
+			Guest = true;
+			return result;
+		}
+
+		public static void EndGuest(LibraryData d, LibraryData snapshot)
+		{
+			if (ActiveLaunches > 0)
+			{
+				throw new IOException("Close the guest's launched emulator before leaving guest mode.");
+			}
+			PropertyInfo[] properties = typeof(LibraryData).GetProperties();
+			foreach (PropertyInfo propertyInfo in properties)
+			{
+				propertyInfo.SetValue(d, propertyInfo.GetValue(snapshot, null), null);
+			}
+			Guest = false;
+		}
+
+		private static void GuestBrowser(IWin32Window owner, LibraryData d)
+		{
+			d = Copy(d);
+			List<Action> list2 = new List<Action>();
+			foreach (Form openForm in Application.OpenForms)
+			{
+				FieldInfo[] fields = openForm.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic);
+				foreach (FieldInfo fieldInfo in fields)
+				{
+					System.Windows.Forms.Timer timer = fieldInfo.GetValue(openForm) as System.Windows.Forms.Timer;
+					if (timer != null && timer.Enabled)
+					{
+						timer.Stop();
+						list2.Add(timer.Start);
+					}
+					FileSystemWatcher watcher = fieldInfo.GetValue(openForm) as FileSystemWatcher;
+					if (watcher != null && watcher.EnableRaisingEvents)
+					{
+						watcher.EnableRaisingEvents = false;
+						list2.Add(delegate
+						{
+							watcher.EnableRaisingEvents = true;
+						});
+					}
+					IEnumerable<FileSystemWatcher> enumerable = fieldInfo.GetValue(openForm) as IEnumerable<FileSystemWatcher>;
+					if (enumerable == null)
+					{
+						continue;
+					}
+					foreach (FileSystemWatcher item in enumerable)
+					{
+						if (item.EnableRaisingEvents)
+						{
+							FileSystemWatcher watched = item;
+							watched.EnableRaisingEvents = false;
+							list2.Add(delegate
+							{
+								watched.EnableRaisingEvents = true;
+							});
+						}
+					}
+				}
+			}
+			LibraryData libraryData = null;
+			try
+			{
+				libraryData = BeginGuest(d);
+				NextDialog f = new NextDialog("Guest browser — Library changes disabled");
+				try
+				{
+					TextBox filter = new TextBox
+					{
+						Dock = DockStyle.Top,
+						AccessibleName = "Filter guest games"
+					};
+					ListBox list = new ListBox
+					{
+						Dock = DockStyle.Fill,
+						DisplayMember = "Title"
+					};
+					f.Body.Controls.Add(list);
+					f.Body.Controls.Add(filter);
+					Action load = delegate
+					{
+						list.Items.Clear();
+						list.Items.AddRange((from g in d.Games
+							where (g.Title ?? "").IndexOf(filter.Text, StringComparison.OrdinalIgnoreCase) >= 0
+							orderby g.Title
+							select g).Cast<object>().ToArray());
+						if (list.Items.Count > 0)
+						{
+							list.SelectedIndex = 0;
+						}
+					};
+					filter.TextChanged += delegate
+					{
+						load();
+					};
+					load();
+					Action launch = delegate
+					{
+						GameEntry gameEntry2 = list.SelectedItem as GameEntry;
+						if (gameEntry2 != null)
+						{
+							ExperienceTools.Launch(f, d, gameEntry2);
+						}
+					};
+					list.DoubleClick += delegate
+					{
+						launch();
+					};
+					f.Action("Launch", launch);
+					f.Action("Details", delegate
+					{
+						GameEntry gameEntry = list.SelectedItem as GameEntry;
+						if (gameEntry != null)
+						{
+							Report(f, "Game details", gameEntry.Title + "\r\n" + gameEntry.Genre + "\r\n" + gameEntry.Description);
+						}
+					});
+					f.Action("Leave guest mode", f.Close);
+					f.FormClosing += delegate(object a, FormClosingEventArgs b)
+					{
+						if (ActiveLaunches > 0)
+						{
+							b.Cancel = true;
+							MessageBox.Show(f, "Close the launched emulator before leaving guest mode.", "Guest browser");
+						}
+					};
+					f.ShowDialog(owner);
+				}
+				finally
+				{
+					if (f != null)
+					{
+						((IDisposable)f).Dispose();
+					}
+				}
+			}
+			finally
+			{
+				if (libraryData != null)
+				{
+					EndGuest(d, libraryData);
+				}
+				foreach (Action item2 in list2)
+				{
+					item2();
+				}
+			}
+		}
+	}
+	public static class RomIntegrity
+	{
+		private static readonly uint[] CrcTable = BuildCrcTable();
+
+		private static uint[] BuildCrcTable()
+		{
+			uint[] array = new uint[256];
+			for (uint num = 0u; num < 256; num++)
+			{
+				uint num2 = num;
+				for (int i = 0; i < 8; i++)
+				{
+					num2 = (num2 >> 1) ^ (((num2 & (true ? 1u : 0u)) != 0) ? 3988292384u : 0u);
+				}
+				array[num] = num2;
+			}
+			return array;
+		}
+
+		public static string Check(string dat, string path, CancellationToken token, Action<string> progress)
+		{
+			if (!File.Exists(path))
+			{
+				throw new IOException("The selected game file is missing.");
+			}
+			if (new FileInfo(dat).Length > 104857600)
+			{
+				throw new IOException("DAT exceeds 100 MB.");
+			}
+			List<Dictionary<string, string>> list = new List<Dictionary<string, string>>();
+			using (XmlReader xmlReader = XmlReader.Create(dat, new XmlReaderSettings
+			{
+				DtdProcessing = DtdProcessing.Ignore,
+				XmlResolver = null,
+				MaxCharactersInDocument = 104857600L
+			}))
+			{
+				while (xmlReader.Read())
+				{
+					token.ThrowIfCancellationRequested();
+					if (xmlReader.NodeType == XmlNodeType.Element && !(xmlReader.LocalName != "rom"))
+					{
+						Dictionary<string, string> dictionary = new Dictionary<string, string>();
+						string[] array = new string[6] { "name", "size", "crc", "md5", "sha1", "status" };
+						foreach (string text in array)
+						{
+							dictionary[text] = xmlReader.GetAttribute(text);
+						}
+						list.Add(dictionary);
+					}
+				}
+			}
+			long size = new FileInfo(path).Length;
+			List<Dictionary<string, string>> list2 = list.Where((Dictionary<string, string> r) => r["status"] != "nodump" && (r["size"] == null || r["size"] == size.ToString(CultureInfo.InvariantCulture))).ToList();
+			if (list2.Count == 0)
+			{
+				return "No reference of this size. The DAT may describe a different format or an uncompressed ROM. No files changed.";
+			}
+			uint num = uint.MaxValue;
+			long num2 = 0L;
+			using (MD5 mD = MD5.Create())
+			{
+				using (SHA1 sHA = SHA1.Create())
+				{
+					using (FileStream fileStream = File.OpenRead(path))
+					{
+						byte[] array2 = new byte[1048576];
+						int num3;
+						while ((num3 = fileStream.Read(array2, 0, array2.Length)) > 0)
+						{
+							token.ThrowIfCancellationRequested();
+							mD.TransformBlock(array2, 0, num3, array2, 0);
+							sHA.TransformBlock(array2, 0, num3, array2, 0);
+							for (int l = 0; l < num3; l++)
+							{
+								num = (num >> 8) ^ CrcTable[(num ^ array2[l]) & 0xFF];
+							}
+							num2 += num3;
+							progress("Checking " + Path.GetFileName(path) + " — " + ((size == 0) ? 100 : (num2 * 100 / size)) + "%");
+						}
+						mD.TransformFinalBlock(new byte[0], 0, 0);
+						sHA.TransformFinalBlock(new byte[0], 0, 0);
+						string i = Hex(mD.Hash);
+						string s = Hex(sHA.Hash);
+						string c = (~num).ToString("x8");
+						List<Dictionary<string, string>> list3 = list2.Where((Dictionary<string, string> r) => Matches(r, "md5", i) && Matches(r, "sha1", s) && Matches(r, "crc", c) && new string[3] { "crc", "md5", "sha1" }.Any((string k) => !string.IsNullOrWhiteSpace(r[k]))).ToList();
+						string text2 = "\r\nCRC32: " + c + "\r\nMD5: " + i + "\r\nSHA1: " + s;
+						if (list3.Count > 0)
+						{
+							return "Verified against reference: " + string.Join(", ", list3.Select((Dictionary<string, string> r) => r["name"])) + text2 + "\r\nAll supplied hashes matched. Reference quality depends on your DAT.";
+						}
+						return (list.Any((Dictionary<string, string> r) => string.Equals(r["name"], Path.GetFileName(path), StringComparison.OrdinalIgnoreCase)) ? "Mismatch against named reference. The file may be modified, damaged, or a different revision." : "Unrecognized file. No hash match in this DAT; this alone does not prove corruption.") + text2 + "\r\nNo files changed.";
+					}
+				}
+			}
+		}
+
+		private static bool Matches(Dictionary<string, string> r, string key, string value)
+		{
+			return string.IsNullOrWhiteSpace(r[key]) || string.Equals(r[key], value, StringComparison.OrdinalIgnoreCase);
+		}
+
+		private static string Hex(byte[] b)
+		{
+			return BitConverter.ToString(b).Replace("-", "").ToLowerInvariant();
+		}
+	}
+	public sealed class UserToolRuntime : IDisposable
+	{
+		private struct Pad
+		{
+			public ushort Buttons;
+
+			public byte LeftTrigger;
+
+			public byte RightTrigger;
+
+			public short LX;
+
+			public short LY;
+
+			public short RX;
+
+			public short RY;
+		}
+
+		private struct State
+		{
+			public uint Packet;
+
+			public Pad Pad;
+		}
+
+		private readonly LibraryData data;
+
+		private readonly Form owner;
+
+		private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer
+		{
+			Interval = 33
+		};
+
+		private readonly Dictionary<string, int> notices = new Dictionary<string, int>();
+
+		private readonly NotifyIcon notification = new NotifyIcon();
+
+		private ushort previous;
+
+		private DateTime hideNotice;
+
+		private DateTime nextReminder;
+
+		public UserToolRuntime(Form owner, LibraryData data)
+		{
+			this.owner = owner;
+			this.data = data;
+			System.Windows.Forms.Timer obj = timer;
+			EventHandler value = delegate
+			{
+				Tick();
+			};
+			obj.Tick += value;
+			timer.Start();
+		}
+
+		private void Tick()
+		{
+			if (notification.Visible && DateTime.UtcNow > hideNotice)
+			{
+				notification.Visible = false;
+			}
+			UserToolSettings userToolSettings = UserTools.Ensure(data);
+			if (userToolSettings.Controller)
+			{
+				Navigate();
+			}
+			if (UserTools.Guest || userToolSettings.BreakMinutes <= 0 || DateTime.UtcNow < nextReminder)
+			{
+				return;
+			}
+			nextReminder = DateTime.UtcNow.AddSeconds(1.0);
+			foreach (PlaySession item in data.PlaySessions ?? new List<PlaySession>())
+			{
+				DateTime result;
+				if (UserTools.ActiveSessions.ContainsKey(item.Id) && !item.Uncertain && item.EndedAt == null && DateTime.TryParse(item.StartedAt, null, DateTimeStyles.RoundtripKind, out result))
+				{
+					int num = (int)((DateTime.UtcNow - result.ToUniversalTime()).TotalMinutes / (double)userToolSettings.BreakMinutes);
+					int value;
+					if (num > 0 && (!notices.TryGetValue(item.Id, out value) || num > value))
+					{
+						notices[item.Id] = num;
+						notification.Icon = owner.Icon ?? SystemIcons.Information;
+						notification.Visible = true;
+						notification.BalloonTipTitle = "FishBowl break reminder";
+						notification.BalloonTipText = "You've played for " + num * userToolSettings.BreakMinutes + " minutes. Take a break when convenient.";
+						notification.ShowBalloonTip(8000);
+						hideNotice = DateTime.UtcNow.AddSeconds(12.0);
+					}
+				}
+			}
+		}
+
+		[DllImport("xinput1_4.dll", EntryPoint = "XInputGetState")]
+		private static extern uint Get(uint index, out State s);
+
+		[DllImport("xinput1_3.dll", EntryPoint = "XInputGetState")]
+		private static extern uint GetOld(uint index, out State s);
+
+		public static bool ControllerConnected()
+		{
+			State state;
+			return Read(out state);
+		}
+
+		private static bool Read(out State state)
+		{
+			state = default(State);
+			try
+			{
+				for (uint num = 0u; num < 4; num++)
+				{
+					if (Get(num, out state) == 0)
+					{
+						return true;
+					}
+				}
+			}
+			catch (DllNotFoundException)
+			{
+				try
+				{
+					for (uint num = 0u; num < 4; num++)
+					{
+						if (GetOld(num, out state) == 0)
+						{
+							return true;
+						}
+					}
+				}
+				catch (DllNotFoundException)
+				{
+				}
+			}
+			return false;
+		}
+
+		private void Navigate()
+		{
+			Form activeForm = Form.ActiveForm;
+			State state;
+			if (activeForm == null || !Read(out state))
+			{
+				previous = 0;
+				return;
+			}
+			ushort pressed = (ushort)(state.Pad.Buttons & ~previous);
+			previous = state.Pad.Buttons;
+			ApplyButtons(activeForm, owner, pressed);
+		}
+
+		public static void ApplyButtons(Form f, Form owner, ushort pressed)
+		{
+			Control activeControl = f.ActiveControl;
+			while (activeControl is ContainerControl && ((ContainerControl)activeControl).ActiveControl != null)
+			{
+				activeControl = ((ContainerControl)activeControl).ActiveControl;
+			}
+			if ((pressed & 0x1000u) != 0)
+			{
+				MainForm mainForm = f as MainForm;
+				if (mainForm != null && mainForm.ActivateControllerSelection(activeControl))
+				{
+					return;
+				}
+				Button button = activeControl as Button;
+				if (button != null)
+				{
+					button.PerformClick();
+				}
+				else if (activeControl is CheckBox)
+				{
+					((CheckBox)activeControl).Checked = !((CheckBox)activeControl).Checked;
+				}
+				else if (activeControl is ComboBox)
+				{
+					((ComboBox)activeControl).DroppedDown = !((ComboBox)activeControl).DroppedDown;
+				}
+				else if (activeControl is ListView || activeControl is ListBox)
+				{
+					typeof(Control).GetMethod("OnDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(activeControl, new object[1] { EventArgs.Empty });
+				}
+			}
+			if ((pressed & 0x2000u) != 0 && f != owner)
+			{
+				f.Close();
+			}
+			int num = ((((uint)pressed & (true ? 1u : 0u)) != 0) ? (-1) : (((pressed & 2u) != 0) ? 1 : 0));
+			if (num != 0)
+			{
+				ListBox listBox = activeControl as ListBox;
+				ListView listView = activeControl as ListView;
+				ComboBox comboBox = activeControl as ComboBox;
+				if (listBox != null && listBox.Items.Count > 0)
+				{
+					listBox.SelectedIndex = Math.Max(0, Math.Min(listBox.Items.Count - 1, listBox.SelectedIndex + num));
+				}
+				else if (comboBox != null && comboBox.Items.Count > 0)
+				{
+					comboBox.SelectedIndex = Math.Max(0, Math.Min(comboBox.Items.Count - 1, comboBox.SelectedIndex + num));
+				}
+				else if (listView != null && listView.Items.Count > 0)
+				{
+					int num2 = ((listView.SelectedIndices.Count > 0) ? listView.SelectedIndices[0] : 0);
+					ListViewItem listViewItem = listView.Items[Math.Max(0, Math.Min(listView.Items.Count - 1, num2 + num))];
+					listView.SelectedItems.Clear();
+					listViewItem.Selected = true;
+					listViewItem.Focused = true;
+					listViewItem.EnsureVisible();
+				}
+				else
+				{
+					f.SelectNextControl(activeControl, num > 0, true, true, true);
+				}
+			}
+			if ((pressed & 0xCu) != 0)
+			{
+				NumericUpDown numericUpDown = activeControl as NumericUpDown;
+				Control control = ((activeControl == null) ? null : activeControl.Parent);
+				while (numericUpDown == null && control != null)
+				{
+					numericUpDown = control as NumericUpDown;
+					control = control.Parent;
+				}
+				if (numericUpDown != null)
+				{
+					numericUpDown.Value = Math.Max(numericUpDown.Minimum, Math.Min(numericUpDown.Maximum, numericUpDown.Value + (((pressed & 8u) != 0) ? numericUpDown.Increment : (-numericUpDown.Increment))));
+				}
+				else
+				{
+					f.SelectNextControl(activeControl, (pressed & 8) != 0, true, true, true);
+				}
+			}
+			if ((pressed & 0x300) == 0)
+			{
+				return;
+			}
+			TabControl tabControl = null;
+			for (Control control = ((activeControl == null) ? null : activeControl.Parent); control != null; control = control.Parent)
+			{
+				if (control is TabControl)
+				{
+					tabControl = (TabControl)control;
+					break;
+				}
+			}
+			if (tabControl == null)
+			{
+				tabControl = Descendants(f).OfType<TabControl>().FirstOrDefault((TabControl t) => t.Visible);
+			}
+			if (tabControl != null && tabControl.TabCount > 0)
+			{
+				tabControl.SelectedIndex = (tabControl.SelectedIndex + (((pressed & 0x200u) != 0) ? 1 : (tabControl.TabCount - 1))) % tabControl.TabCount;
+			}
+		}
+
+		private static IEnumerable<Control> Descendants(Control c)
+		{
+			foreach (Control child in c.Controls)
+			{
+				yield return child;
+				foreach (Control item in Descendants(child))
+				{
+					yield return item;
+				}
+			}
+		}
+
+		public void Dispose()
+		{
+			timer.Stop();
+			timer.Dispose();
+			notification.Dispose();
+		}
+	}
+	public class LibraryNavigation
+	{
+		public string Search { get; set; }
+
+		public string Scope { get; set; }
+
+		public string Console { get; set; }
+
+		public string Emulator { get; set; }
+
+		public string Saves { get; set; }
+
+		public string Sort { get; set; }
+
+		public string Tags { get; set; }
+
+		public string SelectedId { get; set; }
+
+		public string TopId { get; set; }
+
+		public bool Artwork { get; set; }
+	}
+	public class SaveRouting
+	{
+		public string EmulatorId { get; set; }
+
+		public string Mode { get; set; }
+
+		public string Arguments { get; set; }
+	}
+	public class HealthIssue
+	{
+		public string Area { get; set; }
+
+		public string Message { get; set; }
+
+		public string GameId { get; set; }
+	}
+	public static class Polish
+	{
+		public static bool Review(IWin32Window owner, string title, string beforeAfter)
+		{
+			NextDialog f = new NextDialog(title, 850, 600);
+			try
+			{
+				f.Body.Controls.Add(new TextBox
+				{
+					Multiline = true,
+					ReadOnly = true,
+					ScrollBars = ScrollBars.Both,
+					Dock = DockStyle.Fill,
+					Text = beforeAfter,
+					WordWrap = false,
+					AccessibleName = "Changes to review"
+				});
+				f.Action("Apply reviewed changes", delegate
+				{
+					f.DialogResult = DialogResult.OK;
+				});
+				f.Action("Cancel", delegate
+				{
+					f.DialogResult = DialogResult.Cancel;
+				});
+				return f.ShowDialog(owner) == DialogResult.OK;
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static string ImportSummary(LibraryData current, LibraryData incoming)
+		{
+			return "Replace these FishBowl settings. Game and save files themselves will not be moved.\r\nA restore point will be created before replacement.\r\n\r\nGames: " + current.Games.Count + " → " + (incoming.Games ?? new List<GameEntry>()).Count + "\r\nEmulators: " + current.Emulators.Count + " → " + incoming.Emulators.Count + "\r\nUser profiles: " + UserTools.Ensure(current).Users.Count + " → " + ((incoming.UserTools == null || incoming.UserTools.Users == null) ? 1 : incoming.UserTools.Users.Count) + "\r\nTheme: " + ((current.Theme == null) ? "Default" : current.Theme.Name) + " → " + ((incoming.Theme == null) ? "Default" : incoming.Theme.Name) + "\r\n\r\nIncoming games (first 100):\r\n" + string.Join("\r\n", from g in (incoming.Games ?? new List<GameEntry>()).Take(100)
+				select g.Title + " | " + g.Path);
+		}
+
+		public static string BulkSummary(IEnumerable<GameEntry> games, string emulator, string status, string favorite, string pinned, string tags, string art, string collection)
+		{
+			StringBuilder stringBuilder = new StringBuilder("Only the following fields will change. Other fields and game/save files stay unchanged.\r\n\r\n");
+			foreach (GameEntry game in games)
+			{
+				stringBuilder.AppendLine(game.Title);
+				if (emulator != "Keep current")
+				{
+					stringBuilder.AppendLine("  Emulator assignment → " + emulator);
+				}
+				if (status != "Keep current")
+				{
+					stringBuilder.AppendLine("  Status: " + game.PlayStatus + " → " + status);
+				}
+				if (favorite != "Keep current")
+				{
+					stringBuilder.AppendLine("  Favorite: " + game.Favorite + " → " + (favorite == "Favorite"));
+				}
+				if (pinned != "Keep current")
+				{
+					stringBuilder.AppendLine("  Pinned: " + game.Pinned + " → " + (pinned == "Pin"));
+				}
+				if (!string.IsNullOrWhiteSpace(tags))
+				{
+					stringBuilder.AppendLine("  Tags: " + string.Join(", ", game.Tags ?? new List<string>()) + " → add " + tags);
+				}
+				if (!string.IsNullOrWhiteSpace(art))
+				{
+					stringBuilder.AppendLine("  Artwork: " + game.ArtworkPath + " → " + art);
+				}
+				if (collection != "None")
+				{
+					stringBuilder.AppendLine("  Collection → add to " + collection);
+				}
+				stringBuilder.AppendLine();
+			}
+			return stringBuilder.ToString();
+		}
+
+		public static List<HealthIssue> Health(LibraryData d, CancellationToken token)
+		{
+			List<HealthIssue> list = new List<HealthIssue>();
+			foreach (GameEntry game in d.Games)
+			{
+				token.ThrowIfCancellationRequested();
+				if (!File.Exists(NextData.LaunchPath(game)))
+				{
+					list.Add(new HealthIssue
+					{
+						Area = "Game file",
+						GameId = game.Id,
+						Message = game.Title + ": missing file. Choose a replacement in Repair game paths."
+					});
+				}
+				EmulatorProfile emulatorProfile = ExperienceData.Emulator(d, game);
+				if (!Hub.Native(game) && (emulatorProfile == null || !File.Exists(NextData.LaunchEmulator(d, game).Executable)))
+				{
+					list.Add(new HealthIssue
+					{
+						Area = "Emulator",
+						GameId = game.Id,
+						Message = game.Title + ": assign an available emulator in game settings."
+					});
+				}
+				if (string.IsNullOrWhiteSpace(game.ArtworkPath) || !File.Exists(game.ArtworkPath))
+				{
+					list.Add(new HealthIssue
+					{
+						Area = "Artwork",
+						GameId = game.Id,
+						Message = game.Title + ": artwork unavailable. Choose a local image in game settings."
+					});
+				}
+				foreach (GameSaveEntry item in game.Saves ?? new List<GameSaveEntry>())
+				{
+					if (!File.Exists(item.Path) && !Directory.Exists(item.Path))
+					{
+						list.Add(new HealthIssue
+						{
+							Area = "Linked save",
+							GameId = game.Id,
+							Message = game.Title + ": linked save unavailable; review its save associations."
+						});
+					}
+				}
+			}
+			foreach (SaveSnapshot item2 in d.SaveSnapshots ?? new List<SaveSnapshot>())
+			{
+				token.ThrowIfCancellationRequested();
+				if (!File.Exists(item2.Path) && !Directory.Exists(item2.Path))
+				{
+					list.Add(new HealthIssue
+					{
+						Area = "Backup",
+						GameId = item2.GameId,
+						Message = "Missing save snapshot: " + item2.Path
+					});
+				}
+			}
+			if (!string.IsNullOrWhiteSpace(d.BackupFolder) && !Directory.Exists(d.BackupFolder))
+			{
+				list.Add(new HealthIssue
+				{
+					Area = "Backup",
+					Message = "Configured backup folder is unavailable: " + d.BackupFolder
+				});
+			}
+			return list;
+		}
+
+		public static void HealthScreen(IWin32Window owner, LibraryData d)
+		{
+			List<HealthIssue> list2 = BackgroundWork<List<HealthIssue>>.Run(owner, "Check Library health", delegate(CancellationToken token, Action<string> progress)
+			{
+				progress("Checking configured files and folders…");
+				return Health(d, token);
+			});
+			if (list2 == null)
+			{
+				return;
+			}
+			NextDialog f = new NextDialog("Library health");
+			try
+			{
+				ListView list = new ListView
+				{
+					Dock = DockStyle.Fill,
+					View = View.Details,
+					FullRowSelect = true,
+					HideSelection = false,
+					AccessibleName = "Library health issues"
+				};
+				list.Columns.Add("Area", 120);
+				list.Columns.Add("Issue and next step", 660);
+				foreach (HealthIssue item in list2)
+				{
+					list.Items.Add(new ListViewItem(new string[2] { item.Area, item.Message })
+					{
+						Tag = item
+					});
+				}
+				if (list2.Count == 0)
+				{
+					list.Items.Add(new ListViewItem(new string[2] { "Ready", "No missing configured files detected. Emulator compatibility still needs a game test." }));
+				}
+				f.Body.Controls.Add(list);
+				f.Action("Resolve selected game", delegate
+				{
+					if (list.SelectedItems.Count != 0)
+					{
+						HealthIssue issue = list.SelectedItems[0].Tag as HealthIssue;
+						GameEntry gameEntry = ((issue == null) ? null : d.Games.FirstOrDefault((GameEntry x) => x.Id == issue.GameId));
+						if (gameEntry != null)
+						{
+							UserTools.Troubleshoot(f, d, gameEntry, null);
+						}
+						else
+						{
+							UserTools.Report(f, "Backup issue", "Use Backup verification and retention to select a known archive. Reconnect missing backup drives before restoring.");
+						}
+					}
+				});
+				f.Action("Verify save snapshots", delegate
+				{
+					string text = BackgroundWork<string>.Run(f, "Verify snapshot contents", delegate(CancellationToken token, Action<string> progress)
+					{
+						StringBuilder stringBuilder = new StringBuilder();
+						foreach (SaveSnapshot item2 in d.SaveSnapshots ?? new List<SaveSnapshot>())
+						{
+							token.ThrowIfCancellationRequested();
+							progress(item2.Path);
+							try
+							{
+								SaveHistory.Verify(item2, token);
+								stringBuilder.AppendLine("Verified: " + item2.Path);
+							}
+							catch (OperationCanceledException)
+							{
+								throw;
+							}
+							catch (Exception ex2)
+							{
+								stringBuilder.AppendLine("Issue: " + item2.Path + " — " + ex2.Message);
+							}
+						}
+						return (stringBuilder.Length == 0) ? "No save snapshots yet. Create a snapshot from Saves and history first." : stringBuilder.ToString();
+					});
+					if (text != null)
+					{
+						UserTools.Report(f, "Snapshot verification", text);
+					}
+				});
+				f.Action("Repair game paths", delegate
+				{
+					ExperienceTools.Relink(f, d);
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static string DeviceReport(LibraryData d)
+		{
+			StringBuilder stringBuilder = new StringBuilder("Connected XInput controller: " + (UserToolRuntime.ControllerConnected() ? "detected" : "none detected") + "\r\n\r\nEmulator installations:\r\n");
+			foreach (EmulatorProfile emulator in d.Emulators)
+			{
+				try
+				{
+					stringBuilder.AppendLine(emulator.Name + ": " + (File.Exists(emulator.Executable) ? FileVersionInfo.GetVersionInfo(emulator.Executable).FileVersion : "executable missing"));
+				}
+				catch (Exception ex)
+				{
+					stringBuilder.AppendLine(emulator.Name + ": " + ex.Message);
+				}
+			}
+			stringBuilder.AppendLine("\r\nFor a real game check: use a copy of a game you own, select an isolated save route where supported, launch, verify controller navigation, close the emulator, then check the session journal. Break reminders depend on Windows notification settings. This inventory does not claim game compatibility.");
+			return stringBuilder.ToString();
+		}
+
+		public static void Accessibility(Control root)
+		{
+			TableLayoutPanel tableLayoutPanel = root as TableLayoutPanel;
+			if (tableLayoutPanel != null)
+			{
+				for (int i = 0; i < tableLayoutPanel.RowStyles.Count; i++)
+				{
+					if (tableLayoutPanel.RowStyles[i].SizeType != SizeType.Absolute || tableLayoutPanel.RowStyles[i].Height == 0f)
+					{
+						continue;
+					}
+					int num = (int)tableLayoutPanel.RowStyles[i].Height;
+					for (int j = 0; j < tableLayoutPanel.ColumnCount; j++)
+					{
+						Control controlFromPosition = tableLayoutPanel.GetControlFromPosition(j, i);
+						if (controlFromPosition != null)
+						{
+							num = Math.Max(num, controlFromPosition.Font.Height + 24);
+							if (controlFromPosition is Label)
+							{
+								num = Math.Max(num, TextRenderer.MeasureText(controlFromPosition.Text, controlFromPosition.Font, new Size(Math.Max(100, controlFromPosition.Width), 1000), TextFormatFlags.WordBreak).Height + 16);
+							}
+							if (controlFromPosition is FlowLayoutPanel)
+							{
+								num = Math.Max(num, controlFromPosition.GetPreferredSize(new Size(Math.Max(100, controlFromPosition.Width), 0)).Height + 16);
+							}
+						}
+					}
+					tableLayoutPanel.RowStyles[i].Height = num;
+				}
+				Panel panel = tableLayoutPanel.Parent as Panel;
+				if (panel != null)
+				{
+					panel.AutoScroll = true;
+				}
+			}
+			int num2 = 0;
+			foreach (Control control in root.Controls)
+			{
+				control.TabIndex = num2++;
+				if (string.IsNullOrWhiteSpace(control.AccessibleName))
+				{
+					if (control is Button || control is CheckBox || control is Label || control is TabPage)
+					{
+						control.AccessibleName = control.Text.Replace("&", "");
+					}
+					else if (control is ComboBox)
+					{
+						control.AccessibleName = "Choose an option";
+					}
+					else if (control is ListView || control is ListBox)
+					{
+						control.AccessibleName = "Items";
+					}
+				}
+				if (control is Button)
+				{
+					control.AccessibleRole = AccessibleRole.PushButton;
+					if (control.Parent is FlowLayoutPanel)
+					{
+						FishBowlActionButton fishBowlActionButton = control as FishBowlActionButton;
+						if (fishBowlActionButton == null || !fishBowlActionButton.IconOnly)
+						{
+							control.Width = Math.Max(control.Width, TextRenderer.MeasureText(control.Text, control.Font).Width + 56);
+						}
+						control.Height = Math.Max(control.Height, control.Font.Height + 16);
+					}
+				}
+				if (control is TextBoxBase && ((TextBoxBase)control).ReadOnly)
+				{
+					control.TabStop = true;
+				}
+				Accessibility(control);
+			}
+			if (tableLayoutPanel != null)
+			{
+				for (int i = 0; i < tableLayoutPanel.RowStyles.Count; i++)
+				{
+					if (tableLayoutPanel.RowStyles[i].SizeType != SizeType.Absolute || tableLayoutPanel.RowStyles[i].Height == 0f)
+					{
+						continue;
+					}
+					for (int j = 0; j < tableLayoutPanel.ColumnCount; j++)
+					{
+						FlowLayoutPanel flowLayoutPanel = tableLayoutPanel.GetControlFromPosition(j, i) as FlowLayoutPanel;
+						if (flowLayoutPanel != null)
+						{
+							tableLayoutPanel.RowStyles[i].Height = Math.Max(tableLayoutPanel.RowStyles[i].Height, flowLayoutPanel.GetPreferredSize(new Size(Math.Max(100, flowLayoutPanel.Width), 0)).Height + 16);
+						}
+					}
+				}
+			}
+			FlowLayoutPanel toolbar = root as FlowLayoutPanel;
+			if (toolbar != null && toolbar.Name == "FishBowlToolbar")
+			{
+				toolbar.Height = Math.Max(48, (from b in toolbar.Controls.OfType<Button>()
+					select b.Height + b.Margin.Vertical + toolbar.Padding.Vertical).DefaultIfEmpty(48).Max());
+			}
+			root.AccessibleDescription = (string.IsNullOrWhiteSpace(root.AccessibleDescription) ? "Use Tab and Shift+Tab to move between controls. Enter activates the focused command." : root.AccessibleDescription);
+		}
+	}
+	public static class UserSaveRoutes
+	{
+		private static string Identity(string value)
+		{
+			using (SHA256 sHA = SHA256.Create())
+			{
+				return BitConverter.ToString(sHA.ComputeHash(Encoding.UTF8.GetBytes(value ?? ""))).Replace("-", "").Substring(0, 32);
+			}
+		}
+
+		public static string Root(LibraryData d, EmulatorProfile emulator)
+		{
+			return Path.Combine(Store.DataDirectory, "UserEmulatorData", Identity(UserTools.Ensure(d).ActiveId), Identity(emulator.Id));
+		}
+
+		public static SaveRouting Route(LibraryData d, EmulatorProfile emulator)
+		{
+			return (UserTools.Ensure(d).SaveRoutes ?? new List<SaveRouting>()).FirstOrDefault((SaveRouting r) => r.EmulatorId == emulator.Id);
+		}
+
+		public static string Arguments(LibraryData d, EmulatorProfile e, bool create)
+		{
+			SaveRouting saveRouting = Route(d, e);
+			if (saveRouting == null || saveRouting.Mode == "Off" || string.IsNullOrWhiteSpace(saveRouting.Mode))
+			{
+				return "";
+			}
+			string path = Root(d, e);
+			string text = Path.Combine(path, "Saves");
+			string text2 = Path.Combine(path, "States");
+			string path2 = Path.Combine(path, "User");
+			string text3;
+			if (saveRouting.Mode == "Dolphin user directory")
+			{
+				if (!Path.GetFileNameWithoutExtension(e.Executable).Equals("Dolphin", StringComparison.OrdinalIgnoreCase))
+				{
+					throw new IOException("Dolphin save routing requires Dolphin.exe. Review this emulator's route.");
+				}
+				text3 = "--user " + Quote(path2);
+				if (create)
+				{
+					Directory.CreateDirectory(path2);
+				}
+			}
+			else if (saveRouting.Mode == "RetroArch save folders")
+			{
+				if (!Path.GetFileNameWithoutExtension(e.Executable).StartsWith("retroarch", StringComparison.OrdinalIgnoreCase))
+				{
+					throw new IOException("RetroArch save routing requires a RetroArch executable.");
+				}
+				string path3 = Path.Combine(path, "FishBowl-saves.cfg");
+				text3 = "--appendconfig " + Quote(path3);
+				if (create)
+				{
+					Directory.CreateDirectory(text);
+					Directory.CreateDirectory(text2);
+					File.WriteAllText(path3, "savefile_directory = " + Quote(text.Replace('\\', '/')) + "\nsavestate_directory = " + Quote(text2.Replace('\\', '/')) + "\nconfig_save_on_exit = false\n", new UTF8Encoding(false));
+				}
+			}
+			else
+			{
+				if (!(saveRouting.Mode == "Custom arguments"))
+				{
+					throw new IOException("Unknown save-routing mode.");
+				}
+				if (string.IsNullOrWhiteSpace(saveRouting.Arguments) || (!saveRouting.Arguments.Contains("{saves}") && !saveRouting.Arguments.Contains("{states}") && !saveRouting.Arguments.Contains("{user}")))
+				{
+					throw new IOException("Custom routing must use {saves}, {states} or {user}, without extra quotes around the token.");
+				}
+				text3 = saveRouting.Arguments.Replace("{saves}", Quote(text)).Replace("{states}", Quote(text2)).Replace("{user}", Quote(path2));
+				if (text3.Contains("{") || text3.Contains("}"))
+				{
+					throw new IOException("Unknown save-routing token.");
+				}
+				if (create)
+				{
+					Directory.CreateDirectory(text);
+					Directory.CreateDirectory(text2);
+					Directory.CreateDirectory(path2);
+				}
+			}
+			return text3;
+		}
+
+		private static string Quote(string path)
+		{
+			if (path.Contains("\"") || path.Contains("\r") || path.Contains("\n"))
+			{
+				throw new IOException("Invalid save path.");
+			}
+			return "\"" + path + "\"";
+		}
+
+		public static string Apply(LibraryData d, EmulatorProfile e, string args, bool create)
+		{
+			string value = Arguments(d, e, false);
+			if (string.IsNullOrEmpty(value))
+			{
+				return args;
+			}
+			SaveRouting saveRouting = Route(d, e);
+			string[] source = ((saveRouting.Mode == "Dolphin user directory") ? new string[2] { "--user", "-u" } : ((saveRouting.Mode == "RetroArch save folders") ? new string[5] { "--appendconfig", "--save", "--savestate", "-s", "-S" } : new string[0]));
+			if (source.Any((string flag) => Regex.IsMatch(args ?? "", "(^|\\s)" + Regex.Escape(flag) + "(\\s|=|$)")))
+			{
+				throw new IOException("Existing arguments already choose a user/save configuration. Remove that override or disable per-user routing to avoid conflicting locations.");
+			}
+			return (args + " " + Arguments(d, e, create)).Trim();
+		}
+
+		public static void Show(IWin32Window owner, LibraryData d)
+		{
+			if (UserTools.Guest)
+			{
+				return;
+			}
+			NextDialog f = new NextDialog("Per-user emulator saves");
+			try
+			{
+				TableLayoutPanel table = NextDialog.Fields(f.Body);
+				ComboBox choice = new ComboBox
+				{
+					DropDownStyle = ComboBoxStyle.DropDownList,
+					DisplayMember = "Name"
+				};
+				choice.Items.AddRange(d.Emulators.Cast<object>().ToArray());
+				ComboBox mode = NextDialog.Choice(new string[4] { "Off", "Dolphin user directory", "RetroArch save folders", "Custom arguments" }, "Off");
+				TextBox args = new TextBox();
+				TextBox location = new TextBox
+				{
+					ReadOnly = true
+				};
+				NextDialog.Field(table, "Emulator", choice);
+				NextDialog.Field(table, "Routing", mode);
+				NextDialog.Field(table, "Custom arguments", args, 70);
+				NextDialog.Field(table, "Current user's managed folder", location, 70);
+				NextDialog.Field(table, "Scope", new Label
+				{
+					Text = "Off is the default. Dolphin isolates its entire user directory, including settings and Wii data. RetroArch routes save files and states. Custom flags require emulator support. Existing saves are never moved or copied automatically; a new route starts empty. Overrides inside the emulator can still affect save locations.",
+					AutoSize = true
+				}, 180);
+				choice.SelectedIndexChanged += delegate
+				{
+					EmulatorProfile emulatorProfile = choice.SelectedItem as EmulatorProfile;
+					if (emulatorProfile != null)
+					{
+						SaveRouting saveRouting2 = Route(d, emulatorProfile);
+						mode.SelectedItem = ((saveRouting2 == null) ? "Off" : saveRouting2.Mode);
+						args.Text = ((saveRouting2 == null) ? "" : saveRouting2.Arguments);
+						location.Text = Root(d, emulatorProfile);
+					}
+				};
+				if (choice.Items.Count > 0)
+				{
+					choice.SelectedIndex = 0;
+				}
+				f.Action("Preview and save", delegate
+				{
+					EmulatorProfile e = choice.SelectedItem as EmulatorProfile;
+					if (e == null)
+					{
+						throw new IOException("Add an emulator first.");
+					}
+					if (UserTools.ActiveLaunches > 0)
+					{
+						throw new IOException("Close emulator sessions before changing save routing.");
+					}
+					UserToolSettings s = UserTools.Ensure(d);
+					SaveRouting saveRouting = new SaveRouting
+					{
+						EmulatorId = e.Id,
+						Mode = mode.Text,
+						Arguments = args.Text
+					};
+					LibraryData libraryData = UserTools.Copy(d);
+					List<SaveRouting> list = UserTools.Ensure(libraryData).SaveRoutes ?? new List<SaveRouting>();
+					list.RemoveAll((SaveRouting r) => r.EmulatorId == e.Id);
+					list.Add(saveRouting);
+					libraryData.UserTools.SaveRoutes = list;
+					string text = Arguments(libraryData, e, false);
+					if (Polish.Review(f, "Review per-user save routing", "Emulator: " + e.Name + "\r\nUser: " + s.Users.First((BowlUser u) => u.Id == s.ActiveId).Name + "\r\nOld route: " + ((Route(d, e) == null) ? "Off" : Route(d, e).Mode) + "\r\nNew route: " + saveRouting.Mode + "\r\nManaged folder: " + Root(d, e) + "\r\nAdded launch arguments: " + text + "\r\n\r\nNo original saves or configurations will be moved or overwritten. New folders are created on launch. Dolphin's new user folder needs its own setup."))
+					{
+						if (s.SaveRoutes == null)
+						{
+							s.SaveRoutes = new List<SaveRouting>();
+						}
+						s.SaveRoutes.RemoveAll((SaveRouting r) => r.EmulatorId == e.Id);
+						s.SaveRoutes.Add(saveRouting);
+						Store.Save(d);
+						f.Close();
+					}
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+	}
+	public class EmulatorAdapter
+	{
+		public string Name { get; set; }
+
+		public string Platform { get; set; }
+
+		public string Arguments { get; set; }
+
+		public List<string> Extensions { get; set; }
+
+		public string Website { get; set; }
+
+		public string Repository { get; set; }
+	}
+	public class GameExtras
+	{
+		public bool Native { get; set; }
+
+		public string WorkingDirectory { get; set; }
+
+		public string TrailerUrl { get; set; }
+
+		public string MetadataSource { get; set; }
+
+		public Dictionary<string, string> Fields { get; set; }
+
+		public GameExtras()
+		{
+			Fields = new Dictionary<string, string>();
+		}
+	}
+	public static class Hub
+	{
+		public static HubSettings Ensure(LibraryData d)
+		{
+			if (d.Hub == null)
+			{
+				d.Hub = new HubSettings();
+			}
+			HubSettings hub = d.Hub;
+			if (hub.Adapters == null)
+			{
+				hub.Adapters = new List<EmulatorAdapter>();
+			}
+			if (hub.Paths == null)
+			{
+				hub.Paths = new List<PathBinding>();
+			}
+			if (hub.Activity == null)
+			{
+				hub.Activity = new List<HubActivity>();
+			}
+			if (hub.SyncHashes == null)
+			{
+				hub.SyncHashes = new Dictionary<string, string>();
+			}
+			return hub;
+		}
+
+		public static GameExtras Extra(GameEntry g)
+		{
+			if (g.Extras == null)
+			{
+				g.Extras = new GameExtras();
+			}
+			if (g.Extras.Fields == null)
+			{
+				g.Extras.Fields = new Dictionary<string, string>();
+			}
+			return g.Extras;
+		}
+
+		public static bool Native(GameEntry g)
+		{
+			return g != null && g.Extras != null && g.Extras.Native;
+		}
+
+		public static EmulatorProfile NativeProfile(GameEntry g)
+		{
+			EmulatorProfile emulatorProfile = new EmulatorProfile();
+			emulatorProfile.Id = "native-" + g.Id;
+			emulatorProfile.Name = "PC / shortcut";
+			emulatorProfile.Executable = g.Path;
+			emulatorProfile.Arguments = g.Arguments;
+			emulatorProfile.Extensions = new List<string>();
+			emulatorProfile.LaunchProfiles = new List<LaunchProfile>();
+			return emulatorProfile;
+		}
+
+		public static string NativeArguments(GameEntry g)
+		{
+			if (!File.Exists(g.Path))
+			{
+				throw new IOException("The PC game or shortcut is missing. Repair its path.");
+			}
+			string text = Path.GetExtension(g.Path).ToLowerInvariant();
+			if (text != ".exe" && text != ".lnk")
+			{
+				throw new IOException("PC entries support .exe or .lnk files.");
+			}
+			if ((g.Arguments ?? "").Contains("{") || (g.Arguments ?? "").Contains("}"))
+			{
+				throw new IOException("PC arguments must be literal text; templates are not supported.");
+			}
+			if (g.Extras != null && !string.IsNullOrWhiteSpace(g.Extras.WorkingDirectory) && !Directory.Exists(g.Extras.WorkingDirectory))
+			{
+				throw new IOException("The PC game's working folder is missing.");
+			}
+			if (Platform.IsDirectProgram(g.Path) && EmulatorRuntime.State(g.Path) == RuntimeState.Running)
+			{
+				throw new IOException("The PC game is already running. Close it before starting another tracked session.");
+			}
+			return g.Arguments ?? "";
+		}
+
+		public static string SearchText(GameEntry g)
+		{
+			return string.Join(" ", g.Title, g.Path, g.Genre, g.Developer, g.ReleaseYear, g.Description, g.Notes, g.ConsoleLabel, g.PlayStatus, string.Join(" ", g.Tags ?? new List<string>()), (g.Extras == null || g.Extras.Fields == null) ? "" : string.Join(" ", g.Extras.Fields.Select((KeyValuePair<string, string> p) => p.Key + " " + p.Value)));
+		}
+
+		public static void Record(LibraryData d, string text)
+		{
+			HubSettings hubSettings = Ensure(d);
+			hubSettings.Activity.Add(new HubActivity
+			{
+				At = DateTime.UtcNow.ToString("o"),
+				UserId = UserTools.Ensure(d).ActiveId,
+				Text = text
+			});
+			if (hubSettings.Activity.Count > 500)
+			{
+				hubSettings.Activity.RemoveRange(0, hubSettings.Activity.Count - 500);
+			}
+		}
+
+		public static void Idle(LibraryData d)
+		{
+			if (UserTools.Guest || UserTools.ActiveLaunches > 0 || WorkGate.Busy > 0 || Application.OpenForms.OfType<MainForm>().Any((MainForm main) => main.HubBusy))
+			{
+				throw new IOException("Finish active sessions and background work before changing Library paths or profiles.");
+			}
+		}
+
+		public static IEnumerable<GameEntry> NestedEntries(LibraryData d, GameCollection parent, IEnumerable<GameEntry> source)
+		{
+			HashSet<string> ids = new HashSet<string>();
+			Queue<string> queue = new Queue<string>();
+			queue.Enqueue(parent.Id);
+			while (queue.Count > 0)
+			{
+				string id = queue.Dequeue();
+				if (!ids.Add(id))
+				{
+					continue;
+				}
+				foreach (GameCollection item in d.Collections.Where((GameCollection c) => c.ParentId == id))
+				{
+					queue.Enqueue(item.Id);
+				}
+			}
+			List<GameEntry> games = source.ToList();
+			HashSet<string> wanted = new HashSet<string>(from g in d.Collections.Where((GameCollection c) => ids.Contains(c.Id)).SelectMany((GameCollection c) => GameCollections.Entries(c, games))
+				select g.Id);
+			return games.Where((GameEntry g) => wanted.Contains(g.Id));
+		}
+
+		public static void Parent(LibraryData d, GameCollection child, string parent)
+		{
+			if (parent == child.Id)
+			{
+				throw new IOException("A collection cannot contain itself.");
+			}
+			HashSet<string> hashSet = new HashSet<string>();
+			hashSet.Add(child.Id);
+			HashSet<string> hashSet2 = hashSet;
+			string next = parent;
+			while (!string.IsNullOrWhiteSpace(next))
+			{
+				if (!hashSet2.Add(next))
+				{
+					throw new IOException("That parent would create a collection cycle.");
+				}
+				GameCollection gameCollection = d.Collections.FirstOrDefault((GameCollection x) => x.Id == next);
+				if (gameCollection == null)
+				{
+					throw new IOException("Parent collection is unavailable.");
+				}
+				next = gameCollection.ParentId;
+			}
+			child.ParentId = parent;
+		}
+
+		public static string Readiness(LibraryData d, GameEntry g)
+		{
+			StringBuilder stringBuilder = new StringBuilder(g.Title + "\r\n");
+			try
+			{
+				string text = GameSessions.Validate(d, g);
+				EmulatorProfile emulatorProfile = NextData.LaunchEmulator(d, g);
+				stringBuilder.AppendLine("Ready to start: configured launch files and arguments pass validation.");
+				stringBuilder.AppendLine("Program: " + emulatorProfile.Executable);
+				stringBuilder.AppendLine("Arguments: " + text);
+				if (!Native(g))
+				{
+					SetupChecklist.Ensure(emulatorProfile);
+					stringBuilder.AppendLine("Emulator setup checklist: " + SetupChecklist.CompleteCount(emulatorProfile) + " / " + emulatorProfile.SetupChecklist.Count + ". Review firmware, graphics and controller requirements inside the emulator.");
+				}
+			}
+			catch (Exception ex)
+			{
+				stringBuilder.AppendLine("Needs attention: " + ex.Message);
+			}
+			stringBuilder.AppendLine("A successful path check does not establish compatibility inside the game or emulator.");
+			return stringBuilder.ToString();
+		}
+
+		public static bool PreviewImport(IWin32Window owner, LibraryData d, List<GameEntry> found)
+		{
+			if (found == null)
+			{
+				return false;
+			}
+			HashSet<string> hashSet = new HashSet<string>(d.Games.Select((GameEntry g) => g.Path ?? ""), StringComparer.OrdinalIgnoreCase);
+			List<GameEntry> list2 = new List<GameEntry>();
+			int num = 0;
+			foreach (GameEntry item in found)
+			{
+				if (!hashSet.Add(item.Path ?? ""))
+				{
+					num++;
+				}
+				else
+				{
+					list2.Add(item);
+				}
+			}
+			if (list2.Count == 0)
+			{
+				UserTools.Report(owner, "Folder import", "No new matching files. Skipped existing or duplicate paths: " + num);
+				return false;
+			}
+			NextDialog f = new NextDialog("Review folder import", 900, 630);
+			try
+			{
+				ListView list = new ListView
+				{
+					Dock = DockStyle.Fill,
+					View = View.Details,
+					CheckBoxes = true,
+					FullRowSelect = true,
+					AccessibleName = "Games to import"
+				};
+				list.Columns.Add("Title", 220);
+				list.Columns.Add("Path", 480);
+				list.Columns.Add("Emulator", 150);
+				foreach (GameEntry g2 in list2)
+				{
+                    GameRecognition.Apply(g2, d.Emulators, true);
+					List<EmulatorProfile> emulators = d.Emulators;
+					Func<EmulatorProfile, bool> predicate = (EmulatorProfile x) => x.Id == g2.EmulatorId;
+					EmulatorProfile emulatorProfile = emulators.FirstOrDefault(predicate);
+					list.Items.Add(new ListViewItem(new string[3]
+					{
+						g2.Title,
+						g2.Path,
+						(emulatorProfile == null) ? "Unassigned" : emulatorProfile.Name
+					})
+					{
+						Checked = true,
+						Tag = g2
+					});
+				}
+				f.Body.Controls.Add(list);
+				f.Body.Controls.Add(new Label
+				{
+					Dock = DockStyle.Top,
+					Height = 55,
+					Text = "Uncheck files you do not want. Existing/duplicate paths skipped: " + num + ". No files will be moved. Disc grouping remains available in Game actions."
+				});
+				f.Action("Import checked", delegate
+				{
+					Idle(d);
+					foreach (ListViewItem checkedItem in list.CheckedItems)
+					{
+						d.Games.Add((GameEntry)checkedItem.Tag);
+					}
+					Record(d, "Imported " + list.CheckedItems.Count + " games");
+					Store.Save(d);
+					f.DialogResult = DialogResult.OK;
+				});
+				f.Action("Cancel", f.Close);
+				return f.ShowDialog(owner) == DialogResult.OK;
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static void ImportFolder(IWin32Window owner, LibraryData d)
+		{
+			FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
+			folderBrowserDialog.Description = "Choose a game folder to preview";
+			using (FolderBrowserDialog folderBrowserDialog2 = folderBrowserDialog)
+			{
+				if (folderBrowserDialog2.ShowDialog(owner) != DialogResult.OK)
+				{
+					return;
+				}
+				LibraryData snapshot = UserTools.Copy(d);
+				foreach (EmulatorProfile emulator in snapshot.Emulators)
+				{
+					emulator.ScanFolder = folderBrowserDialog2.SelectedPath;
+				}
+				List<GameEntry> found = BackgroundWork<List<GameEntry>>.Run(owner, "Preview game folder", (CancellationToken token, Action<string> progress) => LibraryJobs.Scan(snapshot, token, progress));
+				PreviewImport(owner, d, found);
+			}
+		}
+
+		public static void AddPc(IWin32Window owner, LibraryData d)
+		{
+			OpenFileDialog file = new OpenFileDialog
+			{
+				Filter = "PC game or shortcut|*.exe;*.lnk"
+			};
+			try
+			{
+				if (file.ShowDialog(owner) != DialogResult.OK)
+				{
+					return;
+				}
+				TextPromptDialog textPromptDialog = new TextPromptDialog("PC game", "Display name");
+				textPromptDialog.Value = Path.GetFileNameWithoutExtension(file.FileName);
+				using (TextPromptDialog textPromptDialog2 = textPromptDialog)
+				{
+					if (textPromptDialog2.ShowDialog(owner) == DialogResult.OK)
+					{
+						if (string.IsNullOrWhiteSpace(textPromptDialog2.Value))
+						{
+							throw new IOException("Enter a game name.");
+						}
+						if (d.Games.Any((GameEntry g) => string.Equals(g.Path, file.FileName, StringComparison.OrdinalIgnoreCase)))
+						{
+							throw new IOException("This path is already in the Library.");
+						}
+						d.Games.Add(new GameEntry
+						{
+							Id = Guid.NewGuid().ToString("N"),
+							Title = textPromptDialog2.Value.Trim(),
+							Path = file.FileName,
+							AddedAt = DateTime.UtcNow.ToString("o"),
+							Tags = new List<string>(),
+							ConsoleLabel = "PC",
+							Extras = new GameExtras
+							{
+								Native = true
+							}
+						});
+						GameRecognition.Apply(d.Games.Last(), d.Emulators, false);
+                        Record(d, "Added PC game: " + textPromptDialog2.Value);
+						Store.Save(d);
+					}
+				}
+			}
+			finally
+			{
+				if (file != null)
+				{
+					((IDisposable)file).Dispose();
+				}
+			}
+		}
+
+		public static void Collections(IWin32Window owner, LibraryData d)
+		{
+			NextDialog f = new NextDialog("Nested collections", 800, 560);
+			try
+			{
+				TableLayoutPanel table = NextDialog.Fields(f.Body);
+				List<GameCollection> collections = d.Collections.OrderBy((GameCollection c) => c.Name).ToList();
+				ComboBox child = NextDialog.Choice(collections.Select((GameCollection c) => c.Name), null);
+				ComboBox parents = NextDialog.Choice(new string[1] { "No parent" }.Concat(collections.Select((GameCollection c) => c.Name)), "No parent");
+				NextDialog.Field(table, "Collection", child);
+				NextDialog.Field(table, "Parent", parents);
+				NextDialog.Field(table, "", new Label
+				{
+					Text = "A parent includes games from all its descendants. Existing collection membership remains editable through Collections.",
+					AutoSize = true
+				}, 95);
+				child.SelectedIndexChanged += delegate
+				{
+					if (child.SelectedIndex >= 0)
+					{
+						GameCollection c2 = collections[child.SelectedIndex];
+						GameCollection gameCollection = collections.FirstOrDefault((GameCollection x) => x.Id == c2.ParentId);
+						parents.SelectedItem = ((gameCollection == null) ? "No parent" : gameCollection.Name);
+					}
+				};
+				f.Action("Save parent", delegate
+				{
+					if (child.SelectedIndex < 0)
+					{
+						throw new IOException("Create a collection first.");
+					}
+					GameCollection child2 = collections[child.SelectedIndex];
+					Parent(d, child2, (parents.SelectedIndex <= 0) ? null : collections[parents.SelectedIndex - 1].Id);
+					Store.Save(d);
+					f.Close();
+				});
+				f.Action("Close", f.Close);
+				if (child.Items.Count > 0)
+				{
+					child.SelectedIndex = -1;
+					child.SelectedIndex = 0;
+				}
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static void Activity(IWin32Window owner, LibraryData d)
+		{
+			string user = UserTools.Ensure(d).ActiveId;
+			List<string> list = new List<string>();
+			foreach (HubActivity item in Ensure(d).Activity.Where((HubActivity a) => a.UserId == user))
+			{
+				list.Add(item.At + " | " + item.Text);
+			}
+			foreach (GameEntry item2 in d.Games.Where((GameEntry g) => !string.IsNullOrWhiteSpace(g.LastLaunched)))
+			{
+				list.Add(item2.LastLaunched + " | Played " + item2.Title);
+			}
+			foreach (SaveSnapshot s in d.SaveSnapshots)
+			{
+				string createdAt = s.CreatedAt;
+				List<GameEntry> games = d.Games;
+				Func<GameEntry, bool> predicate = (GameEntry g) => g.Id == s.GameId;
+				list.Add(createdAt + " | Save snapshot: " + (games.FirstOrDefault(predicate) ?? new GameEntry
+				{
+					Title = "Unknown game"
+				}).Title);
+			}
+			using (ResultsDialog resultsDialog = new ResultsDialog("Recent activity", list.OrderByDescending(ParseActivityDate).Take(250)))
+			{
+				resultsDialog.ShowDialog(owner);
+			}
+		}
+
+		private static DateTime ParseActivityDate(string value)
+		{
+			DateTime result;
+			return DateTime.TryParse(value.Split('|')[0].Trim(), out result) ? result.ToUniversalTime() : DateTime.MinValue;
+		}
+
+		public static string Relative(string root, string path)
+		{
+			if (string.IsNullOrWhiteSpace(path))
+			{
+				return null;
+			}
+			root = Path.GetFullPath(root).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+			path = Path.GetFullPath(path);
+			if (path.TrimEnd('\\', '/').Equals(root.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+			{
+				return ".";
+			}
+			return path.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? path.Substring(root.Length) : null;
+		}
+
+		public static string Resolve(string root, string relative)
+		{
+			if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative))
+			{
+				throw new IOException("Expected a relative path.");
+			}
+			if (relative == ".")
+			{
+				return Path.GetFullPath(root);
+			}
+			string text = Path.GetFullPath(root).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+			string fullPath = Path.GetFullPath(Path.Combine(text, relative));
+			if (!fullPath.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+			{
+				throw new IOException("Path escapes the chosen collection folder.");
+			}
+			return fullPath;
+		}
+
+		public static List<PathBinding> Bind(LibraryData d, string root)
+		{
+			List<PathBinding> list = new List<PathBinding>();
+			foreach (KeyValuePair<string, string> item in PathFields(d))
+			{
+				string text = Relative(root, item.Value);
+				if (text != null)
+				{
+					list.Add(new PathBinding
+					{
+						Key = item.Key,
+						Relative = text,
+						Original = item.Value
+					});
+				}
+			}
+			return list;
+		}
+
+		private static List<Tuple<string, string, Action<string>>> ExtraPaths(LibraryData d)
+		{
+			List<Tuple<string, string, Action<string>>> refs = new List<Tuple<string, string, Action<string>>>();
+			Action<string, string, Action<string>> action = delegate(string key, string value, Action<string> set)
+			{
+				refs.Add(Tuple.Create(key, value, set));
+			};
+			action("root:games", d.GameLibraryRoot, delegate(string value)
+			{
+				d.GameLibraryRoot = value;
+			});
+			action("root:emulators", d.EmulatorRootDirectory, delegate(string value)
+			{
+				d.EmulatorRootDirectory = value;
+			});
+			action("root:requirements", d.RequirementsLibraryRoot, delegate(string value)
+			{
+				d.RequirementsLibraryRoot = value;
+			});
+			action("root:backups", d.BackupFolder, delegate(string value)
+			{
+				d.BackupFolder = value;
+			});
+			if (d.Cosmetics != null)
+			{
+				action("appearance:wallpaper", d.Cosmetics.WallpaperPath, delegate(string value)
+				{
+					d.Cosmetics.WallpaperPath = value;
+				});
+			}
+			foreach (GameEntry game in d.Games)
+			{
+				for (int i = 0; i < (game.Saves ?? new List<GameSaveEntry>()).Count; i++)
+				{
+					GameSaveEntry save = game.Saves[i];
+					action("linked:" + game.Id + ":" + i, save.Path, delegate(string value)
+					{
+						save.Path = value;
+					});
+				}
+			}
+			foreach (SaveSnapshot snap in d.SaveSnapshots ?? new List<SaveSnapshot>())
+			{
+				string arg = "snapshot:" + snap.Id;
+				string path = snap.Path;
+				Action<string> arg2 = delegate(string value)
+				{
+					snap.Path = value;
+				};
+				action(arg, path, arg2);
+				action("snapshot-source:" + snap.Id, snap.Source, delegate(string value)
+				{
+					snap.Source = value;
+				});
+			}
+			foreach (GameScreenshot shot in d.GameScreenshots ?? new List<GameScreenshot>())
+			{
+				action("screenshot:" + shot.Id, shot.Path, delegate(string value)
+				{
+					shot.Path = value;
+				});
+			}
+			foreach (EmulatorProfile emulator in d.Emulators)
+			{
+				string arg3 = "firmware:" + emulator.Id;
+				string firmwareFolder = emulator.FirmwareFolder;
+				Action<string> arg4 = delegate(string value)
+				{
+					emulator.FirmwareFolder = value;
+				};
+				action(arg3, firmwareFolder, arg4);
+				action("screenshots:" + emulator.Id, emulator.ScreenshotFolder, delegate(string value)
+				{
+					emulator.ScreenshotFolder = value;
+				});
+				action("logs:" + emulator.Id, emulator.LogFolder, delegate(string value)
+				{
+					emulator.LogFolder = value;
+				});
+				action("icon:" + emulator.Id, emulator.IconPath, delegate(string value)
+				{
+					emulator.IconPath = value;
+				});
+				action("banner:" + emulator.Id, emulator.BannerPath, delegate(string value)
+				{
+					emulator.BannerPath = value;
+				});
+			}
+			foreach (GameConverter converter in d.Converters ?? new List<GameConverter>())
+			{
+				action("converter:" + converter.Id, converter.Program, delegate(string value)
+				{
+					converter.Program = value;
+				});
+			}
+			return refs;
+		}
+
+		private static Dictionary<string, string> PathFields(LibraryData d)
+		{
+			Dictionary<string, string> dictionary = new Dictionary<string, string>();
+			foreach (Tuple<string, string, Action<string>> item in ExtraPaths(d))
+			{
+				dictionary[item.Item1] = item.Item2;
+			}
+			foreach (GameEntry game in d.Games)
+			{
+				dictionary["game:" + game.Id] = game.Path;
+				dictionary["art:" + game.Id] = game.ArtworkPath;
+				dictionary["manual:" + game.Id] = game.ManualPath;
+				if (game.Extras != null)
+				{
+					dictionary["work:" + game.Id] = game.Extras.WorkingDirectory;
+				}
+				for (int i = 0; i < (game.Discs ?? new List<string>()).Count; i++)
+				{
+					dictionary["disc:" + game.Id + ":" + i] = game.Discs[i];
+				}
+			}
+			foreach (EmulatorProfile emulator in d.Emulators)
+			{
+				dictionary["exe:" + emulator.Id] = emulator.Executable;
+				dictionary["scan:" + emulator.Id] = emulator.ScanFolder;
+				dictionary["save:" + emulator.Id] = emulator.SaveFolder;
+				dictionary["ingame:" + emulator.Id] = emulator.InGameSaveFolder;
+				dictionary["state:" + emulator.Id] = emulator.SaveStateFolder;
+				dictionary["config:" + emulator.Id] = emulator.ConfigFolder;
+				foreach (EmulatorBuild item2 in emulator.Builds ?? new List<EmulatorBuild>())
+				{
+					dictionary["build:" + emulator.Id + ":" + item2.Id] = item2.Executable;
+				}
+			}
+			return dictionary;
+		}
+
+		public static List<string> Rebase(LibraryData d, string root, bool apply)
+		{
+			Dictionary<string, string> dictionary = PathFields(d);
+			List<string> list = new List<string>();
+			Dictionary<string, string> dictionary2 = new Dictionary<string, string>();
+			foreach (PathBinding path in Ensure(d).Paths)
+			{
+				if (path != null && !string.IsNullOrEmpty(path.Key) && dictionary.ContainsKey(path.Key))
+				{
+					if (path.Original != null && !string.Equals(path.Original, dictionary[path.Key], StringComparison.OrdinalIgnoreCase))
+					{
+						throw new IOException("A recorded path has changed since binding: " + path.Key + ". Record the current root again before relocation.");
+					}
+					string text = Resolve(root, path.Relative);
+					dictionary2[path.Key] = text;
+					list.Add(path.Key + "\r\n  " + dictionary[path.Key] + "\r\n  → " + text + ((!File.Exists(text) && !Directory.Exists(text)) ? " (unavailable)" : ""));
+				}
+			}
+			if (!apply)
+			{
+				return list;
+			}
+			foreach (GameEntry game in d.Games)
+			{
+				if (dictionary2.ContainsKey("game:" + game.Id))
+				{
+					game.Path = dictionary2["game:" + game.Id];
+				}
+				if (dictionary2.ContainsKey("art:" + game.Id))
+				{
+					game.ArtworkPath = dictionary2["art:" + game.Id];
+				}
+				if (dictionary2.ContainsKey("manual:" + game.Id))
+				{
+					game.ManualPath = dictionary2["manual:" + game.Id];
+				}
+				if (dictionary2.ContainsKey("work:" + game.Id))
+				{
+					Extra(game).WorkingDirectory = dictionary2["work:" + game.Id];
+				}
+				for (int i = 0; i < (game.Discs ?? new List<string>()).Count; i++)
+				{
+					if (dictionary2.ContainsKey("disc:" + game.Id + ":" + i))
+					{
+						game.Discs[i] = dictionary2["disc:" + game.Id + ":" + i];
+					}
+				}
+				game.LastDiscPath = null;
+			}
+			foreach (EmulatorProfile emulator in d.Emulators)
+			{
+				if (dictionary2.ContainsKey("exe:" + emulator.Id))
+				{
+					emulator.Executable = dictionary2["exe:" + emulator.Id];
+				}
+				if (dictionary2.ContainsKey("scan:" + emulator.Id))
+				{
+					emulator.ScanFolder = dictionary2["scan:" + emulator.Id];
+				}
+				if (dictionary2.ContainsKey("save:" + emulator.Id))
+				{
+					emulator.SaveFolder = dictionary2["save:" + emulator.Id];
+				}
+				if (dictionary2.ContainsKey("ingame:" + emulator.Id))
+				{
+					emulator.InGameSaveFolder = dictionary2["ingame:" + emulator.Id];
+				}
+				if (dictionary2.ContainsKey("state:" + emulator.Id))
+				{
+					emulator.SaveStateFolder = dictionary2["state:" + emulator.Id];
+				}
+				if (dictionary2.ContainsKey("config:" + emulator.Id))
+				{
+					emulator.ConfigFolder = dictionary2["config:" + emulator.Id];
+				}
+				foreach (EmulatorBuild item in emulator.Builds ?? new List<EmulatorBuild>())
+				{
+					if (dictionary2.ContainsKey("build:" + emulator.Id + ":" + item.Id))
+					{
+						item.Executable = dictionary2["build:" + emulator.Id + ":" + item.Id];
+					}
+				}
+			}
+			foreach (Tuple<string, string, Action<string>> item2 in ExtraPaths(d))
+			{
+				string value;
+				if (dictionary2.TryGetValue(item2.Item1, out value))
+				{
+					item2.Item3(value);
+				}
+			}
+			Dictionary<string, string> dictionary3 = PathFields(d);
+			foreach (PathBinding path2 in Ensure(d).Paths)
+			{
+				if (dictionary3.ContainsKey(path2.Key))
+				{
+					path2.Original = dictionary3[path2.Key];
+				}
+			}
+			return list;
+		}
+
+		public static void Portable(IWin32Window owner, LibraryData d)
+		{
+			NextDialog f = new NextDialog("Portable collection paths", 900, 600);
+			try
+			{
+				f.Body.Controls.Add(new TextBox
+				{
+					Dock = DockStyle.Fill,
+					ReadOnly = true,
+					Multiline = true,
+					Text = "First record relative paths under the current collection folder. After moving that folder yourself, choose its new location and review path updates.\r\n\r\nPaths outside the recorded folder remain unchanged. Games, original saves and backup catalogs are never moved. Linked saves and snapshots under the recorded root are included; outside-root paths stay unchanged. Emulator-internal paths in configuration files and literal arguments require separate review. Recorded bindings: " + Ensure(d).Paths.Count
+				});
+				f.Action("Record current root", delegate
+				{
+					using (FolderBrowserDialog folderBrowserDialog2 = new FolderBrowserDialog
+					{
+						Description = "Choose the common parent of your games and emulator folders"
+					})
+					{
+						if (folderBrowserDialog2.ShowDialog(f) == DialogResult.OK)
+						{
+							Idle(d);
+							List<PathBinding> list2 = Bind(d, folderBrowserDialog2.SelectedPath);
+							if (Polish.Review(f, "Record relative paths", string.Join("\r\n", list2.Select((PathBinding p) => p.Key + " → " + p.Relative))))
+							{
+								Ensure(d).Paths = list2;
+								Store.Save(d);
+								f.Close();
+							}
+						}
+					}
+				});
+				f.Action("Rebase to new root", delegate
+				{
+					using (FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog
+					{
+						Description = "Choose the collection's new location"
+					})
+					{
+						if (folderBrowserDialog.ShowDialog(f) == DialogResult.OK)
+						{
+							Idle(d);
+							List<string> list = Rebase(d, folderBrowserDialog.SelectedPath, false);
+							if (list.Count == 0)
+							{
+								throw new IOException("Record current root before moving your collection.");
+							}
+							if (Polish.Review(f, "Review relocated paths", string.Join("\r\n\r\n", list)))
+							{
+								Idle(d);
+								Store.CreateRestorePoint(d, "Before path rebase");
+								Rebase(d, folderBrowserDialog.SelectedPath, true);
+								Record(d, "Rebased collection paths");
+								Store.Save(d);
+								f.Close();
+							}
+						}
+					}
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static Dictionary<string, long> Storage(LibraryData d, CancellationToken token)
+		{
+			Dictionary<string, IEnumerable<string>> dictionary = new Dictionary<string, IEnumerable<string>>();
+			dictionary.Add("Games", d.Games.Select((GameEntry g) => g.Path).Concat(d.Games.SelectMany((GameEntry g) => g.Discs ?? new List<string>())));
+			dictionary.Add("Artwork", d.Games.Select((GameEntry g) => g.ArtworkPath));
+			dictionary.Add("Linked saves", d.Games.SelectMany((GameEntry g) => (g.Saves ?? new List<GameSaveEntry>()).Select((GameSaveEntry s) => s.Path)));
+			dictionary.Add("Save snapshots", d.SaveSnapshots.Select((SaveSnapshot s) => s.Path));
+			Dictionary<string, IEnumerable<string>> dictionary2 = dictionary;
+			Dictionary<string, long> dictionary3 = new Dictionary<string, long>();
+			foreach (KeyValuePair<string, IEnumerable<string>> item in dictionary2)
+			{
+				long num = 0L;
+				HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+				foreach (string item2 in item.Value.Where((string p) => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase))
+				{
+					token.ThrowIfCancellationRequested();
+					try
+					{
+						List<string> list2;
+						if (!Directory.Exists(item2))
+						{
+							List<string> list = new List<string>();
+							list.Add(item2);
+							list2 = list;
+						}
+						else
+						{
+							list2 = SafeFiles.Tree(item2, token);
+						}
+						List<string> list3 = list2;
+						foreach (string item3 in list3)
+						{
+							token.ThrowIfCancellationRequested();
+							if (hashSet.Add(Path.GetFullPath(item3)) && File.Exists(item3))
+							{
+								num += new FileInfo(item3).Length;
+							}
+						}
+					}
+					catch (OperationCanceledException)
+					{
+						throw;
+					}
+					catch (IOException)
+					{
+					}
+					catch (UnauthorizedAccessException)
+					{
+					}
+				}
+				dictionary3[item.Key] = num;
+			}
+			return dictionary3;
+		}
+
+		public static void StorageScreen(IWin32Window owner, LibraryData d)
+		{
+			Dictionary<string, long> dictionary = BackgroundWork<Dictionary<string, long>>.Run(owner, "Measure Library storage", (CancellationToken token, Action<string> progress) => Storage(d, token));
+			if (dictionary == null)
+			{
+				return;
+			}
+			NextDialog f = new NextDialog("Storage overview");
+			try
+			{
+				f.Body.Controls.Add(new TextBox
+				{
+					Dock = DockStyle.Fill,
+					ReadOnly = true,
+					Multiline = true,
+					Text = string.Join("\r\n", dictionary.Select((KeyValuePair<string, long> p) => p.Key + ": " + ExperienceUi.Bytes(p.Value))) + "\r\n\r\nCounts configured local files, not entire emulator installations. Categories may overlap. Unreadable files are excluded. Cleanup uses the existing reviewed backup retention controls; original games and saves are never automatically deleted."
+				});
+				f.Action("Backup verification and retention", delegate
+				{
+					ExperienceTools.Backups(f, d);
+				});
+				f.Action("Backup schedule", delegate
+				{
+					NextTools.BackupPlanner(f, d);
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static string RestorePreview(SaveSnapshot s, CancellationToken token)
+		{
+			SaveHistory.Verify(s, token);
+			Dictionary<string, string> incoming = NextData.SnapshotFiles(s, token);
+			SaveSnapshot saveSnapshot = new SaveSnapshot();
+			saveSnapshot.Path = s.Source;
+			saveSnapshot.Source = s.Source;
+			saveSnapshot.IsFolder = s.IsFolder;
+			SaveSnapshot snapshot = saveSnapshot;
+			Dictionary<string, string> dictionary = NextData.SnapshotFiles(snapshot, token);
+			StringBuilder stringBuilder = new StringBuilder("Restore destination: " + s.Source + "\r\nExisting contents will be backed up. Emulator must be closed.\r\n\r\n");
+			foreach (KeyValuePair<string, string> item in incoming)
+			{
+				string value;
+				string text = ((!dictionary.TryGetValue(item.Key, out value)) ? "ADD" : ((value == item.Value) ? "UNCHANGED" : "REPLACE"));
+				stringBuilder.AppendLine(text + " " + item.Key);
+			}
+			foreach (string item2 in dictionary.Keys.Where((string key) => !incoming.ContainsKey(key)))
+			{
+				stringBuilder.AppendLine("REMOVE FROM LIVE (retained in rollback): " + item2);
+			}
+			return stringBuilder.ToString();
+		}
+
+		public static List<string> CloudConflicts(string root, CancellationToken token)
+		{
+			return SafeFiles.Tree(root, token).Where(delegate(string p)
+			{
+				string text = Path.GetFileName(p).ToLowerInvariant();
+				return text.Contains("conflicted copy") || text.Contains("conflict") || text.Contains("sync-conflict");
+			}).Take(500)
+				.ToList();
+		}
+
+		public static void Conflicts(IWin32Window owner)
+		{
+			FolderBrowserDialog folder = new FolderBrowserDialog
+			{
+				Description = "Choose your cloud client's local save/backup folder"
+			};
+			try
+			{
+				if (folder.ShowDialog(owner) != DialogResult.OK)
+				{
+					return;
+				}
+				List<string> list = BackgroundWork<List<string>>.Run(owner, "Find cloud conflict copies", (CancellationToken token, Action<string> progress) => CloudConflicts(folder.SelectedPath, token));
+				if (list == null)
+				{
+					return;
+				}
+				using (ResultsDialog resultsDialog = new ResultsDialog("Cloud conflict review", (list.Count == 0) ? new string[1] { "No filenames indicating conflict copies were found. This does not verify cloud upload completion or detect every conflict." } : list.ToArray()))
+				{
+					resultsDialog.ShowDialog(owner);
+				}
+			}
+			finally
+			{
+				if (folder != null)
+				{
+					((IDisposable)folder).Dispose();
+				}
+			}
+		}
+
+		public static void ValidateAdapter(EmulatorAdapter a)
+		{
+			if (a == null || string.IsNullOrWhiteSpace(a.Name) || a.Name.Length > 120)
+			{
+				throw new IOException("Adapter needs a name of up to 120 characters.");
+			}
+			if (a.Extensions == null || a.Extensions.Count == 0 || a.Extensions.Count > 100 || a.Extensions.Any((string e) => string.IsNullOrWhiteSpace(e) || e.Length > 20 || e.Any((char c) => !char.IsLetterOrDigit(c) && c != '.')))
+			{
+				throw new IOException("Adapter extensions must be simple file extensions.");
+			}
+			string text = (a.Arguments ?? "").Replace("{game}", "");
+			if (text.Contains("{") || text.Contains("}"))
+			{
+				throw new IOException("Adapters support only {game} in launch arguments.");
+			}
+			if (!string.IsNullOrWhiteSpace(a.Website) && !Https(a.Website))
+			{
+				throw new IOException("Adapter website must use HTTPS.");
+			}
+			if (!string.IsNullOrWhiteSpace(a.Repository) && !Regex.IsMatch(a.Repository, "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))
+			{
+				throw new IOException("Repository must be owner/repository.");
+			}
+		}
+
+		public static EmulatorProfile FromAdapter(EmulatorAdapter a, string executable)
+		{
+			ValidateAdapter(a);
+			if (!File.Exists(executable) || Path.GetExtension(executable).ToLowerInvariant() != ".exe")
+			{
+				throw new IOException("Choose an installed emulator executable.");
+			}
+			EmulatorProfile emulatorProfile = new EmulatorProfile();
+			emulatorProfile.Id = Guid.NewGuid().ToString("N");
+			emulatorProfile.Name = a.Name;
+			emulatorProfile.Platform = a.Platform;
+			emulatorProfile.Preset = "Custom";
+			emulatorProfile.Executable = executable;
+			emulatorProfile.Arguments = a.Arguments;
+			emulatorProfile.Extensions = a.Extensions.Select((string e) => e.TrimStart('.').ToLowerInvariant()).ToList();
+			emulatorProfile.WebsiteUrl = a.Website;
+			emulatorProfile.GitHubRepository = a.Repository;
+			emulatorProfile.AddedAt = DateTime.UtcNow.ToString("o");
+			emulatorProfile.Builds = new List<EmulatorBuild>();
+			emulatorProfile.LaunchProfiles = new List<LaunchProfile>();
+			return emulatorProfile;
+		}
+
+		public static void Adapters(IWin32Window owner, LibraryData d)
+		{
+			NextDialog f = new NextDialog("Emulator adapters", 860, 620);
+			try
+			{
+				ListBox list = new ListBox
+				{
+					Dock = DockStyle.Fill,
+					DisplayMember = "Name",
+					AccessibleName = "Installed adapter definitions"
+				};
+				Action refresh = delegate
+				{
+					list.DataSource = null;
+					list.DataSource = Ensure(d).Adapters.ToList();
+				};
+				f.Body.Controls.Add(list);
+				f.Body.Controls.Add(new Label
+				{
+					Dock = DockStyle.Top,
+					Height = 70,
+					Text = "Optional JSON adapters define launch formats and setup links. They do not load executable plugins or download emulator programs. Use an adapter with an emulator you have installed."
+				});
+				EmulatorAdapter a;
+				f.Action("Import JSON adapter", delegate
+				{
+					using (OpenFileDialog openFileDialog2 = new OpenFileDialog
+					{
+						Filter = "Adapter JSON|*.json"
+					})
+					{
+						if (openFileDialog2.ShowDialog(f) == DialogResult.OK)
+						{
+							if (new FileInfo(openFileDialog2.FileName).Length > 1048576)
+							{
+								throw new IOException("Adapter exceeds 1 MB.");
+							}
+							a = Json.Deserialize<EmulatorAdapter>(File.ReadAllText(openFileDialog2.FileName));
+							ValidateAdapter(a);
+							if (Polish.Review(f, "Review adapter", Json.Serialize(a)))
+							{
+								if (Ensure(d).Adapters.Any((EmulatorAdapter x) => x.Name == a.Name))
+								{
+									throw new IOException("An adapter with this name already exists.");
+								}
+								Ensure(d).Adapters.Add(a);
+								Store.Save(d);
+								refresh();
+							}
+						}
+					}
+				});
+				f.Action("Export template", delegate
+				{
+					using (SaveFileDialog saveFileDialog = new SaveFileDialog
+					{
+						Filter = "Adapter JSON|*.json",
+						FileName = "emulator-adapter.json"
+					})
+					{
+						if (saveFileDialog.ShowDialog(f) == DialogResult.OK)
+						{
+							File.WriteAllText(saveFileDialog.FileName, Json.Serialize((list.SelectedItem as EmulatorAdapter) ?? new EmulatorAdapter
+							{
+								Name = "My emulator",
+								Platform = "My platform",
+								Extensions = new List<string> { "rom" },
+								Arguments = "{game}",
+								Website = "https://example.com"
+							}));
+						}
+					}
+				});
+				f.Action("Add emulator from adapter", delegate
+				{
+					EmulatorAdapter emulatorAdapter2 = list.SelectedItem as EmulatorAdapter;
+					if (emulatorAdapter2 == null)
+					{
+						throw new IOException("Select an adapter first.");
+					}
+					using (OpenFileDialog openFileDialog = new OpenFileDialog
+					{
+						Filter = "Installed emulator|*.exe"
+					})
+					{
+						if (openFileDialog.ShowDialog(f) == DialogResult.OK)
+						{
+							EmulatorProfile emulatorProfile = FromAdapter(emulatorAdapter2, openFileDialog.FileName);
+							if (Polish.Review(f, "Add emulator", emulatorProfile.Name + "\r\n" + emulatorProfile.Executable + "\r\nArguments: " + emulatorProfile.Arguments))
+							{
+								d.Emulators.Add(emulatorProfile);
+								Store.Save(d);
+							}
+						}
+					}
+				});
+				f.Action("Remove definition", delegate
+				{
+					EmulatorAdapter emulatorAdapter = list.SelectedItem as EmulatorAdapter;
+					if (emulatorAdapter != null && Polish.Review(f, "Remove adapter", emulatorAdapter.Name + "\r\nExisting emulator profiles are retained."))
+					{
+						Ensure(d).Adapters.Remove(emulatorAdapter);
+						Store.Save(d);
+						refresh();
+					}
+				});
+				f.Action("Close", f.Close);
+				refresh();
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static void Inventory(IWin32Window owner, LibraryData d)
+		{
+			NextDialog f = new NextDialog("Emulator versions and updates", 940, 650);
+			try
+			{
+				ListView list = new ListView
+				{
+					Dock = DockStyle.Fill,
+					View = View.Details,
+					FullRowSelect = true,
+					HideSelection = false
+				};
+				list.Columns.Add("Emulator / build", 240);
+				list.Columns.Add("Version", 150);
+				list.Columns.Add("Executable", 530);
+				foreach (EmulatorProfile emulator in d.Emulators)
+				{
+					AddInventoryRow(list, emulator, null);
+					foreach (EmulatorBuild item in emulator.Builds ?? new List<EmulatorBuild>())
+					{
+						AddInventoryRow(list, emulator, item);
+					}
+				}
+				f.Body.Controls.Add(list);
+				CheckBox watch = new CheckBox
+				{
+					Dock = DockStyle.Top,
+					Height = 48,
+					Text = "Check published emulator releases daily while FishBowl is open (optional)",
+					Checked = Ensure(d).WatchReleases
+				};
+				f.Body.Controls.Add(watch);
+				watch.CheckedChanged += delegate
+				{
+					Ensure(d).WatchReleases = watch.Checked;
+					Store.Save(d);
+				};
+				f.Action("Check release", delegate
+				{
+					EmulatorProfile e = SelectedEmulator(list);
+					UpdateResult updateResult = BackgroundWork<UpdateResult>.Run(f, "Check emulator release", (CancellationToken token, Action<string> progress) => EmulatorUpdates.Check(e, (string url) => Encoding.UTF8.GetString(Fetch(url, 2097152L, token))));
+					if (updateResult != null)
+					{
+						UserTools.Report(f, "Emulator release", updateResult.Status + "\r\nInstalled: " + updateResult.Installed + "\r\nLatest: " + updateResult.Latest + "\r\n" + updateResult.Url + "\r\n\r\n" + updateResult.Notes);
+					}
+				});
+				f.Action("Official releases", delegate
+				{
+					EmulatorProfile emulatorProfile = SelectedEmulator(list);
+					EmulatorReference emulatorReference = EmulatorReference.For(emulatorProfile);
+					OpenLink(string.IsNullOrWhiteSpace(emulatorProfile.ReleasesUrl) ? emulatorReference.Releases : emulatorProfile.ReleasesUrl);
+				});
+				f.Action("Use selected build", delegate
+				{
+					if (list.SelectedItems.Count == 0)
+					{
+						throw new IOException("Select a build first.");
+					}
+					Tuple<EmulatorProfile, EmulatorBuild> tuple = (Tuple<EmulatorProfile, EmulatorBuild>)list.SelectedItems[0].Tag;
+					if (tuple.Item2 == null)
+					{
+						throw new IOException("Choose a registered build. Add alternate versions in the emulator editor.");
+					}
+					Idle(d);
+					if (Polish.Review(f, "Activate emulator build", tuple.Item1.Executable + "\r\n→ " + tuple.Item2.Executable + "\r\nThe current executable is retained in the registered build list for rollback."))
+					{
+						BuildRegistry.Activate(tuple.Item1, tuple.Item2);
+						Record(d, "Changed emulator build: " + tuple.Item1.Name);
+						Store.Save(d);
+						f.Close();
+					}
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		private static void AddInventoryRow(ListView list, EmulatorProfile e, EmulatorBuild b)
+		{
+			string text = ((b == null) ? e.Executable : b.Executable);
+			string text2 = ((b == null) ? e.ManualVersion : b.ManualVersion);
+			try
+			{
+				if (File.Exists(text))
+				{
+					string fileVersion = FileVersionInfo.GetVersionInfo(text).FileVersion;
+					if (!string.IsNullOrWhiteSpace(fileVersion))
+					{
+						text2 = fileVersion;
+					}
+				}
+				else
+				{
+					text2 = "Missing";
+				}
+			}
+			catch (Exception ex)
+			{
+				text2 = ex.Message;
+			}
+			list.Items.Add(new ListViewItem(new string[3]
+			{
+				e.Name + ((b == null) ? " (active)" : (" / " + b.Label)),
+				text2 ?? "Unknown",
+				text
+			})
+			{
+				Tag = Tuple.Create(e, b)
+			});
+		}
+
+		private static EmulatorProfile SelectedEmulator(ListView list)
+		{
+			if (list.SelectedItems.Count == 0)
+			{
+				throw new IOException("Select an emulator or build.");
+			}
+			return ((Tuple<EmulatorProfile, EmulatorBuild>)list.SelectedItems[0].Tag).Item1;
+		}
+
+		public static bool Https(string value)
+		{
+			Uri result;
+			return Uri.TryCreate(value, UriKind.Absolute, out result) && result.Scheme == "https" && string.IsNullOrEmpty(result.UserInfo);
+		}
+
+		public static void OpenLink(string value)
+		{
+			if (!Https(value))
+			{
+				throw new IOException("Enter an HTTPS web address.");
+			}
+			ProcessStartInfo processStartInfo = new ProcessStartInfo(value);
+			processStartInfo.UseShellExecute = true;
+			Process.Start(processStartInfo);
+		}
+
+		public static byte[] Fetch(string url, long limit, CancellationToken token)
+		{
+			ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+			if (limit <= 0)
+			{
+				throw new ArgumentOutOfRangeException("limit");
+			}
+			token.ThrowIfCancellationRequested();
+			if (!Https(url))
+			{
+				throw new IOException("Network requests require HTTPS.");
+			}
+			HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(url);
+			httpWebRequest.UserAgent = "FishBowl/1.8 (desktop library; user-requested lookup)";
+			httpWebRequest.Timeout = 20000;
+			httpWebRequest.ReadWriteTimeout = 20000;
+			httpWebRequest.AllowAutoRedirect = false;
+			try
+			{
+				using (token.Register(httpWebRequest.Abort))
+				{
+					using (HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse())
+					{
+						if (httpWebResponse.ContentLength > limit)
+						{
+							throw new IOException("Download exceeds size limit.");
+						}
+						using (Stream stream = httpWebResponse.GetResponseStream())
+						{
+							using (MemoryStream memoryStream = new MemoryStream())
+							{
+								byte[] array = new byte[16384];
+								int num;
+								while ((num = stream.Read(array, 0, array.Length)) > 0)
+								{
+									token.ThrowIfCancellationRequested();
+									if (memoryStream.Length + num > limit)
+									{
+										throw new IOException("Download exceeds size limit.");
+									}
+									memoryStream.Write(array, 0, num);
+								}
+								return memoryStream.ToArray();
+							}
+						}
+					}
+				}
+			}
+			catch (WebException ex)
+			{
+				if (token.IsCancellationRequested)
+				{
+					throw new OperationCanceledException(token);
+				}
+				throw new IOException("The online service could not be reached. Try Open search website, use a local metadata catalog, or check your network connection. " + ex.Message, ex);
+			}
+		}
+
+		public static string MetadataQuery(string title)
+		{
+			return "https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=0&gsrlimit=8&gsrsearch=" + Uri.EscapeDataString(title + " video game") + "&prop=extracts%7Cinfo%7Cpageimages&inprop=url&exintro=1&explaintext=1&exsentences=4&piprop=thumbnail&pithumbsize=400";
+		}
+
+		public static List<MetadataMatch> ParseMetadata(string json)
+		{
+			Dictionary<string, object> dictionary = new JavaScriptSerializer().DeserializeObject(json) as Dictionary<string, object>;
+			List<MetadataMatch> list = new List<MetadataMatch>();
+			if (dictionary == null || !dictionary.ContainsKey("query"))
+			{
+				return list;
+			}
+			Dictionary<string, object> dictionary2 = dictionary["query"] as Dictionary<string, object>;
+			if (dictionary2 == null || !dictionary2.ContainsKey("pages"))
+			{
+				return list;
+			}
+			Dictionary<string, object> dictionary3 = dictionary2["pages"] as Dictionary<string, object>;
+			if (dictionary3 == null)
+			{
+				return list;
+			}
+			foreach (object value in dictionary3.Values)
+			{
+				Dictionary<string, object> page = value as Dictionary<string, object>;
+				if (page == null)
+				{
+					continue;
+				}
+				Func<string, string> func = (string key) => page.ContainsKey(key) ? Convert.ToString(page[key]) : "";
+				string image = "";
+				if (page.ContainsKey("thumbnail"))
+				{
+					Dictionary<string, object> dictionary4 = page["thumbnail"] as Dictionary<string, object>;
+					if (dictionary4 != null && dictionary4.ContainsKey("source"))
+					{
+						image = Convert.ToString(dictionary4["source"]);
+					}
+				}
+				list.Add(new MetadataMatch
+				{
+					Title = func("title"),
+					Description = func("extract"),
+					Url = func("fullurl"),
+					Image = image
+				});
+			}
+			return list.OrderBy((MetadataMatch m) => m.Title).ToList();
+		}
+
+		public static void Metadata(IWin32Window owner, LibraryData d, GameEntry g)
+		{
+			if (g == null)
+			{
+				throw new IOException("Select a game first.");
+			}
+			NextDialog f = new NextDialog("Online metadata and cover selection", 950, 700);
+			try
+			{
+				TextBox search = new TextBox
+				{
+					Dock = DockStyle.Top,
+					Text = g.Title,
+					AccessibleName = "Wikipedia game lookup"
+				};
+				ListBox list = new ListBox
+				{
+					Dock = DockStyle.Left,
+					Width = 275,
+					AccessibleName = "Metadata matches"
+				};
+				TextBox details = new TextBox
+				{
+					Dock = DockStyle.Fill,
+					ReadOnly = true,
+					Multiline = true,
+					ScrollBars = ScrollBars.Vertical
+				};
+				f.Body.Controls.Add(details);
+				f.Body.Controls.Add(list);
+				f.Body.Controls.Add(search);
+				list.SelectedIndexChanged += delegate
+				{
+					MetadataMatch metadataMatch3 = list.SelectedItem as MetadataMatch;
+					details.Text = ((metadataMatch3 == null) ? "" : (metadataMatch3.Title + "\r\n\r\n" + metadataMatch3.Description + "\r\n\r\nSource: " + metadataMatch3.Url + "\r\nThumbnail: " + (string.IsNullOrWhiteSpace(metadataMatch3.Image) ? "unavailable" : metadataMatch3.Image) + "\r\n\r\nWikipedia text has attribution/share-alike requirements when redistributed. Images have their own rights; review the source before sharing."));
+				};
+				details.Text = "Lookup runs only when you choose Search online. It sends the search text to English Wikipedia. Choose a match, review its source and apply only what you want. Existing developer, genre and year fields are retained.";
+				f.Action("Search online", delegate
+				{
+					List<MetadataMatch> list2 = BackgroundWork<List<MetadataMatch>>.Run(f, "Find game metadata", (CancellationToken token, Action<string> progress) => ParseMetadata(Encoding.UTF8.GetString(Fetch(MetadataQuery(search.Text), 2097152L, token))));
+					if (list2 != null)
+					{
+						list.DataSource = list2;
+						if (list2.Count == 0)
+						{
+							details.Text = "No matches. Try another title or import a local metadata catalog.";
+						}
+					}
+				});
+				f.Action("Apply description", delegate
+				{
+					MetadataMatch metadataMatch2 = list.SelectedItem as MetadataMatch;
+					if (metadataMatch2 == null)
+					{
+						throw new IOException("Choose a metadata match.");
+					}
+					if (Polish.Review(f, "Review description", g.Description + "\r\n→\r\n" + metadataMatch2.Description + "\r\nSource: " + metadataMatch2.Url))
+					{
+						g.Description = metadataMatch2.Description;
+						Extra(g).MetadataSource = metadataMatch2.Url;
+						Record(d, "Updated description: " + g.Title);
+						Store.Save(d);
+					}
+				});
+				f.Action("View source / image rights", delegate
+				{
+					MetadataMatch metadataMatch = list.SelectedItem as MetadataMatch;
+					if (metadataMatch == null)
+					{
+						throw new IOException("Choose a match.");
+					}
+					OpenLink(metadataMatch.Url);
+				});
+				NextDialog preview;
+				f.Action("Choose online cover", delegate
+				{
+					MetadataMatch i = list.SelectedItem as MetadataMatch;
+					if (i == null || string.IsNullOrWhiteSpace(i.Image))
+					{
+						throw new IOException("This match has no image; choose a local cover instead.");
+					}
+					Uri uri = new Uri(i.Image);
+					if (uri.Host != "upload.wikimedia.org")
+					{
+						throw new IOException("Only Wikimedia thumbnails are supported.");
+					}
+					byte[] array = BackgroundWork<byte[]>.Run(f, "Load cover preview", (CancellationToken token, Action<string> progress) => Fetch(i.Image, 5242880L, token));
+					if (array == null)
+					{
+						return;
+					}
+					using (MemoryStream stream = new MemoryStream(array))
+					{
+						Image source = Image.FromStream(stream);
+						try
+						{
+							if (source.Width > 4096 || source.Height > 4096)
+							{
+								throw new IOException("Image dimensions exceed the limit.");
+							}
+							preview = new NextDialog("Review online cover", 600, 570);
+							try
+							{
+								preview.Body.Controls.Add(new PictureBox
+								{
+									Dock = DockStyle.Fill,
+									Image = source,
+									SizeMode = PictureBoxSizeMode.Zoom
+								});
+								preview.Action("Use this cover", delegate
+								{
+									Directory.CreateDirectory(Path.Combine(Store.DataDirectory, "Artwork"));
+									string text = Path.Combine(Store.DataDirectory, "Artwork", Guid.NewGuid().ToString("N") + ".png");
+									using (Bitmap bitmap = new Bitmap(source))
+									{
+										bitmap.Save(text, ImageFormat.Png);
+									}
+									g.ArtworkPath = text;
+									Extra(g).MetadataSource = i.Url;
+									Store.Save(d);
+									preview.Close();
+								});
+								preview.Action("Cancel", preview.Close);
+								preview.ShowDialog(f);
+							}
+							finally
+							{
+								if (preview != null)
+								{
+									((IDisposable)preview).Dispose();
+								}
+							}
+						}
+						finally
+						{
+							if (source != null)
+							{
+								((IDisposable)source).Dispose();
+							}
+						}
+					}
+				});
+				f.Action("Choose local cover", delegate
+				{
+					using (OpenFileDialog openFileDialog = new OpenFileDialog
+					{
+						Filter = "Cover image|*.png;*.jpg;*.jpeg;*.bmp;*.gif"
+					})
+					{
+						if (openFileDialog.ShowDialog(f) == DialogResult.OK)
+						{
+							using (Image image = Image.FromFile(openFileDialog.FileName))
+							{
+								if (image.Width > 16000 || image.Height > 16000)
+								{
+									throw new IOException("Image dimensions are too large.");
+								}
+							}
+							g.ArtworkPath = openFileDialog.FileName;
+							Store.Save(d);
+						}
+					}
+				});
+				f.Action("Local metadata catalog", delegate
+				{
+					ExperienceTools.Metadata(f, d, g);
+				});
+				f.Action("Open search website", delegate
+				{
+					OpenLink("https://en.wikipedia.org/w/index.php?search=" + Uri.EscapeDataString(search.Text + " video game"));
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static Dictionary<string, string> ParseFields(string text)
+		{
+			Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			string[] array = text.Split(new char[2] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+			string[] array2 = array;
+			foreach (string text2 in array2)
+			{
+				int num = text2.IndexOf('=');
+				if (num <= 0)
+				{
+					throw new IOException("Use one Key = Value per line.");
+				}
+				string text3 = text2.Substring(0, num).Trim();
+				string text4 = text2.Substring(num + 1).Trim();
+				if (text3.Length == 0 || text3.Length > 80 || text4.Length > 2000 || dictionary.Count >= 100 || dictionary.ContainsKey(text3))
+				{
+					throw new IOException("Use unique field names (up to 80 characters) and values up to 2000 characters, at most 100 fields.");
+				}
+				dictionary.Add(text3, text4);
+			}
+			return dictionary;
+		}
+
+		public static void GameOptions(IWin32Window owner, LibraryData d, GameEntry g)
+		{
+			if (g == null)
+			{
+				throw new IOException("Select a game first.");
+			}
+			NextDialog f = new NextDialog("Game extensions — " + g.Title, 900, 690);
+			try
+			{
+				FishBowlTabs fishBowlTabs = new FishBowlTabs();
+				fishBowlTabs.Dock = DockStyle.Fill;
+				fishBowlTabs.PreferredColumns = 2;
+				FishBowlTabs fishBowlTabs2 = fishBowlTabs;
+				TabPage tabPage = new TabPage("Launch and media");
+				tabPage.AutoScroll = true;
+				TabPage tabPage2 = tabPage;
+				TabPage tabPage3 = new TabPage("Custom fields");
+				tabPage3.AutoScroll = true;
+				TabPage tabPage4 = tabPage3;
+				fishBowlTabs2.TabPages.Add(tabPage2);
+				fishBowlTabs2.TabPages.Add(tabPage4);
+				f.Body.Controls.Add(fishBowlTabs2);
+				TableLayoutPanel table = NextDialog.Fields(tabPage2);
+				GameExtras extra = Extra(g);
+				CheckBox native = new CheckBox
+				{
+					Text = "Launch this entry as a PC game / shortcut",
+					Checked = extra.Native
+				};
+				TextBox work = new TextBox
+				{
+					Text = (extra.WorkingDirectory ?? "")
+				};
+				TextBox args = new TextBox
+				{
+					Text = (g.Arguments ?? "")
+				};
+				TextBox trailer = new TextBox
+				{
+					Text = (extra.TrailerUrl ?? "")
+				};
+				TextBox manual = new TextBox
+				{
+					Text = (g.ManualPath ?? "")
+				};
+				NextDialog.Field(table, "Launch type", native);
+				NextDialog.Field(table, "Working folder (PC only)", work);
+				NextDialog.Field(table, "Extra launch arguments", args);
+				NextDialog.Field(table, "Trailer HTTPS address", trailer);
+				NextDialog.Field(table, "Local manual path", manual);
+				NextDialog.Field(table, "", new Label
+				{
+					AutoSize = true,
+					Text = "Graphics presets use launch profiles with flags supported by your emulator. FishBowl does not guess emulator-specific settings."
+				}, 70);
+				TextBox fields = new TextBox
+				{
+					Dock = DockStyle.Fill,
+					Multiline = true,
+					ScrollBars = ScrollBars.Vertical,
+					Text = string.Join("\r\n", extra.Fields.Select((KeyValuePair<string, string> p) => p.Key + " = " + p.Value)),
+					AccessibleName = "Custom metadata fields, one Key = Value per line"
+				};
+				tabPage4.Controls.Add(fields);
+				f.Action("Save", delegate
+				{
+					if (!string.IsNullOrWhiteSpace(trailer.Text) && !Https(trailer.Text))
+					{
+						throw new IOException("Trailer must use HTTPS.");
+					}
+					Dictionary<string, string> fields2 = ParseFields(fields.Text);
+					if (native.Checked)
+					{
+						GameEntry gameEntry = UserTools.Copy(g);
+						gameEntry.Arguments = args.Text;
+						Extra(gameEntry).Native = true;
+						gameEntry.Extras.WorkingDirectory = work.Text.Trim();
+						NativeArguments(gameEntry);
+					}
+					g.Arguments = args.Text;
+					extra.Native = native.Checked;
+					extra.WorkingDirectory = work.Text.Trim();
+					extra.TrailerUrl = trailer.Text.Trim();
+					extra.Fields = fields2;
+					g.ManualPath = manual.Text.Trim();
+					Record(d, "Changed game options: " + g.Title);
+					Store.Save(d);
+					f.Close();
+				});
+				f.Action("Focus view", delegate
+				{
+					Immersion.Show(f, d, g);
+				});
+				f.Action("Build / launch preset", delegate
+				{
+					NextTools.PreferredBuild(f, d, g);
+				});
+				f.Action("Launch readiness", delegate
+				{
+					UserTools.Troubleshoot(f, d, g, Readiness(d, g));
+				});
+				f.Action("Open trailer", delegate
+				{
+					OpenLink(trailer.Text.Trim());
+				});
+				f.Action("Open manual", delegate
+				{
+					if (!File.Exists(manual.Text))
+					{
+						throw new IOException("Choose an existing local manual.");
+					}
+					string value = Path.GetExtension(manual.Text).ToLowerInvariant();
+					if (!new string[5] { ".pdf", ".txt", ".md", ".html", ".htm" }.Contains(value))
+					{
+						throw new IOException("Manuals support PDF, text or HTML documents.");
+					}
+					Process.Start(new ProcessStartInfo(manual.Text)
+					{
+						UseShellExecute = true
+					});
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static string Fingerprint(GameEntry g)
+		{
+			using (SHA256 sHA = SHA256.Create())
+			{
+				return BitConverter.ToString(sHA.ComputeHash(Encoding.UTF8.GetBytes(Json.Serialize(g)))).Replace("-", "");
+			}
+		}
+
+		public static TransferPackage ExportPackage(LibraryData d)
+		{
+			UserTools.SaveActive(d);
+			TransferPackage transferPackage = new TransferPackage();
+			transferPackage.Schema = 1;
+			transferPackage.At = DateTime.UtcNow.ToString("o");
+			transferPackage.Profile = UserTools.Copy(UserTools.Ensure(d).Users.First((BowlUser u) => u.Id == d.UserTools.ActiveId));
+			transferPackage.Games = UserTools.Copy(d.Games);
+			return transferPackage;
+		}
+
+		public static List<TransferChange> TransferPlan(LibraryData d, TransferPackage p)
+		{
+			if (p == null || p.Schema != 1 || p.Games == null)
+			{
+				throw new IOException("Unsupported transfer package.");
+			}
+			if (p.Games.Count > 100000 || p.Games.Any((GameEntry g) => g == null || string.IsNullOrWhiteSpace(g.Id) || string.IsNullOrWhiteSpace(g.Title)) || (from g in p.Games
+				group g by g.Id).Any((IGrouping<string, GameEntry> g) => g.Count() > 1))
+			{
+				throw new IOException("Transfer contains invalid or duplicate game records.");
+			}
+			List<TransferChange> list = new List<TransferChange>();
+			Dictionary<string, GameEntry> dictionary = d.Games.ToDictionary((GameEntry g) => g.Id);
+			HashSet<string> hashSet = new HashSet<string>(from g in d.Games
+				where !string.IsNullOrWhiteSpace(g.Path)
+				select g.Path, StringComparer.OrdinalIgnoreCase);
+			foreach (GameEntry game in p.Games)
+			{
+				GameEntry value;
+				dictionary.TryGetValue(game.Id, out value);
+				if (value == null)
+				{
+					if (!string.IsNullOrWhiteSpace(game.Path) && !hashSet.Add(game.Path))
+					{
+						list.Add(new TransferChange
+						{
+							Incoming = game,
+							Status = "Duplicate path — keep local"
+						});
+					}
+					else
+					{
+						list.Add(new TransferChange
+						{
+							Incoming = game,
+							Status = "Add"
+						});
+					}
+					continue;
+				}
+				string text = Fingerprint(game);
+				string text2 = Fingerprint(value);
+				string value2;
+				Ensure(d).SyncHashes.TryGetValue(game.Id, out value2);
+				if (!(text == text2))
+				{
+					list.Add(new TransferChange
+					{
+						Incoming = game,
+						Existing = value,
+						ReviewedHash = text2,
+						Status = ((value2 != null && text2 == value2) ? "Update" : "Conflict — choose explicitly")
+					});
+				}
+			}
+			return list;
+		}
+
+		public static void ApplyTransfer(LibraryData d, IEnumerable<TransferChange> chosen)
+		{
+			Idle(d);
+			List<TransferChange> list = chosen.ToList();
+			HashSet<string> hashSet = new HashSet<string>(from g in d.Games
+				where !string.IsNullOrWhiteSpace(g.Path)
+				select g.Path, StringComparer.OrdinalIgnoreCase);
+			foreach (TransferChange item in list.Where((TransferChange c) => c.Existing == null))
+			{
+				if (!string.IsNullOrWhiteSpace(item.Incoming.Path) && !hashSet.Add(item.Incoming.Path))
+				{
+					throw new IOException("A new entry's path is already present. Start a fresh synchronization preview.");
+				}
+			}
+			if (list.Any((TransferChange c) => c.Status.StartsWith("Duplicate")))
+			{
+				throw new IOException("Duplicate paths cannot be imported as new entries.");
+			}
+			foreach (TransferChange c2 in list)
+			{
+				List<GameEntry> games = d.Games;
+				Func<GameEntry, bool> predicate = (GameEntry g) => g.Id == c2.Incoming.Id;
+				GameEntry gameEntry = games.FirstOrDefault(predicate);
+				if ((c2.Existing == null && gameEntry != null) || (c2.Existing != null && (gameEntry == null || Fingerprint(gameEntry) != c2.ReviewedHash)))
+				{
+					throw new IOException("The Library changed during review; start another preview.");
+				}
+			}
+			foreach (TransferChange item2 in list)
+			{
+				GameEntry gameEntry2 = UserTools.Copy(item2.Incoming);
+				if (item2.Existing == null)
+				{
+					d.Games.Add(gameEntry2);
+				}
+				else
+				{
+					gameEntry2.Arguments = item2.Existing.Arguments;
+					gameEntry2.LaunchProfileName = item2.Existing.LaunchProfileName;
+					if (gameEntry2.Extras == null)
+					{
+						gameEntry2.Extras = UserTools.Copy(item2.Existing.Extras);
+					}
+					else
+					{
+						gameEntry2.Extras.Native = Native(item2.Existing);
+						gameEntry2.Extras.WorkingDirectory = ((item2.Existing.Extras == null) ? null : item2.Existing.Extras.WorkingDirectory);
+					}
+					gameEntry2.ArtworkPath = (File.Exists(gameEntry2.ArtworkPath) ? gameEntry2.ArtworkPath : item2.Existing.ArtworkPath);
+					gameEntry2.ManualPath = item2.Existing.ManualPath;
+					gameEntry2.Path = item2.Existing.Path;
+					gameEntry2.EmulatorId = item2.Existing.EmulatorId;
+					gameEntry2.PreferredEmulatorId = item2.Existing.PreferredEmulatorId;
+					gameEntry2.PreferredBuildId = item2.Existing.PreferredBuildId;
+					gameEntry2.Saves = item2.Existing.Saves;
+					gameEntry2.Discs = item2.Existing.Discs;
+					gameEntry2.LastDiscPath = item2.Existing.LastDiscPath;
+					gameEntry2.TotalPlaySeconds = item2.Existing.TotalPlaySeconds;
+					gameEntry2.LaunchCount = item2.Existing.LaunchCount;
+					gameEntry2.LastLaunched = item2.Existing.LastLaunched;
+					d.Games[d.Games.IndexOf(item2.Existing)] = gameEntry2;
+				}
+				Ensure(d).SyncHashes[gameEntry2.Id] = Fingerprint(gameEntry2);
+			}
+		}
+
+		public static void Transfer(IWin32Window owner, LibraryData d)
+		{
+			NextDialog f = new NextDialog("Profile transfer and reviewed sync", 900, 600);
+			try
+			{
+				f.Body.Controls.Add(new TextBox
+				{
+					ReadOnly = true,
+					Multiline = true,
+					Dock = DockStyle.Fill,
+					Text = "Use a transfer JSON file on another computer or in your cloud client's local folder. Files include game metadata, paths and the active personal profile, but no game bytes, emulator executables or save contents.\r\n\r\nImport previews every change. Conflicts default to keeping local data. Existing game paths, emulator assignments, linked saves and recorded time remain local. New entries may need path repair and emulator assignment. Profiles can be imported separately. Cloud upload/download completion is managed by your cloud client; FishBowl does not silently merge files."
+				});
+				f.Action("Export profile and Library", delegate
+				{
+					using (SaveFileDialog saveFileDialog = new SaveFileDialog
+					{
+						Filter = "FishBowl transfer JSON|*.fishbowl-transfer.json",
+						FileName = "FishBowl-transfer.fishbowl-transfer.json"
+					})
+					{
+						if (saveFileDialog.ShowDialog(f) == DialogResult.OK)
+						{
+							TransferPackage value = ExportPackage(d);
+							File.WriteAllText(saveFileDialog.FileName, Json.Serialize(value));
+							foreach (GameEntry game in d.Games)
+							{
+								Ensure(d).SyncHashes[game.Id] = Fingerprint(game);
+							}
+							Store.Save(d);
+						}
+					}
+				});
+				f.Action("Preview Library sync", delegate
+				{
+					ImportTransfer(f, d, false);
+				});
+				f.Action("Import personal profile", delegate
+				{
+					ImportTransfer(f, d, true);
+				});
+				f.Action("Check cloud conflicts", delegate
+				{
+					Conflicts(f);
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		private static void ImportTransfer(IWin32Window owner, LibraryData d, bool profileOnly)
+		{
+			OpenFileDialog openFileDialog = new OpenFileDialog();
+			openFileDialog.Filter = "FishBowl transfer JSON|*.fishbowl-transfer.json;*.json";
+			using (OpenFileDialog openFileDialog2 = openFileDialog)
+			{
+				if (openFileDialog2.ShowDialog(owner) != DialogResult.OK)
+				{
+					return;
+				}
+				if (new FileInfo(openFileDialog2.FileName).Length > 16777216)
+				{
+					throw new IOException("Transfer exceeds 16 MB.");
+				}
+				TransferPackage transferPackage = Json.Deserialize<TransferPackage>(File.ReadAllText(openFileDialog2.FileName));
+				List<TransferChange> list2 = TransferPlan(d, transferPackage);
+				if (profileOnly)
+				{
+					if (transferPackage.Profile == null)
+					{
+						throw new IOException("Package has no personal profile.");
+					}
+					if (Polish.Review(owner, "Import personal profile", transferPackage.Profile.Name + "\r\nPersonal progress for matching game IDs will be imported as a new profile. Emulator save routes and queues remain subject to local availability."))
+					{
+						Idle(d);
+						BowlUser bowlUser = UserTools.Copy(transferPackage.Profile);
+						bowlUser.Id = Guid.NewGuid().ToString("N");
+						bowlUser.Name = (bowlUser.Name ?? "Imported") + " (imported)";
+						UserTools.Ensure(d).Users.Add(bowlUser);
+						Store.Save(d);
+					}
+					return;
+				}
+				NextDialog f = new NextDialog("Review Library synchronization", 950, 680);
+				try
+				{
+					ListView list = new ListView
+					{
+						Dock = DockStyle.Fill,
+						View = View.Details,
+						CheckBoxes = true,
+						FullRowSelect = true,
+						HideSelection = false
+					};
+					list.Columns.Add("Change", 225);
+					list.Columns.Add("Game", 230);
+					list.Columns.Add("Incoming path", 420);
+					foreach (TransferChange item in list2)
+					{
+						list.Items.Add(new ListViewItem(new string[3]
+						{
+							item.Status,
+							item.Incoming.Title,
+							item.Incoming.Path
+						})
+						{
+							Tag = item,
+							Checked = (item.Status == "Add" || item.Status == "Update")
+						});
+					}
+					f.Body.Controls.Add(list);
+					f.Action("Inspect selected", delegate
+					{
+						if (list.SelectedItems.Count != 0)
+						{
+							TransferChange transferChange = (TransferChange)list.SelectedItems[0].Tag;
+							UserTools.Report(f, "Incoming metadata review", "LOCAL:\r\n" + Json.Serialize(transferChange.Existing) + "\r\n\r\nINCOMING:\r\n" + Json.Serialize(transferChange.Incoming));
+						}
+					});
+					f.Action("Apply checked changes", delegate
+					{
+						Idle(d);
+						Store.CreateRestorePoint(d, "Before reviewed sync");
+						ApplyTransfer(d, from ListViewItem i in list.CheckedItems
+							select (TransferChange)i.Tag);
+						Record(d, "Applied reviewed Library sync");
+						Store.Save(d);
+						f.Close();
+					});
+					f.Action("Cancel", f.Close);
+					f.ShowDialog(owner);
+				}
+				finally
+				{
+					if (f != null)
+					{
+						((IDisposable)f).Dispose();
+					}
+				}
+			}
+		}
+
+		public static void Show(IWin32Window owner, LibraryData d)
+		{
+			Ensure(d);
+			NextDialog f = new NextDialog("Library extensions", 940, 710);
+			try
+			{
+				FishBowlTabs tabs = new FishBowlTabs
+				{
+					Dock = DockStyle.Fill,
+					PreferredColumns = 4
+				};
+				f.Body.Controls.Add(tabs);
+				Dictionary<string, FlowLayoutPanel> pages = new Dictionary<string, FlowLayoutPanel>();
+				string[] array = new string[4] { "Library", "Emulators", "Protect and move", "Presentation" };
+				string[] array2 = array;
+				foreach (string text in array2)
+				{
+					TabPage tabPage = new TabPage(text);
+					tabPage.AutoScroll = true;
+					tabPage.UseVisualStyleBackColor = false;
+					tabPage.BackColor = FishBowlPalette.ThemeSurface;
+					tabPage.ForeColor = FishBowlPalette.ThemeInk;
+					TabPage tabPage2 = tabPage;
+					tabs.TabPages.Add(tabPage2);
+					FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel();
+					flowLayoutPanel.Dock = DockStyle.Top;
+					flowLayoutPanel.AutoSize = true;
+					flowLayoutPanel.FlowDirection = FlowDirection.TopDown;
+					flowLayoutPanel.WrapContents = false;
+					flowLayoutPanel.Padding = new Padding(14);
+					FlowLayoutPanel value = flowLayoutPanel;
+					tabPage2.Controls.Add(value);
+					pages[text] = value;
+				}
+				Action<string, string, string, Action> action2 = delegate(string tab, string title, string description, Action action)
+				{
+					TableLayoutPanel tableLayoutPanel = new TableLayoutPanel
+					{
+						Width = 790,
+						Height = 68,
+						ColumnCount = 2,
+						RowCount = 1,
+						Margin = new Padding(4, 8, 4, 8)
+					};
+					tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40f));
+					tableLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60f));
+					FishBowlActionButton fishBowlActionButton = ExperienceUi.Button(title, action);
+					fishBowlActionButton.Dock = DockStyle.Fill;
+					fishBowlActionButton.AutoSize = true;
+					fishBowlActionButton.MinimumSize = new Size(0, 48);
+					tableLayoutPanel.Controls.Add(fishBowlActionButton, 0, 0);
+					tableLayoutPanel.Controls.Add(new Label
+					{
+						Dock = DockStyle.Fill,
+						Text = description,
+						ForeColor = FishBowlPalette.ThemeInk,
+						TextAlign = ContentAlignment.MiddleLeft,
+						Margin = new Padding(12, 4, 4, 4)
+					}, 1, 0);
+					pages[tab].Controls.Add(tableLayoutPanel);
+				};
+				action2("Library", "Launch readiness", "Check a game and open its guided repair options.", delegate
+				{
+					PickGame(f, d, delegate(GameEntry g)
+					{
+						UserTools.Troubleshoot(f, d, g, Readiness(d, g));
+					});
+				});
+				action2("Library", "Recent activity", "Recent play, Library edits and save snapshots.", delegate
+				{
+					Activity(f, d);
+				});
+				action2("Library", "Preview folder import", "Review and select discovered games before adding them.", delegate
+				{
+					ImportFolder(f, d);
+				});
+				action2("Library", "Add PC game / shortcut", "Launch installed Windows games alongside emulated games.", delegate
+				{
+					AddPc(f, d);
+				});
+				action2("Library", "Nested collections", "Include child collections in their parent's Library view.", delegate
+				{
+					Collections(f, d);
+				});
+				action2("Library", "Game media and custom fields", "Launch overrides, trailers, manuals and searchable custom metadata.", delegate
+				{
+					PickGame(f, d, delegate(GameEntry g)
+					{
+						GameOptions(f, d, g);
+					});
+				});
+				action2("Library", "Online metadata and covers", "Optional Wikipedia lookup and reviewed local/online cover selection.", delegate
+				{
+					PickGame(f, d, delegate(GameEntry g)
+					{
+						Metadata(f, d, g);
+					});
+				});
+				action2("Emulators", "Versions, updates and rollback", "Inventory installed builds, check releases, activate registered versions.", delegate
+				{
+					Inventory(f, d);
+				});
+				action2("Emulators", "Adapters and setup templates", "Import/export optional JSON definitions for additional emulators.", delegate
+				{
+					Adapters(f, d);
+				});
+				action2("Emulators", "Per-game builds and presets", "Reuse registered emulator builds and launch profiles.", delegate
+				{
+					NextTools.PreferredBuild(f, d, null);
+				});
+				action2("Protect and move", "Storage overview", "Measure configured games, artwork, saves and snapshots; review retention.", delegate
+				{
+					StorageScreen(f, d);
+				});
+				action2("Protect and move", "Backup schedule", "Configure existing snapshot export scheduling and storage quota.", delegate
+				{
+					HubSaveSchedule.Settings(f, d);
+				});
+				action2("Protect and move", "Cloud conflict review", "Find filenames indicating conflicts without deleting copies.", delegate
+				{
+					Conflicts(f);
+				});
+				action2("Protect and move", "Portable collection paths", "Record relative paths and review a relocation to another drive.", delegate
+				{
+					Portable(f, d);
+				});
+				action2("Protect and move", "Profile transfer and sync", "Offline transfer packages and explicit conflict resolution.", delegate
+				{
+					Transfer(f, d);
+				});
+				action2("Presentation", "Immersion", "Focus view, personal shelves, galleries, atmosphere and one settings page.", delegate
+				{
+					Immersion.Show(f, d, null);
+				});
+				action2("Presentation", "Living-room Library", "Full-screen, large cards with mouse/keyboard navigation.", delegate
+				{
+					using (LivingRoomLibrary livingRoomLibrary = new LivingRoomLibrary(d))
+					{
+						livingRoomLibrary.ShowDialog(f);
+					}
+				});
+				action2("Presentation", "Library view styles", "Card sizes, spacing, platform labels and a cover-detail pane.", delegate
+				{
+					ViewStyles(f, d);
+				});
+				CheckBox check;
+				action2("Presentation", "Crash recovery", "Offer the previous Library view after an interrupted application run.", delegate
+				{
+					NextDialog prompt = new NextDialog("Crash recovery");
+					try
+					{
+						check = new CheckBox
+						{
+							Dock = DockStyle.Top,
+							Checked = Ensure(d).ResumeAfterCrash,
+							Text = "Offer to reopen the previous Library view after an unexpected exit"
+						};
+						prompt.Body.Controls.Add(check);
+						prompt.Action("Save", delegate
+						{
+							Ensure(d).ResumeAfterCrash = check.Checked;
+							Store.Save(d);
+							prompt.Close();
+						});
+						prompt.Action("Close", prompt.Close);
+						prompt.ShowDialog(f);
+					}
+					finally
+					{
+						if (prompt != null)
+						{
+							((IDisposable)prompt).Dispose();
+						}
+					}
+				});
+				f.Shown += delegate
+				{
+					foreach (FlowLayoutPanel value2 in pages.Values)
+					{
+						value2.Width = Math.Max(420, tabs.ClientSize.Width - 40);
+						foreach (TableLayoutPanel item in value2.Controls.OfType<TableLayoutPanel>())
+						{
+							item.Width = value2.Width - 40;
+							item.Height = Math.Max(68, f.Font.Height * 4);
+						}
+					}
+				};
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+
+		public static void PickGame(IWin32Window owner, LibraryData d, Action<GameEntry> action)
+		{
+			using (NextDialog nextDialog = new NextDialog("Choose a Library game", 750, 530))
+			{
+				ListBox list = new ListBox
+				{
+					Dock = DockStyle.Fill,
+					DisplayMember = "Title",
+					DataSource = d.Games.OrderBy((GameEntry g) => g.Title).ToList()
+				};
+				nextDialog.Body.Controls.Add(list);
+				nextDialog.Action("Open selected", delegate
+				{
+					GameEntry gameEntry = list.SelectedItem as GameEntry;
+					if (gameEntry == null)
+					{
+						throw new IOException("Add a game first.");
+					}
+					action(gameEntry);
+				});
+				nextDialog.Action("Close", nextDialog.Close);
+				nextDialog.ShowDialog(owner);
+			}
+		}
+
+		public static Bitmap PlatformThumbnail(string path, string title, string platform, int size, bool badge)
+		{
+			Bitmap bitmap = GameLibraryDialog.MakeThumbnail(path, title, size);
+			if (badge && !string.IsNullOrWhiteSpace(platform))
+			{
+				string text = ((platform.Length > 5) ? platform.Substring(0, 5) : platform);
+				using (Graphics graphics = Graphics.FromImage(bitmap))
+				{
+					using (Font font = new Font("Segoe UI", Math.Max(7, size / 12), FontStyle.Bold))
+					{
+						using (SolidBrush brush = new SolidBrush(FishBowlPalette.ThemeSurface))
+						{
+							int num = Math.Min(size - 4, TextRenderer.MeasureText(text, font).Width + 6);
+							Rectangle rectangle = new Rectangle(size - num - 2, size - font.Height - 8, num, font.Height + 6);
+							graphics.FillRectangle(brush, rectangle);
+							FishBowlText.DrawText(graphics, text, font, rectangle, FishBowlPalette.ThemeInk, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+						}
+					}
+				}
+			}
+			return bitmap;
+		}
+
+		public static void ViewStyles(IWin32Window owner, LibraryData d)
+		{
+			if (d.Cosmetics == null)
+			{
+				d.Cosmetics = new CosmeticSettings();
+			}
+			NextDialog f = new NextDialog("Library view styles", 820, 620);
+			try
+			{
+				TableLayoutPanel table = NextDialog.Fields(f.Body);
+				NumericUpDown size = NextDialog.Number(d.Experience.ArtworkSize, 64m, 192m);
+				ComboBox density = NextDialog.Choice(new string[2] { "Compact", "Comfortable" }, d.Cosmetics.LibrarySpacing ?? "Comfortable");
+				CheckBox platform = new CheckBox
+				{
+					Text = "Show platform labels on Library rows/cards",
+					Checked = d.Cosmetics.PlatformLabels
+				};
+				CheckBox preview = new CheckBox
+				{
+					Text = "Show a cover and details pane",
+					Checked = d.Cosmetics.DetailPreview
+				};
+				CheckBox reduced = new CheckBox
+				{
+					Text = "Reduce motion",
+					Checked = d.Enhancements.ReducedMotion
+				};
+				NextDialog.Field(table, "Artwork card size", size);
+				NextDialog.Field(table, "Spacing", density);
+				NextDialog.Field(table, "", platform);
+				NextDialog.Field(table, "", preview);
+				NextDialog.Field(table, "", reduced);
+				NextDialog.Field(table, "", new Label
+				{
+					Text = "Details and artwork views retain their own sorting/filter history. Changes apply to open Library views after closing this screen.",
+					AutoSize = true
+				}, 85);
+				f.Action("Save", delegate
+				{
+					d.Experience.ArtworkSize = (int)size.Value;
+					d.Cosmetics.LibrarySpacing = density.Text;
+					d.Cosmetics.PlatformLabels = platform.Checked;
+					d.Cosmetics.DetailPreview = preview.Checked;
+					d.Enhancements.ReducedMotion = reduced.Checked;
+					d.Theme.EnableMotion = !reduced.Checked;
+					FishBowlHighlights.ReducedMotion = reduced.Checked;
+					Store.Save(d);
+					foreach (GameLibraryDialog item in Application.OpenForms.OfType<GameLibraryDialog>())
+					{
+						item.ReloadLibrary();
+					}
+					f.Close();
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+	}
+	public class HubActivity
+	{
+		public string At { get; set; }
+
+		public string UserId { get; set; }
+
+		public string Text { get; set; }
+	}
+	public class HubSettings
+	{
+		public ImmersionSettings Immersion { get; set; }
+
+		public List<EmulatorAdapter> Adapters { get; set; }
+
+		public List<PathBinding> Paths { get; set; }
+
+		public List<HubActivity> Activity { get; set; }
+
+		public Dictionary<string, string> SyncHashes { get; set; }
+
+		public bool ResumeAfterCrash { get; set; }
+
+		public bool WatchReleases { get; set; }
+
+		public string LastReleaseWatchAt { get; set; }
+
+		public Dictionary<string, string> NotifiedReleases { get; set; }
+
+		public int CaptureMinutes { get; set; }
+
+		public string NextCaptureAt { get; set; }
+
+		public string LastCaptureReport { get; set; }
+
+		public HubSettings()
+		{
+			Adapters = new List<EmulatorAdapter>();
+			Paths = new List<PathBinding>();
+			Activity = new List<HubActivity>();
+			SyncHashes = new Dictionary<string, string>();
+			ResumeAfterCrash = true;
+		}
+	}
+	public class MetadataMatch
+	{
+		public string Title { get; set; }
+
+		public string Description { get; set; }
+
+		public string Url { get; set; }
+
+		public string Image { get; set; }
+
+		public override string ToString()
+		{
+			return Title;
+		}
+	}
+	public class PathBinding
+	{
+		public string Original { get; set; }
+
+		public string Key { get; set; }
+
+		public string Relative { get; set; }
+	}
+	public class TransferChange
+	{
+		public GameEntry Incoming;
+
+		public GameEntry Existing;
+
+		public string Status;
+
+		public string ReviewedHash;
+
+		public override string ToString()
+		{
+			return Status + ": " + Incoming.Title;
+		}
+	}
+	public class TransferPackage
+	{
+		public int Schema { get; set; }
+
+		public string At { get; set; }
+
+		public BowlUser Profile { get; set; }
+
+		public List<GameEntry> Games { get; set; }
+	}
+	public class LivingRoomLibrary : NextDialog
+	{
+		private readonly LibraryData data;
+
+		private readonly ListBox games = new ListBox
+		{
+			Dock = DockStyle.Fill,
+			DisplayMember = "Title",
+			ItemHeight = 120,
+			DrawMode = DrawMode.OwnerDrawFixed,
+			AccessibleName = "Living-room game cards"
+		};
+
+		private readonly TextBox search = new TextBox
+		{
+			Dock = DockStyle.Top,
+			AccessibleName = "Find a game"
+		};
+
+		private Font roomFont;
+
+		private Font searchFont;
+
+		private readonly Dictionary<string, Bitmap> covers = new Dictionary<string, Bitmap>();
+
+		private bool onlyFavorites;
+
+		public LivingRoomLibrary(LibraryData d)
+			: base("Living-room Library", 1100, 750)
+		{
+			data = d;
+			base.FormBorderStyle = FormBorderStyle.None;
+			base.WindowState = FormWindowState.Maximized;
+			base.KeyPreview = true;
+			Body.Controls.Add(games);
+			Body.Controls.Add(search);
+			ListBox listBox = games;
+			DrawItemEventHandler value = delegate(object a, DrawItemEventArgs b)
+			{
+				if (b.Index >= 0)
+				{
+					b.DrawBackground();
+					GameEntry gameEntry2 = (GameEntry)games.Items[b.Index];
+					Bitmap value2;
+					if (!covers.TryGetValue(gameEntry2.Id, out value2))
+					{
+						if (covers.Count >= 48)
+						{
+							foreach (Bitmap value3 in covers.Values)
+							{
+								value3.Dispose();
+							}
+							covers.Clear();
+						}
+						value2 = Hub.PlatformThumbnail(gameEntry2.ArtworkPath, gameEntry2.Title, gameEntry2.ConsoleLabel, 96, true);
+						covers[gameEntry2.Id] = value2;
+					}
+					int num2 = Math.Min(160, b.Bounds.Height - 20);
+					b.Graphics.DrawImage(value2, new Rectangle(b.Bounds.X + 10, b.Bounds.Y + 10, num2, num2));
+					Color foreColor = (((b.State & DrawItemState.Selected) != 0) ? SystemColors.HighlightText : FishBowlPalette.ThemeInk);
+					int num3 = games.Font.Height + 18;
+					FishBowlText.DrawText(b.Graphics, (gameEntry2.Favorite ? "★ " : "") + gameEntry2.Title, games.Font, new Rectangle(b.Bounds.X + num2 + 30, b.Bounds.Y + 12, Math.Max(10, b.Bounds.Width - num2 - 50), num3), foreColor, TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
+					using (Font font = new Font(games.Font.FontFamily, Math.Max(12f, games.Font.Size / 2f)))
+					{
+						FishBowlText.DrawText(b.Graphics, gameEntry2.ConsoleLabel ?? "", font, new Rectangle(b.Bounds.X + num2 + 32, b.Bounds.Y + num3 + 20, Math.Max(10, b.Bounds.Width - num2 - 50), font.Height + 8), foreColor, TextFormatFlags.EndEllipsis);
+					}
+					b.DrawFocusRectangle();
+				}
+			};
+			listBox.DrawItem += value;
+			search.TextChanged += delegate
+			{
+				RefreshGames();
+			};
+			games.DoubleClick += delegate
+			{
+				Launch();
+			};
+			base.KeyDown += delegate(object a, KeyEventArgs b)
+			{
+				if (b.KeyCode == Keys.Escape)
+				{
+					Close();
+					b.SuppressKeyPress = true;
+				}
+				else if (b.KeyCode == Keys.Return && games.ContainsFocus)
+				{
+					Launch();
+					b.SuppressKeyPress = true;
+				}
+			};
+			Action("Launch", Launch);
+			Action("Details", delegate
+			{
+				GameEntry gameEntry = games.SelectedItem as GameEntry;
+				if (gameEntry != null)
+				{
+					using (GameExperienceDialog gameExperienceDialog = new GameExperienceDialog(data, gameEntry))
+					{
+						gameExperienceDialog.ShowDialog(this);
+					}
+				}
+				RefreshAfterDetails();
+			});
+			Action("Favorites / all", delegate
+			{
+				onlyFavorites = !onlyFavorites;
+				RefreshGames();
+			});
+			Action("Exit full screen", base.Close);
+			base.Shown += delegate
+			{
+				float num = Math.Max(1f, (float)NextUi.TextPercent / 100f);
+				roomFont = new Font(string.IsNullOrWhiteSpace(NextUi.FontFamily) ? "Segoe UI" : NextUi.FontFamily, 24f * num);
+				searchFont = new Font(roomFont.FontFamily, 20f * num);
+				games.Font = roomFont;
+				games.ItemHeight = (int)(120f * num);
+				search.Font = searchFont;
+			};
+			base.Disposed += delegate
+			{
+				foreach (Bitmap value4 in covers.Values)
+				{
+					value4.Dispose();
+				}
+				if (roomFont != null)
+				{
+					roomFont.Dispose();
+				}
+				if (searchFont != null)
+				{
+					searchFont.Dispose();
+				}
+			};
+			RefreshGames();
+		}
+
+		private void RefreshAfterDetails()
+		{
+			foreach (Bitmap value in covers.Values)
+			{
+				value.Dispose();
+			}
+			covers.Clear();
+			RefreshGames();
+		}
+
+		private void RefreshGames()
+		{
+			GameEntry gameEntry = games.SelectedItem as GameEntry;
+			string id = ((gameEntry == null) ? null : gameEntry.Id);
+			games.DataSource = null;
+			List<GameEntry> list = (from g in data.Games
+				where (!onlyFavorites || g.Favorite) && Hub.SearchText(g).IndexOf(search.Text, StringComparison.OrdinalIgnoreCase) >= 0
+				orderby g.Title
+				select g).ToList();
+			games.DataSource = list;
+			GameEntry gameEntry2 = list.FirstOrDefault((GameEntry g) => g.Id == id);
+			if (gameEntry2 != null)
+			{
+				games.SelectedItem = gameEntry2;
+			}
+		}
+
+		private void Launch()
+		{
+			GameEntry gameEntry = games.SelectedItem as GameEntry;
+			if (gameEntry != null)
+			{
+				ExperienceTools.Launch(this, data, gameEntry);
+			}
+		}
+	}
+	public class ScheduledSaveResult
+	{
+		public List<SaveSnapshot> Snapshots = new List<SaveSnapshot>();
+
+		public List<string> Messages = new List<string>();
+	}
+	public sealed class RecoveryMarker
+	{
+		private string signature;
+
+		public string PathName { get; private set; }
+
+		public bool Interrupted { get; private set; }
+
+		public bool Owned { get; private set; }
+
+		public static bool Alive(string text)
+		{
+			try
+			{
+				string[] array = text.Split('|');
+				if (array.Length != 2)
+				{
+					return false;
+				}
+				int result;
+				long result2;
+				if (!int.TryParse(array[0], out result) || !long.TryParse(array[1], out result2))
+				{
+					return false;
+				}
+				using (Process process = Process.GetProcessById(result))
+				{
+					return !process.HasExited && process.StartTime.ToUniversalTime().Ticks == result2;
+				}
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		public RecoveryMarker(string path)
+		{
+			PathName = path;
+			Directory.CreateDirectory(Path.GetDirectoryName(path));
+			if (File.Exists(path))
+			{
+				string text = File.ReadAllText(path);
+				if (Alive(text))
+				{
+					return;
+				}
+				Interrupted = true;
+			}
+			using (Process process = Process.GetCurrentProcess())
+			{
+				signature = process.Id + "|" + process.StartTime.ToUniversalTime().Ticks;
+			}
+			File.WriteAllText(path, signature);
+			Owned = true;
+		}
+
+		public void Close()
+		{
+			if (Owned && File.Exists(PathName) && File.ReadAllText(PathName) == signature)
+			{
+				File.Delete(PathName);
+			}
+			Owned = false;
+		}
+	}
+	public static class HubSaveSchedule
+	{
+		public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token)
+		{
+			return Capture(copy, token, null);
+		}
+
+		public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token, Action<string> progress)
+		{
+			ScheduledSaveResult scheduledSaveResult = new ScheduledSaveResult();
+			string managed = Path.Combine(GameStorage.Root(copy), "Game Saves");
+			try
+			{
+				string hash;
+				foreach (GameEntry g in copy.Games)
+				{
+					token.ThrowIfCancellationRequested();
+					if (!(g.Saves ?? new List<GameSaveEntry>()).Any((GameSaveEntry link) => !string.IsNullOrWhiteSpace(link.Path) && !SafeFiles.Within(link.Path, managed)))
+					{
+						continue;
+					}
+					EmulatorProfile emulatorProfile = NextData.LaunchEmulator(copy, g);
+					if (emulatorProfile == null || !Platform.IsDirectProgram(emulatorProfile.Executable) || EmulatorRuntime.State(emulatorProfile.Executable) != 0)
+					{
+						scheduledSaveResult.Messages.Add(g.Title + ": skipped; a closed executable could not be verified.");
+						continue;
+					}
+					try
+					{
+						SaveHistory.RequireClosed(copy, new SaveSnapshot
+						{
+							GameId = g.Id
+						});
+					}
+					catch (Exception ex)
+					{
+						scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
+						continue;
+					}
+					GameSaveEntry[] array = (g.Saves ?? new List<GameSaveEntry>()).ToArray();
+					foreach (GameSaveEntry link2 in array)
+					{
+						token.ThrowIfCancellationRequested();
+						if (string.IsNullOrWhiteSpace(link2.Path) || SafeFiles.Within(link2.Path, managed))
+						{
+							continue;
+						}
+						if (!File.Exists(link2.Path) && !Directory.Exists(link2.Path))
+						{
+							scheduledSaveResult.Messages.Add(g.Title + ": linked save missing.");
+							continue;
+						}
+						try
+						{
+							hash = SafeFiles.Hash(link2.Path, token);
+							if (copy.SaveSnapshots.Any((SaveSnapshot s) => s.GameId == g.Id && s.Source == link2.Path && s.Kind == link2.Kind && s.Hash == hash))
+							{
+								scheduledSaveResult.Messages.Add(g.Title + ": unchanged save skipped.");
+								continue;
+							}
+							SaveSnapshot saveSnapshot = SaveHistory.Capture(copy, g, link2.Path, link2.Kind, false, token);
+							saveSnapshot.Note = "Scheduled linked-save capture";
+							scheduledSaveResult.Snapshots.Add(saveSnapshot);
+							scheduledSaveResult.Messages.Add(g.Title + ": verified save captured.");
+							if (progress != null)
+							{
+								progress(g.Title + ": verified save captured.");
+							}
+						}
+						catch (OperationCanceledException)
+						{
+							throw;
+						}
+						catch (Exception ex)
+						{
+							scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
+						}
+					}
+				}
+				token.ThrowIfCancellationRequested();
+				return scheduledSaveResult;
+			}
+			catch (OperationCanceledException)
+			{
+				foreach (SaveSnapshot snapshot in scheduledSaveResult.Snapshots)
+				{
+					SaveHistory.Remove(copy, snapshot);
+				}
+				throw;
+			}
+		}
+
+		public static void Apply(LibraryData d, ScheduledSaveResult result)
+		{
+			foreach (SaveSnapshot s in result.Snapshots)
+			{
+				List<SaveSnapshot> saveSnapshots = d.SaveSnapshots;
+				Func<SaveSnapshot, bool> predicate = (SaveSnapshot x) => x.Id == s.Id;
+				if (!saveSnapshots.Any(predicate))
+				{
+					d.SaveSnapshots.Add(s);
+					GameEntry gameEntry = d.Games.FirstOrDefault((GameEntry x) => x.Id == s.GameId);
+					if (gameEntry != null)
+					{
+						GameSaves.Link(gameEntry, s.Path, s.Kind);
+					}
+				}
+			}
+			if (result.Snapshots.Count > 0)
+			{
+				d.Experience.LastSuccessfulBackup = DateTime.UtcNow.ToString("o");
+			}
+			Hub.Ensure(d).LastCaptureReport = string.Join("\r\n", result.Messages);
+		}
+
+		public static void Settings(IWin32Window owner, LibraryData d)
+		{
+			NextDialog f = new NextDialog("Linked-save backup schedule", 870, 620);
+			try
+			{
+				TableLayoutPanel table = NextDialog.Fields(f.Body);
+				NumericUpDown interval = NextDialog.Number(Hub.Ensure(d).CaptureMinutes, 0m, 10080m);
+				NextDialog.Field(table, "Capture every N minutes (0 = off)", interval);
+				NextDialog.Field(table, "", new Label
+				{
+					Text = "While FishBowl is open, capture changed original saves linked to games with a verifiably closed executable. Unchanged contents and managed snapshots are skipped. Keep sufficient backup space; use reviewed retention to remove old snapshots. Cloud uploads remain your cloud client's responsibility.",
+					AutoSize = true
+				}, 155);
+				NextDialog.Field(table, "Last capture", new TextBox
+				{
+					Multiline = true,
+					ReadOnly = true,
+					ScrollBars = ScrollBars.Vertical,
+					Text = (Hub.Ensure(d).LastCaptureReport ?? "No scheduled captures yet.")
+				}, 180);
+				f.Action("Save schedule", delegate
+				{
+					Hub.Idle(d);
+					Hub.Ensure(d).CaptureMinutes = (int)interval.Value;
+					d.Hub.NextCaptureAt = DateTime.UtcNow.AddMinutes(Math.Max(1, d.Hub.CaptureMinutes)).ToString("o");
+					Store.Save(d);
+					f.Close();
+				});
+				f.Action("Capture linked saves now", delegate
+				{
+					Hub.Idle(d);
+					LibraryData copy = UserTools.Copy(d);
+					ScheduledSaveResult scheduledSaveResult = BackgroundWork<ScheduledSaveResult>.Run(f, "Capture changed linked saves", (CancellationToken token, Action<string> progress) => Capture(copy, token, progress));
+					if (scheduledSaveResult != null)
+					{
+						Apply(d, scheduledSaveResult);
+						Store.Save(d);
+						UserTools.Report(f, "Linked-save capture", d.Hub.LastCaptureReport);
+					}
+				});
+				f.Action("Stop scheduled capture", delegate
+				{
+					foreach (MainForm item in Application.OpenForms.OfType<MainForm>())
+					{
+						item.CancelScheduledCapture();
+					}
+				});
+				f.Action("Snapshot export schedule", delegate
+				{
+					NextTools.BackupPlanner(f, d);
+				});
+				f.Action("Close", f.Close);
+				f.ShowDialog(owner);
+			}
+			finally
+			{
+				if (f != null)
+				{
+					((IDisposable)f).Dispose();
+				}
+			}
+		}
+	}
+	public class ReleaseWatchResult
+	{
+		public string EmulatorId;
+
+		public UpdateResult Release;
+
+		public string Error;
+	}
+	public static class ReleaseWatch
+	{
+		public static List<ReleaseWatchResult> Check(IEnumerable<EmulatorProfile> profiles, CancellationToken token, Func<string, string> fetch = null)
+		{
+			List<ReleaseWatchResult> list = new List<ReleaseWatchResult>();
+			foreach (EmulatorProfile profile in profiles)
+			{
+				token.ThrowIfCancellationRequested();
+				if (string.IsNullOrWhiteSpace(EmulatorUpdates.Repository(profile)))
+				{
+					continue;
+				}
+				try
+				{
+					list.Add(new ReleaseWatchResult
+					{
+						EmulatorId = profile.Id,
+						Release = EmulatorUpdates.Check(profile, fetch ?? ((Func<string, string>)((string url) => Encoding.UTF8.GetString(Hub.Fetch(url, 2097152L, token)))))
+					});
+				}
+				catch (OperationCanceledException)
+				{
+					throw;
+				}
+				catch (Exception ex2)
+				{
+					list.Add(new ReleaseWatchResult
+					{
+						EmulatorId = profile.Id,
+						Error = ex2.Message
+					});
+				}
+			}
+			return list;
+		}
+
+		public static List<string> Apply(LibraryData d, IEnumerable<ReleaseWatchResult> results)
+		{
+			List<string> list = new List<string>();
+			HubSettings hubSettings = Hub.Ensure(d);
+			if (hubSettings.NotifiedReleases == null)
+			{
+				hubSettings.NotifiedReleases = new Dictionary<string, string>();
+			}
+			foreach (ReleaseWatchResult result in results)
+			{
+				List<EmulatorProfile> emulators = d.Emulators;
+				Func<EmulatorProfile, bool> predicate = (EmulatorProfile x) => x.Id == result.EmulatorId;
+				EmulatorProfile emulatorProfile = emulators.FirstOrDefault(predicate);
+				if (emulatorProfile == null)
+				{
+					continue;
+				}
+				if (result.Release == null)
+				{
+					Store.Log("Release watch for " + emulatorProfile.Name + ": " + result.Error);
+					continue;
+				}
+				UpdateResult release = result.Release;
+				emulatorProfile.LatestReleaseTag = release.Latest;
+				emulatorProfile.LatestReleaseUrl = release.Url;
+				emulatorProfile.LatestReleaseNotes = release.Notes;
+				emulatorProfile.LastUpdateCheck = release.CheckedAt;
+				string value;
+				hubSettings.NotifiedReleases.TryGetValue(emulatorProfile.Id, out value);
+				if (release.Status == "Newer release available." && release.Latest != value)
+				{
+					list.Add(emulatorProfile.Name + ": " + release.Latest);
+					hubSettings.NotifiedReleases[emulatorProfile.Id] = release.Latest;
+				}
+			}
+			return list;
+		}
+	}
+	public class ImmersionSettings
+	{
+		public bool Bubbles { get; set; }
+
+		public bool Roomier { get; set; }
+
+		public bool Backdrops { get; set; }
+
+		public bool Transitions { get; set; }
+
+		public bool Sounds { get; set; }
+
+		public bool LaunchPresentation { get; set; }
+
+		public bool Recap { get; set; }
+
+		public bool Ambient { get; set; }
+
+		public int Volume { get; set; }
+
+		public int IdleMinutes { get; set; }
+
+		public string Preset { get; set; }
+
+		public ImmersionSettings()
+		{
+			Bubbles = true;
+			Roomier = true;
+			Volume = 20;
+			IdleMinutes = 3;
+			Preset = "Current";
+			Transitions = true;
+		}
+	}
+	public static class Immersion
+	{
+		private static readonly object soundGate = new object();
+
+		private static DateTime lastSound;
+
+		private static bool soundBusy;
+
+		public static ImmersionSettings Ensure(LibraryData d)
+		{
+			HubSettings hubSettings = Hub.Ensure(d);
+			if (hubSettings.Immersion == null)
+			{
+				hubSettings.Immersion = new ImmersionSettings();
+			}
+			return hubSettings.Immersion;
+		}
+
+		public static string ArtworkStamp(string path)
+		{
+			try
+			{
+				FileInfo fileInfo = new FileInfo(path);
+				return fileInfo.Exists ? (path + "|" + fileInfo.Length + "|" + fileInfo.LastWriteTimeUtc.Ticks) : (path ?? "");
+			}
+			catch
+			{
+				return path ?? "";
+			}
+		}
+
+		public static bool Animate(LibraryData d)
+		{
+			return Ensure(d).Transitions && !d.Enhancements.ReducedMotion;
+		}
+
+		public static Bitmap ImageCopy(string path, int width, int height)
+		{
+			try
+			{
+				if (!File.Exists(path) || new FileInfo(path).Length > 33554432)
+				{
+					return null;
+				}
+				using (Image image = Image.FromFile(path))
+				{
+					if (image.Width > 12000 || image.Height > 12000)
+					{
+						return null;
+					}
+					Bitmap bitmap = new Bitmap(width, height);
+					using (Graphics graphics = Graphics.FromImage(bitmap))
+					{
+						graphics.Clear(FishBowlPalette.ThemeSurface);
+						graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+						float num = Math.Max((float)width / (float)image.Width, (float)height / (float)image.Height);
+						float num2 = (float)image.Width * num;
+						float num3 = (float)image.Height * num;
+						graphics.DrawImage(image, ((float)width - num2) / 2f, ((float)height - num3) / 2f, num2, num3);
+					}
+					return bitmap;
+				}
+			}
+			catch
+			{
+				return null;
+			}
+		}
+
+		public static Bitmap Dimmed(string path, int width, int height, Color background)
+		{
+			Bitmap bitmap = ImageCopy(path, width, height);
+			if (bitmap == null)
+			{
+				return null;
+			}
+			using (Graphics graphics = Graphics.FromImage(bitmap))
+			{
+				using (SolidBrush brush = new SolidBrush(Color.FromArgb(235, background)))
+				{
+					graphics.FillRectangle(brush, 0, 0, width, height);
+				}
+			}
+			return bitmap;
+		}
+
+		public static DateTime Date(string text)
+		{
+			DateTime result;
+			return DateTime.TryParse(text, out result) ? result : DateTime.MinValue;
+		}
+
+		public static List<GameEntry> Shelf(LibraryData d, string shelf)
+		{
+			IEnumerable<GameEntry> games = d.Games;
+			games = ((shelf == "Favorites") ? (from g in games
+				where g.Favorite
+				orderby g.Title
+				select g) : ((!(shelf == "Recently added")) ? (from g in games
+				where g.LaunchCount > 0 && !string.Equals(g.PlayStatus, "Completed", StringComparison.OrdinalIgnoreCase)
+				orderby Date(g.LastLaunched) descending
+				select g) : games.OrderByDescending((GameEntry g) => Date(g.AddedAt))));
+			return games.Take(40).ToList();
+		}
+
+		public static void Show(IWin32Window owner, LibraryData d, GameEntry g)
+		{
+			NextData.Ensure(d);
+			Ensure(d);
+			using (ImmersionWindow immersionWindow = new ImmersionWindow(d, g))
+			{
+				immersionWindow.ShowDialog(owner);
+			}
+		}
+
+		public static byte[] Wave(int volume, bool launch)
+		{
+			volume = Math.Max(0, Math.Min(100, volume));
+			int num = 22050 * (launch ? 180 : 65) / 1000;
+			using (MemoryStream memoryStream = new MemoryStream())
+			{
+				using (BinaryWriter binaryWriter = new BinaryWriter(memoryStream))
+				{
+					binaryWriter.Write(Encoding.ASCII.GetBytes("RIFF"));
+					binaryWriter.Write(36 + num * 2);
+					binaryWriter.Write(Encoding.ASCII.GetBytes("WAVEfmt "));
+					binaryWriter.Write(16);
+					binaryWriter.Write((short)1);
+					binaryWriter.Write((short)1);
+					binaryWriter.Write(22050);
+					binaryWriter.Write(44100);
+					binaryWriter.Write((short)2);
+					binaryWriter.Write((short)16);
+					binaryWriter.Write(Encoding.ASCII.GetBytes("data"));
+					binaryWriter.Write(num * 2);
+					for (int i = 0; i < num; i++)
+					{
+						double num2 = Math.Sin(Math.PI * (double)i / (double)num);
+						double num3 = (launch ? ((i < num / 2) ? 440 : 660) : 520);
+						binaryWriter.Write((short)(Math.Sin(Math.PI * 2.0 * num3 * (double)i / 22050.0) * num2 * 5000.0 * (double)volume / 100.0));
+					}
+					return memoryStream.ToArray();
+				}
+			}
+		}
+
+		public static void Sound(LibraryData d, bool launch)
+		{
+			ImmersionSettings immersionSettings = Ensure(d);
+			if (!immersionSettings.Sounds || immersionSettings.Volume <= 0)
+			{
+				return;
+			}
+			lock (soundGate)
+			{
+				if (soundBusy || (!launch && (DateTime.UtcNow - lastSound).TotalMilliseconds < 150.0))
+				{
+					return;
+				}
+				soundBusy = true;
+				lastSound = DateTime.UtcNow;
+			}
+			byte[] bytes = Wave(immersionSettings.Volume, launch);
+			Task.Factory.StartNew(delegate
+			{
+				try
+				{
+					using (MemoryStream stream = new MemoryStream(bytes))
+					{
+						using (SoundPlayer soundPlayer = new SoundPlayer(stream))
+						{
+							soundPlayer.PlaySync();
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					Store.Log("Interface sound unavailable: " + ex.Message);
+				}
+				finally
+				{
+					lock (soundGate)
+					{
+						soundBusy = false;
+					}
+				}
+			});
+		}
+
+		public static bool PreLaunch(IWin32Window owner, LibraryData d, GameEntry g)
+		{
+			if (!Ensure(d).LaunchPresentation)
+			{
+				return true;
+			}
+			using (LaunchPresentation launchPresentation = new LaunchPresentation(d, g))
+			{
+				return launchPresentation.ShowDialog(owner) == DialogResult.OK;
+			}
+		}
+
+		public static void AfterSession(IWin32Window owner, LibraryData d, GameEntry g, PlaySession session)
+		{
+			if (!Ensure(d).Recap || UserTools.Guest || session.Uncertain)
+			{
+				return;
+			}
+			Control control = owner as Control;
+			if (control == null || control.IsDisposed || !control.IsHandleCreated)
+			{
+				return;
+			}
+			control.BeginInvoke((Action)delegate
+			{
+				if (control.IsDisposed || UserTools.ActiveLaunches > 0)
+				{
+					return;
+				}
+				using (SessionRecap sessionRecap = new SessionRecap(d, g, session))
+				{
+					sessionRecap.ShowDialog(owner);
+				}
+			});
+		}
+
+		public static void ApplyPreset(LibraryData d, string preset)
+		{
+			if (!(preset == "Current"))
+			{
+				if (!new string[3] { "Arcade", "Minimal", "Retro" }.Contains(preset))
+				{
+					throw new ArgumentException("Unknown immersion preset.");
+				}
+				if (d.Cosmetics == null)
+				{
+					d.Cosmetics = new CosmeticSettings();
+				}
+				CosmeticSettings cosmetics = d.Cosmetics;
+				cosmetics.CustomPalette = true;
+				cosmetics.TextColor = "#F4F5F7";
+				cosmetics.MutedColor = "#CBD2DC";
+				cosmetics.SelectionColor = "";
+				cosmetics.FocusColor = "";
+				cosmetics.ArtworkFrame = ((preset == "Minimal") ? "None" : "Rounded");
+				cosmetics.LibrarySpacing = ((preset == "Minimal") ? "Compact" : "Comfortable");
+				switch (preset)
+				{
+				case "Arcade":
+					cosmetics.TopColor = "#20112C";
+					cosmetics.BottomColor = "#110D19";
+					cosmetics.SurfaceColor = "#2B2038";
+					cosmetics.AccentColor = "#DA9CFA";
+					cosmetics.SecondaryColor = "#9BCDF8";
+					cosmetics.BackgroundStyle = "Gradient";
+					break;
+				case "Retro":
+					cosmetics.TopColor = "#29251D";
+					cosmetics.BottomColor = "#15140F";
+					cosmetics.SurfaceColor = "#353129";
+					cosmetics.AccentColor = "#E7C67F";
+					cosmetics.SecondaryColor = "#AFCEAA";
+					cosmetics.BackgroundStyle = "Dots";
+					break;
+				case "Minimal":
+					cosmetics.TopColor = "#20242B";
+					cosmetics.BottomColor = "#14171C";
+					cosmetics.SurfaceColor = "#292F37";
+					cosmetics.AccentColor = "#B9D6ED";
+					cosmetics.SecondaryColor = "#C5CDD9";
+					cosmetics.BackgroundStyle = "Plain";
+					break;
+				default:
+					throw new ArgumentException("Unknown immersion preset.");
+				}
+			}
+		}
+	}
+	public class FadingCover : PictureBox
+	{
+		public float Blend = 1f;
+
+		protected override void OnPaint(PaintEventArgs e)
+		{
+			if (base.Image == null)
+			{
+				return;
+			}
+			float num = Math.Min((float)base.ClientSize.Width / (float)base.Image.Width, (float)base.ClientSize.Height / (float)base.Image.Height);
+			int num2 = (int)((float)base.Image.Width * num);
+			int num3 = (int)((float)base.Image.Height * num);
+			using (ImageAttributes imageAttributes = new ImageAttributes())
+			{
+				ColorMatrix colorMatrix = new ColorMatrix();
+				colorMatrix.Matrix33 = Math.Max(0f, Math.Min(1f, Blend));
+				imageAttributes.SetColorMatrix(colorMatrix);
+				e.Graphics.DrawImage(base.Image, new Rectangle((base.ClientSize.Width - num2) / 2, (base.ClientSize.Height - num3) / 2, num2, num3), 0, 0, base.Image.Width, base.Image.Height, GraphicsUnit.Pixel, imageAttributes);
+			}
+		}
+	}
+	public class FocusSurface : Panel
+	{
+		private readonly LibraryData data;
+
+		private Bitmap backdrop;
+
+		private string stamp;
+
+		private float blend = 1f;
+
+		private readonly System.Windows.Forms.Timer fade;
+
+		public readonly PictureBox Cover;
+
+		public readonly Label Title;
+
+		public readonly TextBox Description;
+
+		public FocusSurface(LibraryData d)
+		{
+			data = d;
+			DoubleBuffered = true;
+			Dock = DockStyle.Fill;
+			base.Padding = new Padding(22);
+			BackColor = FishBowlPalette.ThemeSurface;
+			Cover = new FadingCover
+			{
+				Dock = DockStyle.Left,
+				Width = 210,
+				SizeMode = PictureBoxSizeMode.Zoom,
+				BackColor = FishBowlPalette.ThemeSurface,
+				AccessibleName = "Game cover"
+			};
+			Title = new Label
+			{
+				Dock = DockStyle.Top,
+				AutoSize = false,
+				Height = Math.Max(65, Font.Height * 3),
+				ForeColor = FishBowlPalette.ThemeInk,
+				BackColor = FishBowlPalette.ThemeSurface,
+				Padding = new Padding(12)
+			};
+			Description = new TextBox
+			{
+				Dock = DockStyle.Fill,
+				ReadOnly = true,
+				TabStop = false,
+				Multiline = true,
+				ScrollBars = ScrollBars.Vertical,
+				BorderStyle = BorderStyle.None,
+				BackColor = FishBowlPalette.ThemeSurface,
+				ForeColor = FishBowlPalette.ThemeInk,
+				AccessibleName = "Focused game description"
+			};
+			Panel panel = new Panel
+			{
+				Dock = DockStyle.Fill,
+				Padding = new Padding(20)
+			};
+			panel.Controls.Add(Description);
+			panel.Controls.Add(Title);
+			base.Controls.Add(panel);
+			base.Controls.Add(Cover);
+			fade = new System.Windows.Forms.Timer
+			{
+				Interval = 30
+			};
+			System.Windows.Forms.Timer timer = fade;
+			EventHandler value = delegate
+			{
+				blend = Math.Min(1f, blend + 0.12f);
+				((FadingCover)Cover).Blend = blend;
+				Cover.Invalidate();
+				Invalidate();
+				if (blend >= 1f)
+				{
+					fade.Stop();
+				}
+			};
+			timer.Tick += value;
+		}
+
+		public void SelectGame(GameEntry game)
+		{
+			fade.Stop();
+			if (Cover.Image != null)
+			{
+				Image image = Cover.Image;
+				Cover.Image = null;
+				image.Dispose();
+			}
+			Title.Text = ((game == null) ? "Choose a game" : game.Title);
+			Description.Text = ((game == null) ? "Add games to your Library to start." : (game.ConsoleLabel + "  •  " + game.Genre + "\r\n\r\n" + (game.Description ?? "") + "\r\n\r\n" + (game.Notes ?? "")));
+			if (game != null)
+			{
+				Cover.Image = Immersion.ImageCopy(game.ArtworkPath, 210, 280);
+			}
+			string text = ((game == null) ? "" : (game.Id + "|" + Immersion.ArtworkStamp(game.ArtworkPath) + "|" + Immersion.Ensure(data).Backdrops));
+			if (text != stamp)
+			{
+				stamp = text;
+				if (backdrop != null)
+				{
+					backdrop.Dispose();
+				}
+				backdrop = ((game != null && Immersion.Ensure(data).Backdrops) ? Immersion.Dimmed(game.ArtworkPath, 960, 540, BackColor) : null);
+			}
+			blend = ((!Immersion.Animate(data)) ? 1 : 0);
+			((FadingCover)Cover).Blend = blend;
+			Cover.Invalidate();
+			Description.Select(0, 0);
+			if (blend < 1f)
+			{
+				fade.Start();
+			}
+			Invalidate();
+		}
+
+		protected override void OnPaintBackground(PaintEventArgs e)
+		{
+			base.OnPaintBackground(e);
+			if (backdrop != null)
+			{
+				e.Graphics.DrawImage(backdrop, base.ClientRectangle);
+			}
+			if (blend < 1f)
+			{
+				using (SolidBrush brush = new SolidBrush(Color.FromArgb((int)((1f - blend) * 255f), BackColor)))
+				{
+					e.Graphics.FillRectangle(brush, base.ClientRectangle);
+				}
+			}
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				fade.Dispose();
+				if (backdrop != null)
+				{
+					backdrop.Dispose();
+				}
+				if (Cover.Image != null)
+				{
+					Cover.Image.Dispose();
+					Cover.Image = null;
+				}
+			}
+			base.Dispose(disposing);
+		}
+	}
+	public class LaunchPresentation : NextDialog
+	{
+		private readonly System.Windows.Forms.Timer timer;
+
+		private int steps;
+
+		public LaunchPresentation(LibraryData d, GameEntry g)
+			: base("Preparing " + g.Title, 760, 460)
+		{
+			FocusSurface focusSurface = new FocusSurface(d);
+			focusSurface.SelectGame(g);
+			Body.Controls.Add(focusSurface);
+			Label value = new Label
+			{
+				Dock = DockStyle.Bottom,
+				Height = 50,
+				Text = "Configuration validated. Preparing to start the selected program.",
+				ForeColor = FishBowlPalette.ThemeInk
+			};
+			Body.Controls.Add(value);
+			Action run = delegate
+			{
+				base.DialogResult = DialogResult.Cancel;
+				Close();
+			};
+			Action("Cancel launch", run);
+			base.KeyPreview = true;
+			base.KeyDown += delegate(object a, KeyEventArgs b)
+			{
+				if (b.KeyCode == Keys.Escape)
+				{
+					base.DialogResult = DialogResult.Cancel;
+					Close();
+				}
+			};
+			timer = new System.Windows.Forms.Timer
+			{
+				Interval = (Immersion.Animate(d) ? 250 : 100)
+			};
+			timer.Tick += delegate
+			{
+				steps++;
+				if (steps >= 3)
+				{
+					timer.Stop();
+					base.DialogResult = DialogResult.OK;
+					Close();
+				}
+			};
+			base.Shown += delegate
+			{
+				timer.Start();
+			};
+			base.FormClosed += delegate
+			{
+				timer.Stop();
+			};
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				timer.Dispose();
+			}
+			base.Dispose(disposing);
+		}
+	}
+	public class SessionRecap : NextDialog
+	{
+		public readonly TextBox Note;
+
+		public readonly NumericUpDown Rating;
+
+		public SessionRecap(LibraryData d, GameEntry g, PlaySession s)
+			: base("Session recap — " + g.Title, 760, 540)
+		{
+			SessionRecap sessionRecap = this;
+			TableLayoutPanel table = NextDialog.Fields(Body);
+			NextDialog.Field(table, "Recorded session", new Label
+			{
+				Text = TimeSpan.FromSeconds(Math.Max(0L, s.Seconds)).ToString() + " (launched process)",
+				TextAlign = ContentAlignment.MiddleLeft
+			}, 65);
+			Note = new TextBox
+			{
+				Multiline = true,
+				ScrollBars = ScrollBars.Vertical,
+				MaxLength = 2000
+			};
+			NextDialog.Field(table, "Session note (optional)", Note, 130);
+			Rating = NextDialog.Number(g.PersonalRating, 0m, 5m);
+			NextDialog.Field(table, "Personal rating (0 = unset)", Rating);
+			Action run = delegate
+			{
+				Save(d, g, s, sessionRecap.Note.Text, (int)sessionRecap.Rating.Value);
+				sessionRecap.Close();
+			};
+			Action("Save note / rating", run);
+			Action("Dismiss", base.Close);
+		}
+
+		public static void Save(LibraryData d, GameEntry g, PlaySession session, string note, int rating)
+		{
+			if (!UserTools.Guest)
+			{
+				note = (note ?? "").Trim();
+				if (note.Length > 2000)
+				{
+					throw new ArgumentException("Session notes must be at most 2000 characters.");
+				}
+				g.PersonalRating = Math.Max(0, Math.Min(5, rating));
+				if (note.Length > 0)
+				{
+					session.Note = (string.IsNullOrWhiteSpace(session.Note) ? note : (session.Note + "\r\n" + note));
+					g.Notes = (g.Notes ?? "").TrimEnd() + "\r\n[" + DateTime.Now.ToString("g") + "] " + note;
+				}
+				Store.Save(d);
+			}
+		}
+	}
+	public class ScreenshotGallery : NextDialog
+	{
+		private readonly LibraryData data;
+
+		private readonly GameEntry game;
+
+		private readonly ListBox list;
+
+		private readonly PictureBox image;
+
+		public ScreenshotGallery(LibraryData d, GameEntry g)
+			: base("Screenshot gallery", 960, 700)
+		{
+			ScreenshotGallery screenshotGallery = this;
+			data = d;
+			game = g;
+			image = new PictureBox
+			{
+				Dock = DockStyle.Fill,
+				SizeMode = PictureBoxSizeMode.Zoom,
+				BackColor = FishBowlPalette.ThemeSurface,
+				AccessibleName = "Selected screenshot"
+			};
+			list = new ListBox
+			{
+				Dock = DockStyle.Left,
+				Width = 240,
+				DisplayMember = "Path",
+				HorizontalScrollbar = true,
+				AccessibleName = "Screenshots for selected game"
+			};
+			Body.Controls.Add(image);
+			Body.Controls.Add(list);
+			ListBox listBox = list;
+			EventHandler value = delegate
+			{
+				LoadSelection();
+			};
+			listBox.SelectedIndexChanged += value;
+			Action("Manage / add screenshots", delegate
+			{
+				NextMedia.Screenshots(screenshotGallery, d, g);
+				screenshotGallery.Reload();
+			});
+			Action("Previous", delegate
+			{
+				if (list.Items.Count > 0)
+				{
+					list.SelectedIndex = (list.SelectedIndex + list.Items.Count - 1) % list.Items.Count;
+				}
+			});
+			Action("Next", delegate
+			{
+				if (list.Items.Count > 0)
+				{
+					list.SelectedIndex = (list.SelectedIndex + 1) % list.Items.Count;
+				}
+			});
+			Action("Close", base.Close);
+			Reload();
+		}
+
+		public void Reload()
+		{
+			list.DataSource = (from s in data.GameScreenshots ?? new List<GameScreenshot>()
+				where game == null || s.GameId == game.Id
+				orderby s.AddedAt
+				select s).ToList();
+			LoadSelection();
+		}
+
+		private void LoadSelection()
+		{
+			Image image = this.image.Image;
+			this.image.Image = null;
+			if (image != null)
+			{
+				image.Dispose();
+			}
+			GameScreenshot gameScreenshot = list.SelectedItem as GameScreenshot;
+			if (gameScreenshot != null)
+			{
+				try
+				{
+					if (File.Exists(gameScreenshot.Path) && new FileInfo(gameScreenshot.Path).Length <= 33554432)
+					{
+						using (Image image2 = Image.FromFile(gameScreenshot.Path))
+						{
+							if (image2.Width <= 12000 && image2.Height <= 12000)
+							{
+								float num = Math.Min(1f, Math.Min(1600f / (float)image2.Width, 1000f / (float)image2.Height));
+								this.image.Image = new Bitmap(image2, Math.Max(1, (int)((float)image2.Width * num)), Math.Max(1, (int)((float)image2.Height * num)));
+							}
+						}
+					}
+				}
+				catch
+				{
+				}
+			}
+			Text = ((gameScreenshot == null) ? "Screenshot gallery — no captures linked" : ("Screenshot gallery — " + Path.GetFileName(gameScreenshot.Path)));
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing && image.Image != null)
+			{
+				image.Image.Dispose();
+				image.Image = null;
+			}
+			base.Dispose(disposing);
+		}
+	}
+	public class ImmersionWindow : NextDialog
+	{
+		private readonly LibraryData data;
+
+		private readonly ListBox games;
+
+		private readonly FocusSurface surface;
+
+		private readonly ComboBox shelf;
+
+		private readonly TextBox search;
+
+		public ImmersionWindow(LibraryData d, GameEntry selected)
+			: base("Immersion", 1080, 730)
+		{
+			ImmersionWindow immersionWindow = this;
+			data = d;
+			Immersion.Ensure(d);
+			TableLayoutPanel top = new TableLayoutPanel
+			{
+				Dock = DockStyle.Top,
+				Height = 55,
+				ColumnCount = 2
+			};
+			top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40f));
+			top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60f));
+			shelf = NextDialog.Choice(new string[4] { "All games", "Continue playing", "Recently added", "Favorites" }, "All games");
+			shelf.Dock = DockStyle.Fill;
+			shelf.AccessibleName = "Personal shelf";
+			search = new TextBox
+			{
+				Dock = DockStyle.Fill,
+				AccessibleName = "Search immersive Library"
+			};
+			top.Controls.Add(shelf, 0, 0);
+			top.Controls.Add(search, 1, 0);
+			games = new ListBox
+			{
+				Dock = DockStyle.Left,
+				Width = 260,
+				DisplayMember = "Title",
+				AccessibleName = "Games on selected shelf"
+			};
+			surface = new FocusSurface(d);
+			Body.Controls.Add(surface);
+			Body.Controls.Add(games);
+			Body.Controls.Add(top);
+			ComboBox comboBox = shelf;
+			EventHandler value = delegate
+			{
+				Reload(null);
+			};
+			comboBox.SelectedIndexChanged += value;
+			search.TextChanged += delegate
+			{
+				Reload(null);
+			};
+			games.SelectedIndexChanged += delegate
+			{
+				immersionWindow.surface.SelectGame(immersionWindow.games.SelectedItem as GameEntry);
+				Immersion.Sound(d, false);
+			};
+			Action("Focus / shelves", delegate
+			{
+				immersionWindow.games.Visible = !immersionWindow.games.Visible;
+				top.Visible = immersionWindow.games.Visible;
+			});
+			Action("Play", delegate
+			{
+				GameEntry gameEntry2 = immersionWindow.Selected();
+				if (gameEntry2 != null)
+				{
+					ExperienceTools.Launch(immersionWindow, d, gameEntry2);
+				}
+			});
+			Action("Screenshots", delegate
+			{
+				using (ScreenshotGallery screenshotGallery = new ScreenshotGallery(d, immersionWindow.Selected()))
+				{
+					screenshotGallery.ShowDialog(immersionWindow);
+				}
+			});
+			Action("Details", delegate
+			{
+				GameEntry gameEntry = immersionWindow.Selected();
+				if (gameEntry != null)
+				{
+					using (GameExperienceDialog gameExperienceDialog = new GameExperienceDialog(d, gameEntry))
+					{
+						gameExperienceDialog.ShowDialog(immersionWindow);
+					}
+					immersionWindow.Reload(gameEntry.Id);
+				}
+			});
+			Action("Ambient preview", delegate
+			{
+				using (AmbientWindow ambientWindow = new AmbientWindow(d))
+				{
+					ambientWindow.ShowDialog(immersionWindow);
+				}
+			});
+			Action("Immersion settings", delegate
+			{
+				using (ImmersionSettingsDialog immersionSettingsDialog = new ImmersionSettingsDialog(d))
+				{
+					immersionSettingsDialog.ShowDialog(immersionWindow);
+				}
+				immersionWindow.Reload((immersionWindow.Selected() == null) ? null : immersionWindow.Selected().Id);
+			});
+			Action("Close", base.Close);
+			Reload((selected == null) ? null : selected.Id);
+			if (selected != null)
+			{
+				games.Visible = false;
+				top.Visible = false;
+			}
+		}
+
+		private GameEntry Selected()
+		{
+			return games.SelectedItem as GameEntry;
+		}
+
+		public void Reload(string selected)
+		{
+			List<GameEntry> source = ((shelf.Text == "All games") ? data.Games.OrderBy((GameEntry g) => g.Title).ToList() : Immersion.Shelf(data, shelf.Text));
+			games.DataSource = source.Where((GameEntry g) => Hub.SearchText(g).IndexOf(search.Text.Trim(), StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+			if (selected != null)
+			{
+				for (int i = 0; i < games.Items.Count; i++)
+				{
+					if (((GameEntry)games.Items[i]).Id == selected)
+					{
+						games.SelectedIndex = i;
+						break;
+					}
+				}
+			}
+			surface.SelectGame(Selected());
+		}
+	}
+	public class ImmersionSettingsDialog : NextDialog
+	{
+		private readonly LibraryData data;
+
+		private readonly Dictionary<string, CheckBox> checks = new Dictionary<string, CheckBox>();
+
+		private readonly NumericUpDown volume;
+
+		private readonly NumericUpDown idle;
+
+		private readonly ComboBox preset;
+
+		public ImmersionSettingsDialog(LibraryData d)
+			: base("Immersion settings", 840, 730)
+		{
+			data = d;
+			ImmersionSettings immersionSettings = Immersion.Ensure(d);
+			TableLayoutPanel table = NextDialog.Fields(Body);
+			string[][] array = new string[8][]
+			{
+				new string[2] { "Bubbles", "Theme bubbles along the workspace sides" },
+				new string[2] { "Roomier", "Roomier Home cards and Library rows" },
+				new string[2] { "Backdrops", "Dim selected-game backgrounds" },
+				new string[2] { "Transitions", "Gentle tab highlights and artwork fades (honors reduced motion)" },
+				new string[2] { "Sounds", "Interface selection and launch sounds" },
+				new string[2] { "LaunchPresentation", "Brief launch artwork with cancel before starting" },
+				new string[2] { "Recap", "Offer session recap after tracked process closes" },
+				new string[2] { "Ambient", "Artwork slideshow after idle time" }
+			};
+			foreach (string[] array2 in array)
+			{
+				CheckBox checkBox = new CheckBox
+				{
+					Checked = (bool)typeof(ImmersionSettings).GetProperty(array2[0]).GetValue(immersionSettings, null)
+				};
+				checks[array2[0]] = checkBox;
+				NextDialog.Field(table, array2[1], checkBox, Math.Max(48, Font.Height * 3));
+			}
+			volume = NextDialog.Number(immersionSettings.Volume, 0m, 100m);
+			NextDialog.Field(table, "Interface volume (%)", volume);
+			idle = NextDialog.Number(immersionSettings.IdleMinutes, 1m, 60m);
+			NextDialog.Field(table, "Idle minutes", idle);
+			preset = NextDialog.Choice(new string[4] { "Current", "Arcade", "Minimal", "Retro" }, "Current");
+			NextDialog.Field(table, "Apply a coordinated cosmetic preset", preset);
+			NextDialog.Field(table, "Backgrounds are local artwork. Sounds and ambient mode start off.", new Label
+			{
+				Text = "Preset replaces palette, spacing and background style when applied.",
+				AutoSize = true
+			}, 75);
+			Action("Test sound", delegate
+			{
+				LibraryData d2 = new LibraryData();
+				Hub.Ensure(d2).Immersion = new ImmersionSettings
+				{
+					Sounds = true,
+					Volume = (int)volume.Value
+				};
+				Immersion.Sound(d2, false);
+			});
+			Action("Apply", Apply);
+			Action("Cancel", base.Close);
+		}
+
+		public void Apply()
+		{
+			ImmersionSettings immersionSettings = new ImmersionSettings();
+			immersionSettings.Volume = (int)volume.Value;
+			immersionSettings.IdleMinutes = (int)idle.Value;
+			immersionSettings.Preset = preset.Text;
+			ImmersionSettings immersionSettings2 = immersionSettings;
+			foreach (KeyValuePair<string, CheckBox> check in checks)
+			{
+				typeof(ImmersionSettings).GetProperty(check.Key).SetValue(immersionSettings2, check.Value.Checked, null);
+			}
+			Immersion.ApplyPreset(data, preset.Text);
+			Hub.Ensure(data).Immersion = immersionSettings2;
+			FluidStyle.Configure(data);
+			Store.Save(data);
+			MainForm[] array = Application.OpenForms.OfType<MainForm>().ToArray();
+			foreach (MainForm mainForm in array)
+			{
+				mainForm.RefreshUserToolsViews(data);
+			}
+			GameLibraryDialog[] array2 = Application.OpenForms.OfType<GameLibraryDialog>().ToArray();
+			foreach (GameLibraryDialog gameLibraryDialog in array2)
+			{
+				gameLibraryDialog.ReloadLibrary();
+			}
+			base.DialogResult = DialogResult.OK;
+			Close();
+		}
+	}
+	public class IdleInput : IMessageFilter, IDisposable
+	{
+		public DateTime Last = DateTime.UtcNow;
+
+		private Point position = Cursor.Position;
+
+		public IdleInput()
+		{
+			Application.AddMessageFilter(this);
+		}
+
+		public bool PreFilterMessage(ref Message m)
+		{
+			if ((m.Msg >= 256 && m.Msg <= 265) || (m.Msg >= 513 && m.Msg <= 526))
+			{
+				Last = DateTime.UtcNow;
+			}
+			else if (m.Msg == 512 && Cursor.Position != position)
+			{
+				position = Cursor.Position;
+				Last = DateTime.UtcNow;
+			}
+			return false;
+		}
+
+		public void Dispose()
+		{
+			Application.RemoveMessageFilter(this);
+		}
+	}
+	public class AmbientWindow : NextDialog, IMessageFilter
+	{
+		private readonly List<GameEntry> games;
+
+		private readonly PictureBox artwork;
+
+		private readonly Label caption;
+
+		private readonly System.Windows.Forms.Timer timer;
+
+		private int index;
+
+		private Point origin;
+
+		private bool closing;
+
+		public AmbientWindow(LibraryData d)
+			: base("Ambient artwork — move, click or press a key to exit", 1100, 740)
+		{
+			base.FormBorderStyle = FormBorderStyle.None;
+			base.WindowState = FormWindowState.Maximized;
+			base.KeyPreview = true;
+			games = (from g in d.Games
+				where File.Exists(g.ArtworkPath)
+				orderby g.Title
+				select g).Take(200).ToList();
+			artwork = new PictureBox
+			{
+				Dock = DockStyle.Fill,
+				SizeMode = PictureBoxSizeMode.Zoom,
+				BackColor = FishBowlPalette.ThemeSurface,
+				AccessibleName = "Ambient game artwork"
+			};
+			caption = new Label
+			{
+				Dock = DockStyle.Bottom,
+				Height = 65,
+				TextAlign = ContentAlignment.MiddleCenter,
+				ForeColor = FishBowlPalette.ThemeInk,
+				BackColor = FishBowlPalette.ThemeSurface
+			};
+			Body.Controls.Add(artwork);
+			Body.Controls.Add(caption);
+			Action("Exit ambient mode", base.Close);
+			base.KeyDown += delegate(object a, KeyEventArgs b)
+			{
+				b.SuppressKeyPress = true;
+				Close();
+			};
+			origin = Cursor.Position;
+			Application.AddMessageFilter(this);
+			timer = new System.Windows.Forms.Timer
+			{
+				Interval = 12000
+			};
+			timer.Tick += delegate
+			{
+				Advance();
+			};
+			base.Shown += delegate
+			{
+				origin = Cursor.Position;
+				caption.Height = Math.Max(65, caption.Font.Height * 3);
+				Advance();
+				timer.Start();
+			};
+			base.FormClosed += delegate
+			{
+				timer.Stop();
+			};
+		}
+
+		public bool PreFilterMessage(ref Message m)
+		{
+			if (!base.IsHandleCreated || closing || !base.Visible)
+			{
+				return false;
+			}
+			Control control = Control.FromHandle(m.HWnd);
+			if (control == null || control.FindForm() != this)
+			{
+				return false;
+			}
+			if ((m.Msg >= 256 && m.Msg <= 265) || (m.Msg >= 513 && m.Msg <= 526) || (m.Msg == 512 && Math.Abs(Cursor.Position.X - origin.X) + Math.Abs(Cursor.Position.Y - origin.Y) > 5))
+			{
+				closing = true;
+				BeginInvoke(new Action(base.Close));
+				return true;
+			}
+			return false;
+		}
+
+		public void Advance()
+		{
+			Image image = artwork.Image;
+			artwork.Image = null;
+			if (image != null)
+			{
+				image.Dispose();
+			}
+			if (games.Count == 0)
+			{
+				caption.Text = "No game artwork linked. Move, click or press a key to exit.";
+				return;
+			}
+			GameEntry gameEntry = games[index++ % games.Count];
+			Bitmap bitmap = Immersion.ImageCopy(gameEntry.ArtworkPath, 1920, 1080);
+			if (bitmap != null)
+			{
+				using (Graphics graphics = Graphics.FromImage(bitmap))
+				{
+					using (SolidBrush brush = new SolidBrush(Color.FromArgb(75, Color.Black)))
+					{
+						graphics.FillRectangle(brush, 0, 0, bitmap.Width, bitmap.Height);
+					}
+				}
+			}
+			artwork.Image = bitmap;
+			caption.Text = gameEntry.Title + "  •  " + gameEntry.ConsoleLabel;
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				timer.Dispose();
+				Application.RemoveMessageFilter(this);
+				if (artwork.Image != null)
+				{
+					artwork.Image.Dispose();
+					artwork.Image = null;
+				}
+			}
+			base.Dispose(disposing);
+		}
+	}
+	public static class FishBowlText
+	{
+		public static void DrawText(IDeviceContext dc, string text, Font font, Rectangle bounds, Color foreColor, TextFormatFlags flags)
+		{
+			TextRenderer.DrawText(dc, text, font, bounds, foreColor, flags | TextFormatFlags.PreserveGraphicsClipping | TextFormatFlags.PreserveGraphicsTranslateTransform);
+		}
+
+		public static void DrawText(IDeviceContext dc, string text, Font font, Point point, Color foreColor)
+		{
+			TextRenderer.DrawText(dc, text, font, point, foreColor, TextFormatFlags.PreserveGraphicsClipping | TextFormatFlags.PreserveGraphicsTranslateTransform);
+		}
+	}
+	public static class NativeSurfacePainting
+	{
+		[DllImport("user32.dll")]
+		private static extern int GetUpdateRgn(IntPtr window, IntPtr region, bool erase);
+
+		[DllImport("gdi32.dll")]
+		private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+		[DllImport("gdi32.dll")]
+		private static extern bool DeleteObject(IntPtr value);
+
+		public static Region UpdateRegion(IntPtr window)
+		{
+			IntPtr intPtr = CreateRectRgn(0, 0, 0, 0);
+			if (intPtr == IntPtr.Zero)
+			{
+				return null;
+			}
+			try
+			{
+				int updateRgn = GetUpdateRgn(window, intPtr, false);
+				return (updateRgn > 1) ? Region.FromHrgn(intPtr) : null;
+			}
+			finally
+			{
+				DeleteObject(intPtr);
+			}
+		}
+
+		public static void ExcludeChildren(Graphics graphics, Control parent)
+		{
+			foreach (Control control in parent.Controls)
+			{
+				if (control.Visible)
+				{
+					graphics.ExcludeClip(control.Bounds);
+				}
+			}
+		}
+	}
+	public class BufferedPromptTable : TableLayoutPanel
+	{
+		public BufferedPromptTable()
+		{
+			DoubleBuffered = true;
+		}
+	}
+	public static class StartupPromptLayout
+	{
+		public static void PositionBeforeShow(Form form)
+		{
+			Rectangle area = Screen.FromControl(form.Owner ?? form).WorkingArea;
+			Rectangle anchor = form.Owner != null && form.Owner.WindowState != FormWindowState.Minimized ? form.Owner.Bounds : area;
+			int x = anchor.Left + (anchor.Width - form.Width) / 2;
+			int y = anchor.Top + (anchor.Height - form.Height) / 2;
+			x = Math.Max(area.Left, Math.Min(x, area.Right - form.Width));
+			y = Math.Max(area.Top, Math.Min(y, area.Bottom - form.Height));
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new Point(x, y);
+		}
+
+		public static bool IsPrompt(Form f)
+		{
+			return f is StartupAssistantDialog || f is GameStoragePromptDialog || f is RequirementsStoragePromptDialog || f is WhatsNewDialog || (f is ResultsDialog && f.Text == "FishBowl Notifications");
+		}
+
+		public static void Apply(Form form)
+		{
+			if (!IsPrompt(form) || form.Controls.ContainsKey("StartupPromptRoot"))
+			{
+				return;
+			}
+			if (!form.Controls.OfType<PictureBox>().Any()) FishBowlPromptBranding.AddLogo(form);
+			form.FormBorderStyle = FormBorderStyle.FixedDialog; form.MaximizeBox = false; form.MinimizeBox = false;
+			form.SuspendLayout();
+			try
+			{
+				Rectangle workingArea = Screen.FromControl(form).WorkingArea;
+				int num = Math.Min(Math.Max(570, (int)(570.0 * Math.Min(1.3, (double)NextUi.TextPercent / 100.0))), Math.Max(300, workingArea.Width - 48));
+				Control[] source = form.Controls.Cast<Control>().ToArray();
+				Label[] source2 = (from c in source.OfType<Label>()
+					orderby c.Top
+					select c).ToArray();
+				Label label = source2.First();
+				PictureBox pictureBox = source.OfType<PictureBox>().FirstOrDefault();
+				Button[] source3 = (from c in source.OfType<Button>()
+					orderby c.Left
+					select c).ToArray();
+				form.Controls.Clear();
+				form.AutoScroll = false;
+				form.AutoScrollMinSize = Size.Empty;
+				BufferedPromptTable bufferedPromptTable = new BufferedPromptTable();
+				bufferedPromptTable.Dock = DockStyle.Fill;
+				bufferedPromptTable.ColumnCount = 1;
+				bufferedPromptTable.RowCount = 3;
+				bufferedPromptTable.Padding = new Padding(20);
+				bufferedPromptTable.BackColor = form.BackColor;
+				bufferedPromptTable.Name = "StartupPromptRoot";
+				BufferedPromptTable bufferedPromptTable2 = bufferedPromptTable;
+				bufferedPromptTable2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+				bufferedPromptTable2.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+				bufferedPromptTable2.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+				bufferedPromptTable2.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+				BufferedPromptTable bufferedPromptTable3 = new BufferedPromptTable();
+				bufferedPromptTable3.Dock = DockStyle.Fill;
+				bufferedPromptTable3.AutoSize = true;
+				bufferedPromptTable3.ColumnCount = ((pictureBox == null) ? 1 : 2);
+				bufferedPromptTable3.RowCount = 1;
+				bufferedPromptTable3.Margin = new Padding(0, 0, 0, 16);
+				bufferedPromptTable3.BackColor = form.BackColor;
+				BufferedPromptTable bufferedPromptTable4 = bufferedPromptTable3;
+				if (pictureBox != null)
+				{
+					bufferedPromptTable4.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60f));
+					pictureBox.Dock = DockStyle.Fill;
+					pictureBox.MinimumSize = new Size(46, 46);
+					pictureBox.Margin = new Padding(0, 0, 14, 0);
+					bufferedPromptTable4.Controls.Add(pictureBox, 0, 0);
+				}
+				bufferedPromptTable4.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+				label.AutoSize = true;
+				label.MaximumSize = new Size(num - 40 - ((pictureBox != null) ? 60 : 0), 0);
+				label.Dock = DockStyle.Fill;
+				label.Margin = Padding.Empty;
+				label.BackColor = form.BackColor;
+				label.ForeColor = FishBowlPalette.IconAccent;
+				bufferedPromptTable4.Controls.Add(label, (pictureBox != null) ? 1 : 0, 0);
+				bufferedPromptTable2.Controls.Add(bufferedPromptTable4, 0, 0);
+				Panel panel = new Panel();
+				panel.Dock = DockStyle.Fill;
+				panel.AutoScroll = true;
+				panel.Margin = new Padding(0, 0, 0, 16);
+				panel.BackColor = form.BackColor;
+				panel.Name = "StartupPromptBody";
+				Panel panel2 = panel;
+				int num2 = 0;
+				foreach (Label item in source2.Skip(1))
+				{
+					item.AutoSize = true;
+					item.MaximumSize = new Size(num - 40 - SystemInformation.VerticalScrollBarWidth, 0);
+					item.Dock = DockStyle.Top;
+					item.Margin = Padding.Empty;
+					item.BackColor = form.BackColor;
+					panel2.Controls.Add(item);
+					num2 += item.GetPreferredSize(new Size(item.MaximumSize.Width, 0)).Height + 12;
+				}
+				foreach (TextBox item2 in source.OfType<TextBox>())
+				{
+					item2.Dock = DockStyle.Fill;
+					item2.ScrollBars = ScrollBars.Vertical;
+					item2.WordWrap = true;
+					item2.TabStop = true;
+					item2.Select(0, 0);
+					item2.BackColor = FishBowlPalette.DeepSeaSurface;
+					panel2.Controls.Add(item2);
+					num2 = Math.Max(num2, (int)(220.0 * Math.Max(1.0, (double)NextUi.TextPercent / 100.0)));
+				}
+				bufferedPromptTable2.Controls.Add(panel2, 0, 1);
+				BufferedPromptTable bufferedPromptTable5 = new BufferedPromptTable();
+				bufferedPromptTable5.Dock = DockStyle.Fill;
+				bufferedPromptTable5.AutoSize = true;
+				bufferedPromptTable5.ColumnCount = 1;
+				bufferedPromptTable5.RowCount = 2;
+				bufferedPromptTable5.Margin = Padding.Empty;
+				bufferedPromptTable5.BackColor = form.BackColor;
+				BufferedPromptTable bufferedPromptTable6 = bufferedPromptTable5;
+				bufferedPromptTable6.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+				bufferedPromptTable6.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+				bufferedPromptTable6.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+				foreach (CheckBox item3 in source.OfType<CheckBox>())
+				{
+					item3.AutoSize = true;
+					item3.MaximumSize = new Size(num - 40, 0);
+					item3.Dock = DockStyle.Fill;
+					item3.Margin = new Padding(0, 0, 0, 16);
+					item3.BackColor = form.BackColor;
+					bufferedPromptTable6.Controls.Add(item3, 0, 0);
+				}
+				FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel();
+				flowLayoutPanel.Dock = DockStyle.Fill;
+				flowLayoutPanel.AutoSize = true;
+				flowLayoutPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+				flowLayoutPanel.FlowDirection = FlowDirection.RightToLeft;
+				flowLayoutPanel.WrapContents = true;
+				flowLayoutPanel.Margin = Padding.Empty;
+				flowLayoutPanel.Padding = Padding.Empty;
+				flowLayoutPanel.BackColor = form.BackColor;
+				FlowLayoutPanel flowLayoutPanel2 = flowLayoutPanel;
+				foreach (Button item4 in source3.Reverse())
+				{
+					item4.AutoSize = false;
+					item4.Size = new Size(Math.Max(116, TextRenderer.MeasureText(item4.Text, item4.Font).Width + 58), Math.Max(38, item4.Font.Height + 18));
+					item4.Margin = new Padding(10, 0, 0, 0);
+					flowLayoutPanel2.Controls.Add(item4);
+				}
+				bufferedPromptTable6.Controls.Add(flowLayoutPanel2, 0, 1);
+				bufferedPromptTable2.Controls.Add(bufferedPromptTable6, 0, 2);
+				int num3 = Math.Max(46, label.GetPreferredSize(new Size(label.MaximumSize.Width, 0)).Height) + 16;
+				int height = bufferedPromptTable6.GetPreferredSize(new Size(num - 40, 0)).Height;
+				int val = 40 + num3 + Math.Max(120, num2) + 16 + height;
+				form.ClientSize = new Size(num, Math.Min(val, Math.Max(240, workingArea.Height - 80)));
+				form.Controls.Add(bufferedPromptTable2);
+				form.AcceptButton = source3.FirstOrDefault();
+				form.CancelButton = source3.FirstOrDefault();
+			}
+			finally
+			{
+				form.ResumeLayout(true);
+			}
+		}
+	}
+	public static class ThemeCatalog
+	{
+		public static readonly string[] Names = new string[18]
+		{
+			"FishBowl Water", "Twilight", "Lavender", "Ember", "Light", "High Contrast", "Midnight", "Forest", "Rosewood", "Mist",
+			"Deep Ocean", "Aurora", "Slate", "Plum", "Sand", "Paper", "Nordic", "Copper"
+		};
+	}
+	public static class FluidStyle
+	{
+		public static bool Motion = true;
+
+		public static bool Transitions = true;
+
+		public static bool Roomier = true;
+
+		public static bool Bubbles = true;
+
+		public static bool Animate
+		{
+			get
+			{
+				return Motion && Transitions && !FishBowlHighlights.ReducedMotion && !SystemInformation.HighContrast;
+			}
+		}
+
+		public static event Action Changed;
+
+		public static void NotifyMotionChange()
+		{
+			Action changed = FluidStyle.Changed;
+			if (changed != null)
+			{
+				changed();
+			}
+		}
+
+		public static void Configure(LibraryData d)
+		{
+			ImmersionSettings immersionSettings = Immersion.Ensure(d);
+			bool flag = Motion != d.Theme.EnableMotion || Transitions != immersionSettings.Transitions || Roomier != immersionSettings.Roomier || Bubbles != immersionSettings.Bubbles;
+			Motion = d.Theme.EnableMotion;
+			Transitions = immersionSettings.Transitions;
+			Roomier = immersionSettings.Roomier;
+			Bubbles = immersionSettings.Bubbles;
+			if (flag)
+			{
+				Action changed = FluidStyle.Changed;
+				if (changed != null)
+				{
+					changed();
+				}
+			}
+		}
+	}
+	public class BubbleRail : Control
+	{
+		private readonly double[] positions = new double[8];
+
+		private readonly float[] sizes = new float[8];
+
+		private readonly double[] speeds = new double[8];
+
+		private readonly double[] phases = new double[8];
+
+		private readonly Random random;
+
+		private readonly bool right;
+
+		public float[] Sizes
+		{
+			get
+			{
+				return (float[])sizes.Clone();
+			}
+		}
+
+		public double[] Speeds
+		{
+			get
+			{
+				return (double[])speeds.Clone();
+			}
+		}
+
+		public double[] Positions
+		{
+			get
+			{
+				return (double[])positions.Clone();
+			}
+		}
+
+		public BubbleRail(bool rightSide)
+		{
+			right = rightSide;
+			random = new Random(rightSide ? 9173 : 4289);
+			base.Width = 24;
+			base.TabStop = false;
+			base.AccessibleName = "Decorative theme bubbles";
+			SetStyle(ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+			for (int i = 0; i < 8; i++)
+			{
+				positions[i] = ((double)i + random.NextDouble() * 0.85) / 8.0;
+				ResetBubble(i);
+			}
+		}
+
+		private void ResetBubble(int i)
+		{
+			sizes[i] = 6f + (float)random.NextDouble() * 9f;
+			speeds[i] = 13.0 + random.NextDouble() * 22.0;
+			phases[i] = random.NextDouble() * Math.PI * 2.0;
+		}
+
+		public void Advance(double seconds)
+		{
+			if (base.ClientSize.Height < 1)
+			{
+				return;
+			}
+			for (int i = 0; i < positions.Length; i++)
+			{
+				positions[i] -= Math.Max(0.0, Math.Min(0.1, seconds)) * speeds[i] / (double)Math.Max(1, base.Height);
+				if (positions[i] < -0.03)
+				{
+					positions[i] = 1.03 + random.NextDouble() * 0.08;
+					ResetBubble(i);
+				}
+			}
+			Invalidate();
+		}
+
+		protected override void OnPaint(PaintEventArgs e)
+		{
+			e.Graphics.Clear(FishBowlPalette.ThemeBottom);
+			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+			Color light;
+			Color deep;
+			FishBowlBranding.GetColors(out light, out deep);
+			for (int i = 0; i < positions.Length; i++)
+			{
+				float num = Math.Min(sizes[i], base.Width - 4);
+				float num2 = ((float)base.Width - num) / 2f + (float)Math.Sin(positions[i] * 9.0 + phases[i]) * (float)(right ? (-2) : 2);
+				float num3 = (float)(positions[i] * (double)base.Height);
+				RectangleF rect = new RectangleF(num2, num3, num, num);
+				using (LinearGradientBrush brush2 = new LinearGradientBrush(rect, Color.FromArgb(65, light), Color.FromArgb(32, deep), 45f))
+				{
+					using (LinearGradientBrush brush = new LinearGradientBrush(rect, Color.FromArgb(210, light), Color.FromArgb(170, deep), 45f))
+					{
+						using (Pen pen = new Pen(brush, 1.2f))
+						{
+							using (Pen pen2 = new Pen(Color.FromArgb(175, Color.White), 1f))
+							{
+								e.Graphics.FillEllipse(brush2, rect);
+								e.Graphics.DrawEllipse(pen, rect);
+								e.Graphics.DrawArc(pen2, num2 + num * 0.2f, num3 + num * 0.18f, num * 0.5f, num * 0.5f, 200f, 65f);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	public class AquariumFrame : Panel
+	{
+		public readonly BubbleRail LeftRail = new BubbleRail(false);
+
+		public readonly BubbleRail RightRail = new BubbleRail(true);
+
+		private readonly System.Windows.Forms.Timer clock;
+
+		private readonly Stopwatch watch = new Stopwatch();
+
+		private Form owner;
+
+		private bool disposed;
+
+		public bool Running
+		{
+			get
+			{
+				return clock.Enabled;
+			}
+		}
+
+		public AquariumFrame(Control content)
+		{
+			Dock = DockStyle.Fill;
+			DoubleBuffered = true;
+			LeftRail.Dock = DockStyle.Left;
+			RightRail.Dock = DockStyle.Right;
+			content.Dock = DockStyle.Fill;
+			base.Controls.Add(content);
+			base.Controls.Add(LeftRail);
+			base.Controls.Add(RightRail);
+			clock = new System.Windows.Forms.Timer
+			{
+				Interval = 40
+			};
+			System.Windows.Forms.Timer timer = clock;
+			EventHandler value = delegate
+			{
+				double seconds = Math.Min(0.1, watch.Elapsed.TotalSeconds);
+				watch.Restart();
+				if (!ShouldAnimate())
+				{
+					ApplyState();
+				}
+				else
+				{
+					LeftRail.Advance(seconds);
+					RightRail.Advance(seconds);
+				}
+			};
+			timer.Tick += value;
+			base.VisibleChanged += delegate
+			{
+				ApplyState();
+			};
+			base.ParentChanged += delegate
+			{
+				ConnectOwner();
+			};
+			base.HandleCreated += delegate
+			{
+				ConnectOwner();
+			};
+			FluidStyle.Changed += ApplyState;
+			ApplyState();
+		}
+
+		private void ConnectOwner()
+		{
+			Form form = FindForm();
+			if (owner != form)
+			{
+				if (owner != null)
+				{
+					owner.Activated -= OwnerState;
+					owner.Deactivate -= OwnerState;
+					owner.Resize -= OwnerState;
+				}
+				owner = form;
+				if (owner != null)
+				{
+					owner.Activated += OwnerState;
+					owner.Deactivate += OwnerState;
+					owner.Resize += OwnerState;
+				}
+				ApplyState();
+			}
+		}
+
+		private void OwnerState(object sender, EventArgs e)
+		{
+			ApplyState();
+		}
+
+		public bool ShouldAnimate()
+		{
+			return FluidStyle.Bubbles && FluidStyle.Motion && !FishBowlHighlights.ReducedMotion && !SystemInformation.HighContrast && base.Visible && owner != null && owner.WindowState != FormWindowState.Minimized && Form.ActiveForm == owner;
+		}
+
+		public void ApplyState()
+		{
+			if (!disposed)
+			{
+				if (LeftRail.Visible != FluidStyle.Bubbles)
+				{
+					LeftRail.Visible = FluidStyle.Bubbles;
+				}
+				if (RightRail.Visible != FluidStyle.Bubbles)
+				{
+					RightRail.Visible = FluidStyle.Bubbles;
+				}
+				LeftRail.Invalidate();
+				RightRail.Invalidate();
+				bool flag = ShouldAnimate();
+				if (clock.Enabled != flag)
+				{
+					clock.Enabled = flag;
+					watch.Restart();
+				}
+			}
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing && !disposed)
+			{
+				disposed = true;
+				FluidStyle.Changed -= ApplyState;
+				clock.Dispose();
+				if (owner != null)
+				{
+					owner.Activated -= OwnerState;
+					owner.Deactivate -= OwnerState;
+					owner.Resize -= OwnerState;
+				}
+			}
+			base.Dispose(disposing);
+		}
+	}
+	public sealed class SectionTransition : IDisposable
+	{
+		private readonly TabControl tabs;
+
+		private readonly System.Windows.Forms.Timer clock;
+
+		private readonly Stopwatch watch = new Stopwatch();
+
+		private bool disposed;
+
+		public float Progress = 1f;
+
+		public bool Running
+		{
+			get
+			{
+				return clock.Enabled;
+			}
+		}
+
+		public bool HasImages
+		{
+			get
+			{
+				return false;
+			}
+		}
+
+		public SectionTransition(TabControl control)
+		{
+			tabs = control;
+			clock = new System.Windows.Forms.Timer
+			{
+				Interval = 25
+			};
+			System.Windows.Forms.Timer timer = clock;
+			EventHandler value = delegate
+			{
+				if (!FluidStyle.Animate)
+				{
+					Cancel();
+				}
+				else
+				{
+					Progress = (float)Math.Min(1.0, watch.Elapsed.TotalMilliseconds / 150.0);
+					InvalidateHeader();
+					if (Progress >= 1f)
+					{
+						Cancel();
+					}
+				}
+			};
+			timer.Tick += value;
+			tabs.SelectedIndexChanged += Selected;
+			tabs.SizeChanged += Resized;
+			tabs.FontChanged += Resized;
+			tabs.HandleDestroyed += Resized;
+			tabs.Disposed += Closed;
+			FluidStyle.Changed += Cancel;
+		}
+
+		private void InvalidateHeader()
+		{
+			if (!tabs.IsDisposed && tabs.SelectedIndex >= 0)
+			{
+				tabs.Invalidate(tabs.GetTabRect(tabs.SelectedIndex));
+			}
+		}
+
+		private void Selected(object sender, EventArgs e)
+		{
+			Cancel();
+		}
+
+		private void Resized(object sender, EventArgs e)
+		{
+			Cancel();
+		}
+
+		private void Closed(object sender, EventArgs e)
+		{
+			Dispose();
+		}
+
+		public void Cancel()
+		{
+			clock.Stop();
+			Progress = 1f;
+			InvalidateHeader();
+		}
+
+		public void Dispose()
+		{
+			if (!disposed)
+			{
+				Cancel();
+				disposed = true;
+				clock.Dispose();
+				FluidStyle.Changed -= Cancel;
+				tabs.SelectedIndexChanged -= Selected;
+				tabs.SizeChanged -= Resized;
+				tabs.FontChanged -= Resized;
+				tabs.HandleDestroyed -= Resized;
+				tabs.Disposed -= Closed;
+			}
+		}
+	}
+	public static class SectionMotion
+	{
+		private static readonly ConditionalWeakTable<TabControl, SectionTransition> transitions = new ConditionalWeakTable<TabControl, SectionTransition>();
+
+		public static SectionTransition For(TabControl tabs)
+		{
+			return transitions.GetValue(tabs, (TabControl t) => new SectionTransition(t));
+		}
+
+		public static void Attach(Control root)
+		{
+			TabControl[] array = NextUi.Descendants(root).OfType<TabControl>().ToArray();
+			foreach (TabControl tabs in array)
+			{
+				For(tabs);
+			}
+		}
+
+		public static void Reveal(Form form)
+		{
 		}
 	}
 }

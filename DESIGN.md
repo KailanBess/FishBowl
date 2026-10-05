@@ -8,7 +8,7 @@ The goal is shared behavior with platform-specific interfaces. Keep this collabo
 
 ## Current architecture and the catch-up boundary
 
-The current Windows release displays **1.1** and has internal build **1.24.0.0**. Its complete released source, tests, build scripts and artwork live in `windows/`. Run `windows/Build.ps1` to build it and `windows/Run Tests.ps1` to test it.
+The current Windows release displays **1.25.8** and has internal build **1.25.8.0**. Its complete released source, tests, build scripts and artwork live in `windows/`. Run `windows/Build.ps1` to build it and `windows/Run Tests.ps1` to test it.
 
 The Linux application lives in `FishBowl.Avalonia/`. It links the root `FishBowl.Core.cs` and `FishBowl.Platform.cs`. The root `FishBowl.cs` is the older split WinForms interface, retained for compatibility; it does **not** build the current Windows release.
 
@@ -107,4 +107,4 @@ Branch protection, repository settings, release publishing and merging PRs are s
 
 ## Validation of this repair
 
-The current Windows source builds and passes 1,075 checks; the Framework shared-file compilation passes. Avalonia builds, its Linux core test project compiles, self-contained Linux x64 publishing succeeds, and 90 schema preservation checks pass. Linux-specific runtime and GUI tests have not been run on the Windows development machine. The Ubuntu job must provide that evidence before merging. See `VALIDATION.md`.
+The current Windows 1.25.8 source builds and passes 2,587 checks; the Framework shared-file compilation passes. The Linux results below belong to the earlier compatibility repair and are not a new local Linux validation of this source upload. Avalonia builds, its Linux core test project compiles, self-contained Linux x64 publishing succeeds, and 90 schema preservation checks pass. Linux-specific runtime and GUI tests have not been run on the Windows development machine. The Ubuntu job must provide that evidence before merging. See `VALIDATION.md`.

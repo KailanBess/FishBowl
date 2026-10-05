@@ -1,8 +1,10 @@
 ﻿# FishBowl
 
-The current Windows release source is in [`windows/`](windows/), displaying 1.1 (internal build 1.24.0.0). Build it with `windows/Build.ps1`. The retained root split source powers Linux and does not yet include the newer Windows features. See [source layout and compatibility](SOURCE-LAYOUT.md) and the [collaboration design](DESIGN.md).
+The current Windows release source is in [`windows/`](windows/), version 1.25.8 (internal build 1.25.8.0). Build it with `windows/Build.ps1`. The retained root split source powers Linux and does not yet include the newer Windows features. See [source layout and compatibility](SOURCE-LAYOUT.md) and the [collaboration design](DESIGN.md).
 
-FishBowl opens your installed Windows emulators and keeps useful emulator information in one place. Add and manage games inside the dedicated emulator.
+The current Windows build supports game identification, retained game icons and launching already installed games, alongside emulator management. See the [Windows release source README](windows/README.md) and [change notes](windows/CHANGES.md) for its features, build commands and validation.
+
+The documentation below describes the older split source retained for the Linux port. Its feature coverage differs from the current Windows release.
 
 ## Start
 
