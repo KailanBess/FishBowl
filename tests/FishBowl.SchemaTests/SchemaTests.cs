@@ -12,6 +12,7 @@ class SchemaTests {
   using(var before=JsonDocument.Parse(fixture))using(var after=JsonDocument.Parse(roundtrip))Preserved(before.RootElement,after.RootElement,"library");
   data.Games[0].Title="Linux edit";data.Emulators[0].Favorite=true;
   using(var edited=JsonDocument.Parse(Json.Serialize(data))){var doc=edited.RootElement;JsonElement unwanted;Check(doc.GetProperty("Games")[0].GetProperty("Title").GetString()=="Linux edit","known game edits lost");Check(doc.GetProperty("Games")[0].GetProperty("Pinned").GetBoolean(),"unknown nested game field lost during edit");Check(doc.GetProperty("Theme").GetProperty("LastSeenBuild").GetString()=="1.24","unknown theme field lost during edit");Check(doc.GetProperty("Emulators")[0].GetProperty("Favorite").GetBoolean(),"known emulator edit lost");Check(doc.GetProperty("Enhancements").GetProperty("TextPercent").GetInt32()==150,"unknown top-level settings lost during edit");Check(!doc.TryGetProperty("AdditionalFields",out unwanted),"extension data leaked into library format");}
+  var typed=Json.Deserialize<LibraryData>(fixture);Check(typed.Games[0].Pinned&&typed.Games[0].PlayStatus=="Playing","Linux reads newer Windows game fields as typed data");
   var old=Json.Deserialize<LibraryData>("{\"Version\":1,\"Games\":[],\"Emulators\":[],\"Theme\":{\"Name\":\"Forest\"}}");Check(old.Version==1&&old.Theme.Name=="Forest","old library fixture rejected");
   Console.WriteLine("PASS: "+checks+" schema preservation checks");return 0;
  }catch(Exception e){Console.WriteLine(e);return 1;}}
