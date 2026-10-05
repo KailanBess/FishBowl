@@ -4,6 +4,8 @@
 
 The repository root `FishBowl.cs`, `FishBowl.Core.cs` and `FishBowl.Platform.cs` remain the older split source used by the Linux port. `FishBowl.Avalonia/` continues linking the root core/platform files; it must not compile the Windows monolith. **The newer Windows non-UI logic has not yet been extracted into the shared core.** The Windows source is committed as-is to make that port possible without overwriting Linux work or claiming feature parity.
 
+**Shared data model:** `FishBowl.Model.cs` at the root holds every class saved in `library.json` (38 classes, moved verbatim from `windows/FishBowl.cs`). The Windows build (`windows/Build.ps1`) and the Linux build both compile it, so a field added there exists in both apps. Keep it C# 5, add fields as optional, and never rename or remove one. The Linux build adds `[JsonExtensionData]` to each class so fields from newer versions still survive a save.
+
 Root `FishBowl.png` and `FishBowl.ico` are restored for the current Linux project and installer. Windows also has its own source-folder copies, so changing Windows artwork does not remove Linux inputs.
 
 Linux model classes retain unknown JSON properties under NETCOREAPP. This lets Linux update known fields while retaining newer optional Windows fields, including nested fields on games, emulators, themes and collections. This is data preservation, not an implementation of the newer features. Existing JSON field names remain unchanged. The Framework/C# 5 code path is preserved.
