@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in FishBowl doesn't work or looks wrong
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Which version?
+      options:
+        - Windows
+        - Linux
+        - Both / not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: FishBowl version
+      description: Shown in the window title or Help > About (e.g. 1.1 / build 1.24)
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        1. Opened Library
+        2. Clicked Launch on a game
+        3. Expected the emulator to open, but nothing happened
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Drag images or a short screen recording here. Very helpful for flicker or drawing glitches.
+  - type: dropdown
+    id: how-often
+    attributes:
+      label: How often?
+      options:
+        - Every time
+        - Sometimes
+        - Once
+  - type: textarea
+    id: log
+    attributes:
+      label: Activity log (optional)
+      description: Tools > Open FishBowl activity log; paste the last few lines.
+      render: text
