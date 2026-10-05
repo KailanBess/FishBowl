@@ -16,3 +16,6 @@ FishBowl Installer.exe
 # .NET build output (FishBowl.Avalonia)
 bin/
 obj/
+
+# Rebuild Windows binaries from windows/; distribute them through Releases/artifacts.
+/windows/*.exe

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -12,6 +12,11 @@ namespace EmulatorHub
 {
     public class EmulatorProfile
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Id { get; set; }
         public string Name { get; set; }
         public string Preset { get; set; }
@@ -60,12 +65,22 @@ namespace EmulatorHub
 
     public class LaunchProfile
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Name { get; set; }
         public string Arguments { get; set; }
     }
 
     public class GameEntry
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Id { get; set; }
         public string EmulatorId { get; set; }
         public string Title { get; set; }
@@ -88,6 +103,11 @@ namespace EmulatorHub
 
     public class WebsiteLink
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Id { get; set; }
         public string Name { get; set; }
         public string Url { get; set; }
@@ -95,6 +115,11 @@ namespace EmulatorHub
 
     public class GameConverter
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Id { get; set; }
         public string Name { get; set; }
         public string EmulatorId { get; set; }
@@ -107,6 +132,11 @@ namespace EmulatorHub
 
     public class GameCollection
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Id { get; set; }
         public string Name { get; set; }
         public List<string> GameIds { get; set; }
@@ -117,6 +147,11 @@ namespace EmulatorHub
 
     public class ThemeSettings
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Name { get; set; }
         public int AutoBackupDays { get; set; }
         public string LastBackupAt { get; set; }
@@ -146,6 +181,11 @@ namespace EmulatorHub
 
     public class LibraryData
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public int Version { get; set; }
         public List<EmulatorProfile> Emulators { get; set; }
         public List<GameEntry> Games { get; set; }
@@ -852,6 +892,11 @@ namespace EmulatorHub
 
     public class EmulatorBuild
     {
+#if NETCOREAPP
+        // Preserve optional fields written by newer Windows builds when Linux edits this record.
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
         public string Id { get; set; }
         public string Label { get; set; }
         public string Executable { get; set; }

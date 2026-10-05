@@ -294,7 +294,8 @@ namespace EmulatorHub
             var footer = Footer("Save", () =>
             {
                 int percent; if (!Int32.TryParse(((scale.SelectedItem as string) ?? "100").TrimEnd('%'), out percent)) percent = 100;
-                ChosenTheme = new ThemeSettings { Name = theme.SelectedItem as string, AutoBackupDays = (int)(days.Value ?? 7), LastBackupAt = original.LastBackupAt, DiscordRichPresenceEnabled = original.DiscordRichPresenceEnabled,
+                // Keep fields this version does not edit (e.g. newer Windows settings), or saving Settings would erase them.
+                ChosenTheme = new ThemeSettings { AdditionalFields = original.AdditionalFields, Name = theme.SelectedItem as string, AutoBackupDays = (int)(days.Value ?? 7), LastBackupAt = original.LastBackupAt, DiscordRichPresenceEnabled = original.DiscordRichPresenceEnabled,
                     ShowStartupAssistant = startup.IsChecked == true, StartupAssistantPreferenceSet = true, ShowGameStorageAssistant = storage.IsChecked == true, GameStorageAssistantPreferenceSet = true,
                     StartMaximized = maximized.IsChecked == true, AutoSyncGameFolders = autoSync.IsChecked == true, ConfirmBeforeGameLaunch = original.ConfirmBeforeGameLaunch,
                     AccentColor = accent.SelectedItem as string, FontFamily = font.SelectedItem as string, UiScalePercent = percent, ListDensity = density.SelectedItem as string,

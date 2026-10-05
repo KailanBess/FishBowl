@@ -1,4 +1,6 @@
-# FishBowl
+﻿# FishBowl
+
+The current Windows release source is in [`windows/`](windows/), displaying 1.1 (internal build 1.24.0.0). Build it with `windows/Build.ps1`. The retained root split source powers Linux and does not yet include the newer Windows features. See [source layout and compatibility](SOURCE-LAYOUT.md) and the [collaboration design](DESIGN.md).
 
 FishBowl opens your installed Windows emulators and keeps useful emulator information in one place. Add and manage games inside the dedicated emulator.
 
@@ -91,6 +93,8 @@ On Linux:
 - Windows-only emulators (Altirra, WinUAE, Xenia) can be added with Custom through a Wine launcher script.
 
 ## Building from source
+
+For the current Windows release, use `windows/Build.ps1` and `windows/Run Tests.ps1`. The command below builds the older retained split Windows source, not the current release.
 
 The shared logic lives in FishBowl.Core.cs (data model, presets, folder routing, backups, updates) and FishBowl.Platform.cs (Windows/Linux differences). Both stay C# 5 compatible so the Windows build still compiles with the .NET Framework csc.exe:
 
