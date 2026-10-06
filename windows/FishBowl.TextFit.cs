@@ -59,7 +59,8 @@ namespace EmulatorHub
 				if (label.Visible && label.AutoSize && label.Dock == DockStyle.None && label.Right > edge && label.Left < edge - 40)
 					label.MaximumSize = new Size(edge - label.Left, 0);
 			var buttons = container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None && !b.AutoSize && Need(b) > b.Width).ToList();
-			foreach (var row in container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None && !b.AutoSize).GroupBy(b => b.Top / 8))
+			// Auto-sized buttons stay in their row (at their own width) so the row shifts together.
+			foreach (var row in container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None).GroupBy(b => b.Top / 8))
 			{
 				if (!row.Any(b => buttons.Contains(b))) continue;
 				var others = container.Controls.Cast<Control>().Where(c => c.Visible && !(c is ButtonBase) && c.Top < row.Max(b => b.Bottom) && c.Bottom > row.Min(b => b.Top)).ToList();
@@ -84,7 +85,7 @@ namespace EmulatorHub
 		private static void Relay(List<ButtonBase> group, int limit, bool fromRight)
 		{
 			if (group.Count == 0) return;
-			var widths = group.Select(b => Math.Max(b.Width, Need(b))).ToList();
+			var widths = group.Select(b => b.AutoSize ? b.Width : Math.Max(b.Width, Need(b))).ToList();
 			var gaps = new List<int>();
 			for (int i = 1; i < group.Count; i++) gaps.Add(Math.Max(6, fromRight ? group[i - 1].Left - group[i].Right : group[i].Left - group[i - 1].Right));
 			int total = widths.Sum() + gaps.Sum();
