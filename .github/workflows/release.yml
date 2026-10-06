@@ -41,10 +41,18 @@ jobs:
       - run: dotnet run --project tests/FishBowl.Tests -c Release
       - run: dotnet run --project tests/FishBowl.SchemaTests -c Release
       - run: dotnet publish FishBowl.Avalonia -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o artifacts/linux-x64
+      - name: Archive Linux executable with permissions
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_REF_TYPE" != tag ]; then version="$REQUESTED_VERSION"; fi
+          grep -q "<Version>$version</Version>" FishBowl.Avalonia/FishBowl.Avalonia.csproj
+          tar -czf "artifacts/FishBowl-$version-linux-x64.tar.gz" -C artifacts/linux-x64 .
       - uses: actions/upload-artifact@v7
         with:
           name: FishBowl-release-linux-x64
-          path: artifacts/linux-x64/
+          path: artifacts/*.tar.gz
   publish:
     if: github.ref_type == 'tag'
     needs: [windows, linux]
@@ -58,5 +66,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          tar -czf "packages/FishBowl-${GITHUB_REF_NAME#v}-linux-x64.tar.gz" -C packages/FishBowl-release-linux-x64 .
-          find packages/FishBowl-release-windows -type f \( -name '*.zip' -o -name 'SHA256SUMS.txt' -o -name '*.exe' -o -name '*.ico' -o -name '*.bat' -o -name '*.ps1' -o -name 'README.md' \) -print0 | xargs -0 gh release create "$GITHUB_REF_NAME" "packages/FishBowl-${GITHUB_REF_NAME#v}-linux-x64.tar.gz" --draft --title "FishBowl $GITHUB_REF_NAME" --generate-notes
+          find packages/FishBowl-release-windows -type f \( -name '*.zip' -o -name 'SHA256SUMS.txt' -o -name '*.exe' -o -name '*.ico' -o -name '*.bat' -o -name '*.ps1' -o -name 'README.md' \) -print0 | xargs -0 gh release create "$GITHUB_REF_NAME" "packages/FishBowl-release-linux-x64/FishBowl-${GITHUB_REF_NAME#v}-linux-x64.tar.gz" --draft --title "FishBowl $GITHUB_REF_NAME" --generate-notes

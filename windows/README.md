@@ -1,6 +1,6 @@
 # FishBowl for Windows
 
-This folder contains the source of the Windows version of FishBowl (current source version **1.25.12**). See [CHANGES.md](CHANGES.md) for what's new, and the [main README](../README.md) for features and installation.
+This folder contains the source of the Windows version of FishBowl (current source version **1.26.0**). See [CHANGES.md](CHANGES.md) for what's new, and the [main README](../README.md) for features and installation.
 
 ## Build
 
@@ -9,6 +9,8 @@ The build uses the .NET Framework C# compiler included with Windows. No Visual S
 ```powershell
 .\Build.ps1
 ```
+
+Run `Package.ps1` after committing source to create a complete app folder, app/source ZIPs and checksums. It rebuilds from committed source and rejects mixed-version or stale bundles.
 
 This produces `FishBowl.exe` and `FishBowl Setup.exe` in this folder. Releases are published on the repository's Releases page instead of being committed.
 

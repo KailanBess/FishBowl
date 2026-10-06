@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -22,6 +22,7 @@ namespace EmulatorHub
         private readonly StackPanel homeCards = new StackPanel { Spacing = 14 };
         private readonly WrapPanel couchCards = new WrapPanel();
         private readonly Dictionary<string, Process> gameProcesses = new Dictionary<string, Process>();
+        private readonly Dictionary<string, Tuple<GameEntry, DateTime, string, string, string>> runningGameSessions = new Dictionary<string, Tuple<GameEntry, DateTime, string, string, string>>();
         private bool rebuildingGames;
         private TabControl libraryPages;
 
@@ -213,16 +214,30 @@ namespace EmulatorHub
             if (args.Any(a => a.Contains("{") || a.Contains("}"))) throw new IOException("Unsupported argument template. Use {game} for the game path.");
             var info = Platform.StartInfo(program, ""); if (Directory.Exists(game.Extras?.WorkingDirectory)) info.WorkingDirectory = game.Extras.WorkingDirectory; foreach (var argument in args) info.ArgumentList.Add(argument);
             var started = DateTime.UtcNow; var process = Process.Start(info); if (process == null) throw new IOException("The game could not be started.");
-            gameProcesses[game.Id] = process; LibraryProfiles.ActiveLaunches++; game.LastLaunched = started.ToString("o"); game.LaunchCount++; Store.Save(library); RefreshGameLibrary();
+            gameProcesses[game.Id] = process; runningGameSessions[game.Id] = Tuple.Create(game, started, program, game.Path, library.UserTools?.ActiveId); LibraryProfiles.ActiveLaunches++; game.LastLaunched = started.ToString("o"); game.LaunchCount++; Store.Save(library); RefreshGameLibrary();
             process.EnableRaisingEvents = true;
-            process.Exited += delegate
-            {
-                Ui.Post(() => { long seconds = Math.Max(0, (long)(DateTime.UtcNow - started).TotalSeconds); game.TotalPlaySeconds += seconds;
-                    if (library.PlaySessions == null) library.PlaySessions = new List<PlaySession>();
-                    library.PlaySessions.Add(new PlaySession { Id = Guid.NewGuid().ToString("N"), GameId = game.Id, StartedAt = started.ToString("o"), EndedAt = DateTime.UtcNow.ToString("o"), Seconds = seconds, EmulatorPath = program, DiscPath = game.Path, Note = "Time recorded for the launched process. Launchers that hand off to another process may end early." });
-                    gameProcesses.Remove(game.Id); LibraryProfiles.ActiveLaunches = Math.Max(0, LibraryProfiles.ActiveLaunches - 1); process.Dispose(); Store.Save(library); RefreshGameLibrary(); });
-            };
+            process.Exited += delegate { Ui.Post(() => FinishLibraryGameSession(game.Id, false, true)); };
+            process.EnableRaisingEvents = true;
+            if (process.HasExited) Ui.Post(() => FinishLibraryGameSession(game.Id, false, true));
             SetStatus("Started " + game.Title + ".");
+        }
+
+        private void FinishLibraryGameSession(string id, bool closing, bool save)
+        {
+            if (!runningGameSessions.TryGetValue(id, out var session)) return;
+            runningGameSessions.Remove(id); // An already-queued Exited callback cannot finalize this session twice.
+            var ended = DateTime.UtcNow; var seconds = Math.Max(0, (long)(ended - session.Item2).TotalSeconds);
+            session.Item1.TotalPlaySeconds += seconds;
+            if (library.PlaySessions == null) library.PlaySessions = new List<PlaySession>();
+            library.PlaySessions.Add(new PlaySession { Id = Guid.NewGuid().ToString("N"), GameId = id, StartedAt = session.Item2.ToString("o"), EndedAt = ended.ToString("o"), Seconds = seconds, EmulatorPath = session.Item3, DiscPath = session.Item4, Profile = session.Item5, Uncertain = closing, Note = closing ? "FishBowl closed while the launched game was running. Time recorded until FishBowl closed; the game was left running." : "Time recorded for the launched process. Launchers that hand off to another process may end early." });
+            if (gameProcesses.TryGetValue(id, out var process)) { gameProcesses.Remove(id); process.Dispose(); }
+            LibraryProfiles.ActiveLaunches = Math.Max(0, LibraryProfiles.ActiveLaunches - 1);
+            if (save) { Store.Save(library); RefreshGameLibrary(); }
+        }
+        private void FinishLibraryGameSessionsAtClose()
+        {
+            foreach (var id in runningGameSessions.Keys.ToArray()) FinishLibraryGameSession(id, true, false);
+            LibraryProfiles.SaveActive(library); Store.Save(library);
         }
 
         private async Task RemoveLibraryGame()

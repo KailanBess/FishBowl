@@ -1,3 +1,14 @@
+# Windows and Linux 1.26.0 source
+
+- Added Home page scrolling, primary/More actions, theme/accent previews, accessibility presets, cover proportions, card ordering/visibility and restrained accents using current controls.
+- Added unified game setup, native executable imports and installed Steam discovery; declarative import catalogs can cover additional storefronts with explicit executable selection.
+- Added verified mod overlay backups and resumable rollback, IPS patch copies, manuals/trailer links, screenshot galleries, monthly summaries and session notes.
+- Added reviewed file save timeline/comparison/transfer and backup-before-overwrite recovery. Folder archives use the emulator backup manager.
+- Added RetroAchievements completion caching, reviewed metadata provider catalogs, declarative extensions and a paired read-only companion.
+- Added Linux Home/Library/profiles/collections/living-room keyboard screens and matching title/cover/removal/recovery/game tool actions. Linux remains a preview requiring desktop smoke testing.
+- Added complete app/source packaging, checksums and version-checked draft-release automation. No executable is committed to source.
+- Windows popup bounds fit compact desktops. Existing startup popup fixes and appearance remain supported.
+
 # Windows 1.25.12
 
 - Expanded themes from 18 to 40, with distinct dark, light, warm, cool and neutral surfaces. Existing saved theme names remain supported.

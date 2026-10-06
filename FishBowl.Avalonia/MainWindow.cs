@@ -87,8 +87,8 @@ namespace EmulatorHub
             };
             Closing += (sender, e) =>
             {
-                try { SaveProfileNotes(); SaveWindowLayout(); }
-                catch (Exception error) { e.Cancel = true; Ui.Post(async () => await Ui.Message(this, "Your notes could not be saved.\n\n" + error.Message)); }
+                try { FinishLibraryGameSessionsAtClose(); SaveProfileNotes(); SaveWindowLayout(); }
+                catch (Exception error) { e.Cancel = true; Ui.Post(async () => await Ui.Message(this, "Your library could not be saved.\n\n" + error.Message)); }
             };
             Closed += delegate { companionServer?.Dispose(); runtimeTimer.Stop(); foreach (var watcher in gameFolderWatchers) watcher.Dispose(); };
         }

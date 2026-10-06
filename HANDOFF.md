@@ -14,7 +14,7 @@ _Last updated: 2026-10-06, expansion integration._
 
 ## Open pull requests
 
-Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dialog focus). Review/merge #18 before the expansion PR. Both platform implementations are included in the expansion.
+Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dialog focus). PR #20 includes and supersedes #18; it can be reviewed directly against main. Both platform implementations are included.
 
 ## Expansion 1.26.0
 
@@ -22,7 +22,7 @@ Home page scrolling, primary/More actions, 40 theme/28 accent previews, card ord
 
 Linux adds library/profiles/collections/removal Undo/reassignment/path repair/cover editing and shared expansion tools. File save timelines use SaveTools; folder saves use EmulatorBackups. Living-room input is keyboard/buttons; new gamepad polling is not included. Existing Linux-maintainer launch wrappers and in-progress native integrations below remain separate.
 
-Validation: Windows build and 2,310 expansion layout checks passed across 132 captures at three text sizes on normal/compact screens; UI settings tests passed 184 checks; game tools passed 36 checks. Full regression/audit and clean-runner Windows/Linux CI results will be recorded before completion. Local semantic Avalonia compilation passed; this is not a native Linux desktop smoke test. Account-dependent achievement/network metadata calls need real credentials/providers for live verification.
+Validation: Windows build and 2,310 expansion layout checks passed across 132 captures at three text sizes on normal/compact screens; UI settings tests passed 184 checks; game tools passed 36 checks. Full Windows run passed 13,141 checks; targeted final integration/game/UI reruns passed 46/36/184 checks. Normal and compact audits report zero findings. Clean-runner Windows/Linux CI results are pending. Linux metadata selection/importers/retained covers and paired companion lifecycle are integrated. Closing records observed playtime once without stopping games; crash recovery and launcher handoff tracking remain limited. Local semantic Avalonia compilation passed; this is not a native Linux desktop smoke test. Account-dependent achievement/network metadata calls need real credentials/providers for live verification.
 
 Release packaging now produces a complete six-file app folder, app ZIP, source ZIP and SHA256 checksums. Tagged reviewed versions produce draft releases; no binary build output is committed. App/installer/source versions must match.
 

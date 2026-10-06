@@ -26,3 +26,4 @@ windows/overflow-audit-compact/
 
 # Packaged workflow/local deliverables
 /artifacts/
+/SharedCompatibility.dll

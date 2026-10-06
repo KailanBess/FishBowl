@@ -1,5 +1,9 @@
 param([string]$OutputDirectory = (Join-Path $PSScriptRoot '../artifacts/windows'), [string]$ExpectedVersion)
 $ErrorActionPreference = 'Stop'
+$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$changes = & git -C $repository status --porcelain
+if ($LASTEXITCODE -ne 0 -or $changes) { throw 'Commit source changes before packaging so the app and source archive match.' }
+& (Join-Path $PSScriptRoot 'Build.ps1')
 $app = Join-Path $PSScriptRoot 'FishBowl.exe'
 $setup = Join-Path $PSScriptRoot 'FishBowl Setup.exe'
 $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($app).ProductVersion
@@ -10,6 +14,11 @@ if ($setupVersion -ne $version) { throw 'App and installer versions differ.' }
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $bundle = Join-Path $output ('FishBowl-' + $version)
+$expectedNames = @('FishBowl.exe','FishBowl Setup.exe','FishBowl.ico','Uninstall FishBowl.bat','Uninstall FishBowl.ps1','README.md')
+if (Test-Path -LiteralPath $bundle) {
+ $extra = Get-ChildItem -LiteralPath $bundle | Where-Object { $_.PSIsContainer -or $_.Name -notin $expectedNames }
+ if ($extra) { throw 'Existing bundle contains unrelated files; choose a fresh output directory.' }
+}
 New-Item -ItemType Directory -Path $bundle -Force | Out-Null
 foreach ($name in @('FishBowl.exe','FishBowl Setup.exe','FishBowl.ico','Uninstall FishBowl.bat','Uninstall FishBowl.ps1')) {
  Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle $name) -Force
