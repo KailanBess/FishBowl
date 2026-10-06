@@ -20,6 +20,7 @@
     <Compile Include="../FishBowl.LinuxShims.cs" Link="Shared/FishBowl.LinuxShims.cs" />
     <EmbeddedResource Include="../FishBowl.png" LogicalName="FishBowl.png" />
     <EmbeddedResource Include="../FishBowl.ico" LogicalName="FishBowl.ico" />
+    <Compile Include="../FishBowl.Library.cs" Link="Shared/FishBowl.Library.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.22" />

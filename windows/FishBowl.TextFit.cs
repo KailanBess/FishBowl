@@ -12,15 +12,21 @@ namespace EmulatorHub
 	public static class TextFit
 	{
 		private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Form, object> scaled = new System.Runtime.CompilerServices.ConditionalWeakTable<Form, object>();
+        // Lets the offscreen audit exercise a smaller desktop without changing the user's display.
+        public static Rectangle? WorkingAreaOverride;
+        private static Rectangle WorkingArea(Form form) { return WorkingAreaOverride ?? Screen.FromControl(form).WorkingArea; }
 
 		public static void FitLabels(Form form)
 		{
 			if (form == null || form.IsDisposed) return;
 			ScaleFixedLayout(form);
+			FitContainers(form);
 			FitRows(form);
 			int grown = Fit(form);
+            FitContainers(form);
+            if (!form.TopLevel) { form.MinimumSize = Size.Empty; return; }
 			if (grown <= 0) return;
-			Rectangle area = Screen.FromControl(form).WorkingArea;
+			Rectangle area = WorkingArea(form);
 			int height = Math.Min(form.ClientSize.Height + grown, area.Height - (form.Height - form.ClientSize.Height));
 			if (height < form.ClientSize.Height + grown) form.AutoScroll = true;
 			if (form.MinimumSize.Height > 0 && form.MinimumSize.Height < form.Height + grown) form.MinimumSize = new Size(form.MinimumSize.Width, Math.Min(form.MinimumSize.Height + grown, area.Height));
@@ -37,14 +43,106 @@ namespace EmulatorHub
 			scaled.Add(form, true);
 			int positioned = form.Controls.Cast<Control>().Count(c => c.Dock == DockStyle.None && !(c is TableLayoutPanel) && !(c is FlowLayoutPanel));
 			if (positioned < 3 || form.Controls.Cast<Control>().Any(c => c.Dock == DockStyle.Fill && (c is TableLayoutPanel || c is FlowLayoutPanel))) return;
-			Rectangle area = Screen.FromControl(form).WorkingArea;
+			Rectangle area = WorkingArea(form);
 			float factor = NextUi.TextPercent / 100f;
 			factor = Math.Min(factor, Math.Min(area.Width * 0.95f / Math.Max(1, form.Width), area.Height * 0.95f / Math.Max(1, form.Height)));
 			if (factor <= 1.01f) return;
+			// Accessibility has already set fonts. Scale coordinates without scaling text a second time.
+			var fonts = Walk(form).ToDictionary(c => c, c => c.Font);
 			form.Scale(new SizeF(factor, factor));
+			foreach (var entry in fonts) entry.Key.Font = entry.Value;
 			if (form.Right > area.Right) form.Left = Math.Max(area.Left, area.Right - form.Width);
 			if (form.Bottom > area.Bottom) form.Top = Math.Max(area.Top, area.Bottom - form.Height);
 		}
+
+        private static IEnumerable<Control> Walk(Control root)
+        {
+            yield return root;
+            foreach (Control child in root.Controls) foreach (Control item in Walk(child)) yield return item;
+        }
+        private static void FitContainers(Control root)
+        {
+            foreach (Control child in root.Controls.Cast<Control>().ToArray()) FitContainers(child);
+            var flow = root as FlowLayoutPanel;
+            if (flow != null) {
+                foreach (ButtonBase button in flow.Controls.OfType<ButtonBase>()) button.Width = Math.Max(button.Width, Need(button));
+                if (!flow.WrapContents && flow.ClientSize.Width > 0 && flow.Controls.Cast<Control>().Any(c => (c.Visible || !flow.Visible) && c.Right + c.Margin.Right > flow.ClientSize.Width - flow.Padding.Right)) {
+                    flow.WrapContents = true;
+                    flow.PerformLayout();
+                }
+                if (flow.Dock == DockStyle.Top || flow.Dock == DockStyle.Bottom || flow.Dock == DockStyle.None) {
+                    int bottom = flow.Controls.Cast<Control>().Where(c => c.Visible || !flow.Visible).Select(c => c.Bottom + c.Margin.Bottom + flow.Padding.Bottom).DefaultIfEmpty(flow.Height).Max();
+                    if (bottom > flow.ClientSize.Height) flow.Height += bottom - flow.ClientSize.Height;
+                }
+                var parentTable = flow.Parent as TableLayoutPanel;
+                if (parentTable != null && flow.Dock == DockStyle.Fill) {
+                    int row = parentTable.GetRow(flow);
+                    int need = flow.Controls.Cast<Control>().Where(c => c.Visible || !flow.Visible).Select(c => c.Bottom + c.Margin.Bottom).DefaultIfEmpty(0).Max() + flow.Padding.Bottom + flow.Margin.Vertical;
+                    if (row >= 0 && row < parentTable.RowStyles.Count && parentTable.GetRowHeights()[row] < need) {
+                        int delta = need - parentTable.GetRowHeights()[row];
+                        parentTable.RowStyles[row] = new RowStyle(SizeType.Absolute, need);
+                        var form = parentTable.FindForm();
+                        if (form != null && form.TopLevel) form.ClientSize = new Size(form.ClientSize.Width, form.ClientSize.Height + delta);
+                    }
+                }
+            }
+            if (root is SettingsDialog && NextUi.TextPercent > 100) {
+                var checks = root.Controls.OfType<CheckBox>().ToList();
+                var motion = checks.FirstOrDefault(c => c.Text == "Enable hover and selection motion");
+                var info = checks.FirstOrDefault(c => c.Text == "Show emulator information pane");
+                var icons = checks.FirstOrDefault(c => c.Text == "Show emulator icons");
+                if (motion != null && info != null && (motion.Bounds.IntersectsWith(info.Bounds) || icons != null && motion.Bounds.IntersectsWith(icons.Bounds))) {
+                    int oldBottom = motion.Bottom, delta = Math.Max(info.Bottom, icons == null ? 0 : icons.Bottom) + 8 - motion.Top;
+                    motion.Top += delta;
+                    foreach (Control other in root.Controls) if (other != motion && other.Top >= oldBottom) other.Top += delta;
+                }
+                var alternate = checks.FirstOrDefault(c => c.Text == "Use subtle alternating rows");
+                var caption = root.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Selection contrast");
+                if (alternate != null && caption != null && caption.Top < alternate.Bottom + 8) {
+                    int oldTop = caption.Top, delta = alternate.Bottom + 8 - oldTop;
+                    foreach (Control other in root.Controls) if (other != alternate && other.Top >= oldTop) other.Top += delta;
+                }
+            }
+            if (root is TableLayoutPanel) {
+                var table = (TableLayoutPanel)root;
+                while (table.RowStyles.Count < table.RowCount) table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                foreach (Control input in table.Controls) {
+                    var text = input as TextBox;
+                    bool singleLine = text != null && !text.Multiline;
+                    if (!(table.FindForm() is GameDialog) && !(table.FindForm() is WebsiteLinkDialog)) continue;
+                    if (!(input is ComboBox) && !singleLine) continue;
+                    int row = table.GetRow(input), need = input.PreferredSize.Height + input.Margin.Vertical;
+                    if (row >= 0 && row < table.RowStyles.Count && table.GetRowHeights()[row] < need) table.RowStyles[row] = new RowStyle(SizeType.Absolute, need);
+                }
+                foreach (Label label in table.Controls.OfType<Label>().Where(l => l.Text == "Filter:")) {
+                    int column = table.GetColumn(label);
+                    if (column >= 0 && column < table.ColumnStyles.Count) table.ColumnStyles[column] = new ColumnStyle(SizeType.Absolute, TextRenderer.MeasureText(label.Text, label.Font).Width + label.Margin.Horizontal + 8);
+                }
+                var owner = table.Parent as Form;
+                int overflow = table.GetRowHeights().Sum() + table.Padding.Vertical - table.ClientSize.Height;
+                if (owner != null && owner.TopLevel && !(owner is MainForm) && overflow > 0) owner.ClientSize = new Size(owner.ClientSize.Width, owner.ClientSize.Height + overflow);
+            }
+            if (root is UpdateMonitorDialog) {
+                var check = root.Controls.OfType<ButtonBase>().FirstOrDefault(b => b.Text == "Check emulator releases");
+                var close = root.Controls.OfType<ButtonBase>().FirstOrDefault(b => b.Text == "Close");
+                if (check != null && close != null) { check.Width = Math.Max(check.Width, Need(check)); check.Left = Math.Min(check.Left, close.Left - check.Width - 8); }
+            }
+            // Header panels contain a title followed by an instruction. Keep their spacing at larger fonts.
+            if (root is Panel && !(root is TableLayoutPanel) && !(root is FlowLayoutPanel)) {
+                if (root.Dock == DockStyle.Top) foreach (Label caption in root.Controls.OfType<Label>().Where(l => l.Dock == DockStyle.Fill)) {
+                    int needed = TextRenderer.MeasureText(caption.Text, caption.Font, new Size(Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal - caption.Margin.Horizontal), int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl).Height;
+                    root.Height = Math.Max(root.Height, needed + caption.Padding.Vertical + root.Padding.Vertical + caption.Margin.Vertical);
+                }
+                var labels = root.Controls.OfType<Label>().Where(l => l.Visible && l.Dock == DockStyle.None).OrderBy(l => l.Top).ToArray();
+                for (int i = 1; i < labels.Length; i++) if (labels[i].Top < labels[i - 1].Bottom + 4 && labels[i].Left < labels[i - 1].Right) {
+                    int oldBottom = labels[i].Bottom, delta = labels[i - 1].Bottom + 4 - labels[i].Top;
+                    foreach (Control other in root.Controls) if (other != labels[i] && other.Top >= oldBottom) other.Top += delta;
+                    labels[i].Top += delta;
+                }
+                int bottom = labels.Select(l => l.Bottom + root.Padding.Bottom).DefaultIfEmpty(0).Max();
+                if (root.Dock == DockStyle.Top && bottom > root.Height) root.Height = bottom;
+            }
+        }
 
 		// In fixed layouts: lay rows of buttons out again at the widths their text needs (left-aligned groups from the
 		// left, right-anchored groups from the right) when the row has room, and let one-line labels that run past
@@ -55,6 +153,24 @@ namespace EmulatorHub
 				if (child.HasChildren && !(child is FlowLayoutPanel)) FitRows(child);
 			if (container is FlowLayoutPanel || container is TableLayoutPanel) return;
 			int edge = container.ClientSize.Width - 8;
+            foreach (Label label in container.Controls.OfType<Label>().Where(l => l.Visible && l.Dock == DockStyle.None && !l.AutoSize && !l.Text.Contains(" ") && !l.Text.Contains("\n")))
+                label.Width = Math.Max(label.Width, TextRenderer.MeasureText(label.Text, label.Font).Width + label.Padding.Horizontal + 4);
+            if (container is Form) {
+                var labels = container.Controls.OfType<Label>().Where(l => l.Visible && l.Dock == DockStyle.None).OrderBy(l => l.Top).ToList();
+                for (int i = 1; i < labels.Count; i++) {
+                    var previous = labels[i - 1]; var current = labels[i];
+                    if (current.Top <= previous.Top + 8 || current.Top >= previous.Bottom + 4 || current.Left >= previous.Right || current.Right <= previous.Left) continue;
+                    int oldBottom = current.Bottom, delta = previous.Bottom + 6 - current.Top;
+                    foreach (Control sibling in container.Controls) if (sibling != current && sibling.Dock == DockStyle.None && sibling.Top >= oldBottom) sibling.Top += delta;
+                    current.Top += delta;
+                }
+                foreach (ButtonBase button in container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None && Need(b) > b.Width)) {
+                    var field = container.Controls.OfType<TextBox>().FirstOrDefault(t => t.Dock == DockStyle.None && t.Left < button.Left && t.Top < button.Bottom && t.Bottom > button.Top);
+                    if (field == null) continue;
+                    button.Width = Need(button); button.Left = Math.Min(button.Left, edge - button.Width - 8);
+                    field.Width = Math.Max(80, button.Left - field.Left - 8);
+                }
+            }
 			foreach (Label label in container.Controls.OfType<Label>())
 				if (label.Visible && label.AutoSize && label.Dock == DockStyle.None && label.Right > edge && label.Left < edge - 40)
 					label.MaximumSize = new Size(edge - label.Left, 0);
@@ -79,6 +195,8 @@ namespace EmulatorHub
 
 		private static int Need(ButtonBase button)
 		{
+			var action = button as FishBowlActionButton;
+			if (action != null && action.IconOnly) return button.Width;
 			var own = button.GetType().GetMethod("TextWidthNeeded");
 			return own != null ? (int)own.Invoke(button, null) : TextRenderer.MeasureText(button.Text, button.Font).Width + 16;
 		}
@@ -91,7 +209,19 @@ namespace EmulatorHub
 			var gaps = new List<int>();
 			for (int i = 1; i < group.Count; i++) gaps.Add(Math.Max(6, fromRight ? group[i - 1].Left - group[i].Right : group[i].Left - group[i - 1].Right));
 			int total = widths.Sum() + gaps.Sum();
-			if (fromRight ? group[0].Right - total < limit : group[0].Left + total > limit) return;
+            if (fromRight ? group[0].Right - total < limit : group[0].Left + total > limit) {
+                if (fromRight) return;
+                int start = group[0].Left, top = group.Min(b => b.Top), oldBottom = group.Max(b => b.Bottom), rowHeight = group.Max(b => b.Height) + 8, wrapX = start;
+                if (limit - start < widths.Max()) return;
+                for (int i = 0; i < group.Count; i++) {
+                    if (wrapX + widths[i] > limit && wrapX > start) { wrapX = start; top += rowHeight; }
+                    group[i].SetBounds(wrapX, top, widths[i], group[i].Height); wrapX += widths[i] + 8;
+                }
+                int delta = group.Max(b => b.Bottom) - oldBottom;
+                var parent = group[0].Parent;
+                foreach (Control other in parent.Controls) if (!group.Contains(other as ButtonBase) && other.Dock == DockStyle.None && other.Top >= oldBottom && (other.Anchor & AnchorStyles.Bottom) == 0) other.Top += delta;
+                return;
+            }
 			int x = fromRight ? group[0].Right : group[0].Left;
 			for (int i = 0; i < group.Count; i++)
 			{
@@ -128,7 +258,7 @@ namespace EmulatorHub
 		private static int Missing(Label label)
 		{
 			if (label.AutoSize || label.AutoEllipsis || String.IsNullOrWhiteSpace(label.Text)) return 0;
-			if (label.Dock != DockStyle.None && !(label.Parent is TableLayoutPanel)) return 0; // docked labels follow their container
+			if (label.Dock == DockStyle.Fill && !(label.Parent is TableLayoutPanel)) return 0;
 			int width = label.ClientSize.Width - label.Padding.Horizontal, height = label.ClientSize.Height - label.Padding.Vertical;
 			if (width <= 0) return 0;
 			int line = TextRenderer.MeasureText("Ag", label.Font).Height;
@@ -151,6 +281,11 @@ namespace EmulatorHub
 					if (control.Dock == DockStyle.None) control.Height += delta;
 					return delta;
 				}
+				if (row >= 0 && row < table.RowStyles.Count && table.RowStyles[row].SizeType != SizeType.Absolute) {
+                    table.RowStyles[row] = new RowStyle(SizeType.Absolute, table.GetRowHeights()[row] + delta);
+                    if (control.Dock == DockStyle.None) control.Height += delta;
+                    return delta;
+                }
 				if (control.Dock == DockStyle.None) control.Height += delta;
 				return row >= 0 && row < table.RowStyles.Count && table.RowStyles[row].SizeType == SizeType.AutoSize ? delta : 0;
 			}
@@ -159,6 +294,8 @@ namespace EmulatorHub
 				control.Height += delta;
 				return delta;
 			}
+			if (control.Dock == DockStyle.Top || control.Dock == DockStyle.Bottom) { control.Height += delta; return delta; }
+			if (control.Dock == DockStyle.Fill && container is Form) return delta;
 			if (control.Dock != DockStyle.None) return 0;
 			int oldBottom = control.Bottom;
 			control.Height += delta;

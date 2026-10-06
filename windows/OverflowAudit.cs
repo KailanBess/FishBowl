@@ -19,14 +19,19 @@ class OverflowAudit {
  static readonly List<string> skipped = new List<string>();
  static readonly BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
  static LibraryData data;
+ static bool compact;
 
  static void Pump(int ms) { var w = Stopwatch.StartNew(); while (w.ElapsedMilliseconds < ms) { Application.DoEvents(); System.Threading.Thread.Sleep(5); } }
 
  [STAThread]
  static int Main(string[] args) {
   string output = Path.GetFullPath(args.Length > 0 ? args[0] : "overflow-audit"); Directory.CreateDirectory(output);
+  compact = args.Contains("--compact");
+  if (compact) TextFit.WorkingAreaOverride = new Rectangle(0, 0, 1024, 720);
   Application.EnableVisualStyles(); Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
   Application.ThreadException += (s, e) => skipped.Add("UI exception: " + e.Exception.Message);
+   Console.WriteLine("Audit working area: " + (TextFit.WorkingAreaOverride ?? Screen.PrimaryScreen.WorkingArea));
+  using (var font = new Font("Bahnschrift", 8f)) Console.WriteLine("Audit font: " + font.Name);
   data = Fixture();
   var dialogs = typeof(MainForm).Assembly.GetTypes().Where(t => typeof(Form).IsAssignableFrom(t) && !t.IsAbstract && t != typeof(MainForm) && t.IsPublic).OrderBy(t => t.Name).ToList();
   foreach (int percent in new[] { 100, 150, 200 }) {
@@ -37,6 +42,7 @@ class OverflowAudit {
   NextUi.TextPercent = 100;
   WriteReport(output, dialogs.Count);
   Console.WriteLine("Overflow audit: " + issues.Count + " clipped text findings; report in " + output);
+  Console.WriteLine(File.ReadAllText(Path.Combine(output, "overflow-report.md")));
   return 0;
  }
 
@@ -56,7 +62,8 @@ class OverflowAudit {
  static void AuditMain(int percent, string output) {
   MainForm main = null;
   try {
-   main = new MainForm(true); main.ShowInTaskbar = false; main.StartPosition = FormStartPosition.Manual; main.Location = new Point(-4000, -4000); main.Size = new Size(1280, 800);
+   main = new MainForm(true); main.ShowInTaskbar = false; main.StartPosition = FormStartPosition.Manual; main.Location = new Point(-4000, -4000); main.Size = compact ? new Size(1024, 720) : new Size(1280, 800);
+   if (compact) { main.MinimumSize = new Size(Math.Min(main.MinimumSize.Width, 1024), Math.Min(main.MinimumSize.Height, 720)); main.MaximumSize = new Size(1024, 720); main.Size = new Size(1024, 720); }
    main.Show(); Pump(600);
    var tabs = typeof(MainForm).GetField("workspaceNavigation", flags);
    var navigation = tabs == null ? null : tabs.GetValue(main) as TabControl;
@@ -75,6 +82,7 @@ class OverflowAudit {
   try {
    form = Create(type);
    if (form == null) { if (percent == 100) skipped.Add(type.Name + ": no constructor the audit can satisfy"); return; }
+   if (compact) { form.MinimumSize = new Size(Math.Min(form.MinimumSize.Width, 1024), Math.Min(form.MinimumSize.Height, 720)); form.MaximumSize = new Size(1024, 720); }
    form.ShowInTaskbar = false; form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-4000, -4000);
    form.Show(); Pump(400);
    Audit(form, type.Name, percent, output);
@@ -101,6 +109,12 @@ class OverflowAudit {
   else if (t == typeof(EmulatorProfile)) value = data.Emulators[0];
   else if (t == typeof(GameEntry)) value = data.Games[1];
   else if (t == typeof(ThemeSettings)) value = data.Theme;
+  else if (t == typeof(WorkspaceItem)) value = new WorkspaceItem { Title = "Fixture workspace item", Target = Path.GetFullPath("fixture.rom") };
+  else if (t == typeof(PlaySession)) value = new PlaySession { Seconds = 120 };
+  else if (t == typeof(IEnumerable<DiscoveredEmulator>)) value = new List<DiscoveredEmulator>();
+  else if (t == typeof(IEnumerable<SearchResult>)) value = new List<SearchResult> { new SearchResult { Caption = "Fixture game", Open = delegate {} } };
+  else if (t == typeof(IEnumerable<WebsiteLink>)) value = new List<WebsiteLink> { new WebsiteLink { Name = "Fixture website", Url = "https://example.com" } };
+  else if (t == typeof(List<OrganizationPlan>)) value = new List<OrganizationPlan>();
   else if (t == typeof(string)) value = parameter.Name.IndexOf("path", StringComparison.OrdinalIgnoreCase) >= 0 ? Path.GetFullPath("fixture.rom") : parameter.Name.IndexOf("version", StringComparison.OrdinalIgnoreCase) >= 0 ? "1.24" : "Fixture text that is long enough to show how this dialog handles a realistic sentence";
   else if (t == typeof(int)) value = 0; else if (t == typeof(long)) value = 0L; else if (t == typeof(bool)) value = false; else if (t == typeof(double)) value = 0d;
   else if (t.IsEnum) value = Enum.GetValues(t).GetValue(0);
@@ -132,7 +146,7 @@ class OverflowAudit {
     using (var g = Graphics.FromImage(bitmap)) using (var pen = new Pen(Color.Red, 3)) foreach (var c in found) {
      var p = form.PointToClient(c.PointToScreen(Point.Empty)); g.DrawRectangle(pen, p.X + offset.X, p.Y + offset.Y, c.Width - 1, c.Height - 1);
     }
-    if (found.Count > 0 || percent == 100) bitmap.Save(Path.Combine(output, Safe(window) + "-" + percent + ".png"));
+    bitmap.Save(Path.Combine(output, Safe(window) + "-" + percent + ".png"));
    }
   } catch (Exception error) { skipped.Add(window + " screenshot at " + percent + "%: " + error.Message); }
  }

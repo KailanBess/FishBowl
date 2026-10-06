@@ -300,7 +300,7 @@ namespace EmulatorHub
             if (g == null || !File.Exists(g.Path) || UserTools.Guest) return;
             using (var r = Inspect(g.Path))
             {
-                if (replaceTitle || string.IsNullOrWhiteSpace(g.Title) || g.Title == "New game") g.Title = r.Title;
+                if (replaceTitle || (!g.TitleIsCustom && (string.IsNullOrWhiteSpace(g.Title) || g.Title == "New game"))) g.Title = r.Title;
                 if (string.IsNullOrWhiteSpace(g.TitleId)) g.TitleId = r.TitleId;
                 if (string.IsNullOrWhiteSpace(g.ConsoleLabel) || g.ConsoleLabel.StartsWith("Needs review")) g.ConsoleLabel = r.Platform;
                 if (string.IsNullOrWhiteSpace(g.Developer)) g.Developer = r.Developer;
@@ -313,7 +313,7 @@ namespace EmulatorHub
                 var emulator = all.FirstOrDefault(e => e.Id == (g.PreferredEmulatorId ?? g.EmulatorId));
                 string installed = InstalledGames.Find(emulator, g.TitleId, g.Path);
                 if (installed != null && (r.Icon == null || r.Source == "File name" || r.Source == "Package content ID" || r.Source == "CIA title metadata")) InstalledGames.Metadata(installed, r);
-                if ((replaceTitle || g.Title == "New game" || g.Title == CleanTitle(g.Path)) && r.Source != "File name") g.Title = r.Title;
+                if ((replaceTitle || (!g.TitleIsCustom && (g.Title == "New game" || g.Title == CleanTitle(g.Path)))) && r.Source != "File name") g.Title = r.Title;
                 if (string.IsNullOrWhiteSpace(g.Developer)) g.Developer = r.Developer;
                 if (string.IsNullOrWhiteSpace(g.ArtworkPath) || !File.Exists(g.ArtworkPath))
                     if (r.Icon != null) g.ArtworkPath = CacheIcon(r.Icon, g.Path);

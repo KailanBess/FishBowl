@@ -82,6 +82,8 @@ class CosmeticTests {
             using(var library=new GameLibraryDialog(data)) {library.ShowInTaskbar=false;library.StartPosition=FormStartPosition.Manual;library.Location=new Point(-4000,-4000);library.Show();Application.DoEvents();
                 var buttons=NextUi.Descendants(library).OfType<FishBowlActionButton>().Where(b=>b.Parent.Name=="FishBowlToolbar").ToList();
                 Check(buttons.All(b=>b.IconOnly && !string.IsNullOrWhiteSpace(b.AccessibleName)),"icon-only toolbar preserves accessible labels");
+                CosmeticRuntime.Apply(library);var iconWidths=buttons.ToDictionary(b=>b,b=>b.Width);TextFit.FitLabels(library);
+                Check(buttons.All(b=>b.Width==iconWidths[b]),"text fitting preserves compact icon-only button widths");
                 var tips=(ToolTip)typeof(CosmeticRuntime).GetField("tips",BindingFlags.Static|BindingFlags.NonPublic).GetValue(null);Check(buttons.All(b=>!string.IsNullOrWhiteSpace(tips.GetToolTip(b))),"icon-only buttons have tooltips");
                 Capture(library,"cosmetic-library.png");
                 data.Cosmetics.IconOnlyToolbars=false;CosmeticRuntime.Configure(data.Cosmetics);CosmeticRuntime.Apply(library);Check(buttons.All(b=>!b.IconOnly && b.Width>=100),"toolbar text mode restores widths");

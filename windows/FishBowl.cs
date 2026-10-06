@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.25.8.0")]
+[assembly: AssemblyFileVersion("1.25.11.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.25.8.0")]
+[assembly: AssemblyVersion("1.25.11.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.25.8";
+		private const string FishBowlVersion = "1.25.11";
 
-		private const string FishBowlTitleVersion = "1.25.8";
+		private const string FishBowlTitleVersion = "1.25.11";
 
 		private Icon ownedAppIcon;
 
@@ -315,7 +315,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.25.8";
+			Text = "FishBowl 1.25.11";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -347,6 +347,9 @@ namespace EmulatorHub
 			}
 			RefreshHub();
 			ApplyVisualScale();
+			Rectangle desktop = TextFit.WorkingAreaOverride ?? Screen.FromControl(this).WorkingArea;
+			MinimumSize = new Size(Math.Min(MinimumSize.Width, desktop.Width), Math.Min(MinimumSize.Height, desktop.Height));
+			Size = new Size(Math.Min(Width, desktop.Width), Math.Min(Height, desktop.Height));
 			InitializeEnhancements(isolatedPreview);
 			InitializeHub(isolatedPreview);
 			FishBowlPalette.StyleWindow(this);
@@ -361,6 +364,7 @@ namespace EmulatorHub
 			ConfigureScheduledLibraryScan();
 			base.Shown += delegate
 			{
+				TextFit.FitLabels(this);
 				InitializeSaveNotifications();
 			};
 			SetStatus("Use Home to continue playing, Library for games and saves, or Emulators to launch.");
@@ -397,11 +401,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.25.8" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.25.11" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.25.8";
+						library.Theme.LastSeenBuild = "1.25.11";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -1537,7 +1541,7 @@ namespace EmulatorHub
 			FishBowlActionButton fishBowlActionButton = new FishBowlActionButton();
 			ConfigureButton(fishBowlActionButton, "Add emulator", AddEmulator, surface);
 			ConfigureButton(editButton, "Edit emulator", EditEmulator, surface);
-			ConfigureButton(removeButton, "Remove", RemoveEmulator, surface);
+			ConfigureButton(removeButton, "Remove emulator", RemoveEmulator, surface);
 			ConfigureButton(managementButton, "Manage", delegate
 			{
 				ShowEmulatorManager("Setup checks");
@@ -1547,6 +1551,7 @@ namespace EmulatorHub
 			ConfigureButton(communityButton, "Community", OpenCommunity, surface);
 			flowLayoutPanel2.Controls.Add(fishBowlActionButton);
 			flowLayoutPanel2.Controls.Add(editButton);
+			flowLayoutPanel2.Controls.Add(removeButton);
 			flowLayoutPanel2.Controls.Add(managementButton);
 			fishBowlActionButton2.Dispose();
 			favoritesOnly.Text = "Favorites only";
@@ -2895,19 +2900,18 @@ namespace EmulatorHub
 
 		private void ResizeEmulatorColumns()
 		{
-			if (emulatorList.Columns.Count == 4)
+			if (emulatorList.Columns.Count == 4 && !resizingEmulatorColumns)
 			{
+				resizingEmulatorColumns = true;
+				try {
 				int num = Math.Max(1, emulatorList.ClientSize.Width - 4);
-				emulatorList.Columns[0].Width = (int)((double)num * 0.36);
-				emulatorList.Columns[1].Width = (int)((double)num * 0.18);
-				emulatorList.Columns[2].Width = (int)((double)num * 0.29);
-				emulatorList.Columns[3].Width = num - emulatorList.Columns[0].Width - emulatorList.Columns[1].Width - emulatorList.Columns[2].Width;
-				if (emulatorList.IsHandleCreated)
-				{
-					emulatorList.AutoResizeColumn(3, ColumnHeaderAutoResizeStyle.HeaderSize);
-				}
+				int first = (int)(num * 0.36), second = (int)(num * 0.18), third = (int)(num * 0.29);
+				int[] widths = { first, second, third, num - first - second - third };
+				for (int i = 0; i < widths.Length; i++) if (emulatorList.Columns[i].Width != widths[i]) emulatorList.Columns[i].Width = widths[i];
+				} finally { resizingEmulatorColumns = false; }
 			}
 		}
+		private bool resizingEmulatorColumns;
 
 		private ProcessStartInfo EmulatorStartInfo(EmulatorProfile profile)
 		{
@@ -3057,12 +3061,13 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile != null && (!library.Theme.ConfirmBeforeEmulatorRemoval || MessageBox.Show(this, "Remove " + emulatorProfile.Name + " from FishBowl?\n\nIts emulator program, games, and saves will stay where they are.", "FishBowl", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes))
 			{
-				library.Emulators.Remove(emulatorProfile);
+				GameLibraryRemoval.RemoveEmulator(library, emulatorProfile.Id);
 				selectedEmulatorId = null;
 				Store.Save(library);
 				RefreshHub();
 				ConfigureGameFolderWatchers();
-				SetStatus("Emulator removed from FishBowl.");
+				if (embeddedLibrary != null) embeddedLibrary.ReloadLibrary();
+				SetStatus("Emulator removed from FishBowl. Game entries and files were kept. Use Library tools → Undo removal to restore it.");
 			}
 		}
 
@@ -3379,7 +3384,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.25.8"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.25.11"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3387,7 +3392,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.25.8"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.25.11"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3395,7 +3400,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.25.8"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.25.11"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3886,7 +3891,7 @@ namespace EmulatorHub
 					savedNormalBounds = ((base.WindowState == FormWindowState.Normal) ? base.Bounds : base.RestoreBounds);
 					base.FormBorderStyle = FormBorderStyle.None;
 					base.WindowState = FormWindowState.Normal;
-					base.Bounds = Screen.FromControl(this).Bounds;
+					base.Bounds = TextFit.WorkingAreaOverride ?? Screen.FromControl(this).Bounds;
 					fullScreen = true;
 					SetStatus("Full-screen mode. Press F11 to return.");
 				}
@@ -5080,7 +5085,7 @@ namespace EmulatorHub
 						{
 							List<GameEntry> games = library.Games;
 							Func<GameEntry, bool> predicate = (GameEntry g) => string.Equals(g.Path, game.Path, StringComparison.OrdinalIgnoreCase);
-							if (!games.Any(predicate))
+							if (!games.Any(predicate) && !GameLibraryRemoval.IsExcluded(library, game.Path) && library.Emulators.Any(emulator => emulator.Id == game.EmulatorId))
 							{
 								library.Games.Add(game);
 								num++;
@@ -6657,6 +6662,7 @@ namespace EmulatorHub
 			StartupPromptLayout.Apply(this);
 			// After styling sets the final fonts: larger text sizes can wrap labels onto lines a fixed layout hides.
 			TextFit.FitLabels(this);
+            Shown += delegate { TextFit.FitLabels(this); };
 		}
 
 	}
@@ -9259,10 +9265,11 @@ namespace EmulatorHub
 			kind.DropDownStyle = ComboBoxStyle.DropDownList;
 			kind.Items.AddRange(new object[7] { "App or tool", "PC game", "Document or manual", "Media", "Folder", "Website", "Collection note" });
 			AddField("Path or website", target, 130);
+			target.Width = 416;
 			FishBowlActionButton fishBowlActionButton = new FishBowlActionButton
 			{
 				Text = "Browse",
-				Location = new Point(442, 164),
+				Location = new Point(442, 150),
 				Size = new Size(80, 26)
 			};
 			fishBowlActionButton.Click += Browse;
@@ -9407,6 +9414,7 @@ namespace EmulatorHub
 			FishBowlActionButton fishBowlActionButton = new FishBowlActionButton
 			{
 				Text = "Check emulator releases",
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
 				DialogResult = DialogResult.OK,
 				Location = new Point(454, 450),
 				Size = new Size(132, 28)
@@ -9907,6 +9915,19 @@ namespace EmulatorHub
 				LaunchGame();
 			};
 			games.AccessibleName = "FishBowl game list";
+            ContextMenuStrip gameMenu = CompactMenus.Menu();
+            gameMenu.Items.Add("Launch", null, delegate { LaunchGame(); });
+            gameMenu.Items.Add("Edit game", null, delegate { EditGame(); });
+            gameMenu.Items.Add(new ToolStripSeparator());
+            gameMenu.Items.Add("Remove selected games from FishBowl", null, delegate { RemoveGames(); });
+            gameMenu.Opening += delegate { foreach (ToolStripItem action in gameMenu.Items) action.Enabled = SelectedGame() != null; };
+            games.MouseDown += delegate(object sender, MouseEventArgs e) {
+                if (e.Button != MouseButtons.Right) return;
+                ListViewItem row = games.GetItemAt(e.X, e.Y);
+                if (row != null && !row.Selected) { foreach (ListViewItem selected in games.SelectedItems.Cast<ListViewItem>().ToArray()) selected.Selected = false; row.Selected = true; }
+            };
+            games.ContextMenuStrip = gameMenu;
+            games.Disposed += delegate { gameMenu.Dispose(); };
 			base.Controls.Add(games);
 			base.Controls.SetChildIndex(games, 0);
 			base.Controls.SetChildIndex(panel, 2);
@@ -9943,7 +9964,7 @@ namespace EmulatorHub
 				}
 			};
 			panel.Controls.Add(fishBowlActionButton2);
-			if (new string[10] { "Edit", "Launch", "Open folder", "Saves", "Details", "Progress", "Pin", "Favorite", "Bulk edit", "Metadata" }.Contains(text))
+			if (new string[11] { "Remove game", "Edit", "Launch", "Open folder", "Saves", "Details", "Progress", "Pin", "Favorite", "Bulk edit", "Metadata" }.Contains(text))
 			{
 				selectionActions.Add(fishBowlActionButton2);
 				fishBowlActionButton2.Enabled = SelectedGame() != null;
@@ -10011,6 +10032,7 @@ namespace EmulatorHub
 
 		private EmulatorProfile EmulatorFor(GameEntry game)
 		{
+			if (game.RequiresEmulatorAssignment) return null;
 			return library.Emulators.FirstOrDefault((EmulatorProfile item) => item.Id == (string.IsNullOrWhiteSpace(game.PreferredEmulatorId) ? game.EmulatorId : game.PreferredEmulatorId)) ?? ((library.Emulators.Count == 1) ? library.Emulators[0] : null);
 		}
 
@@ -10027,12 +10049,24 @@ namespace EmulatorHub
 			{
 				if (gameDialog.ShowDialog(this) == DialogResult.OK)
 				{
+					GameLibraryRemoval.AllowPath(library, gameDialog.Game.Path);
 					library.Games.Add(gameDialog.Game);
 					Store.Save(library);
 					RefreshGames();
 				}
 			}
 		}
+
+        private void RemoveGames()
+        {
+            var selected = games.SelectedItems.Cast<ListViewItem>().Select(row => row.Tag as GameEntry).Where(game => game != null).ToArray();
+            if (selected.Length == 0) return;
+            string name = selected.Length == 1 ? selected[0].Title : selected.Length + " selected games";
+            if (MessageBox.Show(this, "Remove " + name + " from FishBowl?\n\nGame files, saves and emulator installations will stay on disk. These games will be skipped by folder scans until you add them again.", "Remove games", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            GameLibraryRemoval.RemoveGames(library, selected.Select(game => game.Id));
+            Store.Save(library);
+            RefreshGames();
+        }
 
 		private void EditGame()
 		{
@@ -10475,14 +10509,16 @@ namespace EmulatorHub
 			AddButton(bar, "Add game", AddGame);
 			AddButton(bar, "Launch", LaunchGame);
 			AddButton(bar, "Details", ShowDetails);
+			AddButton(bar, "Remove game", RemoveGames);
 			AddActionGroup(bar, "Game actions", delegate(ContextMenuStrip menu)
 			{
 				GroupAction(menu, "Edit game", EditGame, true);
+				GroupAction(menu, "Remove selected games from FishBowl", RemoveGames, true);
                 GroupAction(menu, "Identify game and retain icon", delegate
                 {
                     var selected = SelectedGame();
                     if (selected == null) return;
-                    bool automaticTitle = selected.Title == Path.GetFileNameWithoutExtension(selected.Path) || selected.Title == "New game";
+                    bool automaticTitle = !selected.TitleIsCustom && (selected.Title == Path.GetFileNameWithoutExtension(selected.Path) || selected.Title == "New game");
                     GameRecognition.Apply(selected, library.Emulators, automaticTitle);
                     Store.Save(library);
                     RefreshGames();
@@ -10536,6 +10572,8 @@ namespace EmulatorHub
 				GroupAction(menu, "Sync folders", SyncFolders);
 				GroupAction(menu, "Find duplicates", ShowDuplicates);
 				GroupAction(menu, "Repair game paths", RepairGames);
+                GroupAction(menu, "Undo removal", delegate { ExperienceTools.UndoRemoval(this, library); ReloadLibrary(); });
+                GroupAction(menu, "Cleanup artwork", delegate { ExperienceTools.CleanupArtwork(this, library); ReloadLibrary(); });
 				GroupAction(menu, "Export current view to CSV", delegate
 				{
 					LibraryAdditions.Export(this, VisibleGames());
@@ -11008,11 +11046,8 @@ namespace EmulatorHub
 			games.TileSize = new Size(Math.Max(130, library.Experience.ArtworkSize + 24), library.Experience.ArtworkSize + ((library.Cosmetics != null && library.Cosmetics.LibrarySpacing == "Compact") ? 32 : 55));
 			games.View = ((!artworkView) ? View.Details : View.LargeIcon);
 			ApplyHubSpacing();
-			if (!artworkView)
-			{
-				return;
-			}
-			int num = Math.Max(64, Math.Min(192, library.Experience.ArtworkSize));
+			int num = artworkView ? Math.Max(64, Math.Min(192, library.Experience.ArtworkSize)) : densityHeight;
+            games.SmallImageList = artworkView ? densityImages : coverImages;
 			string text = Json.Serialize(CosmeticRuntime.Current) + "|" + FishBowlPalette.ThemeSurface.ToArgb() + "|" + FishBowlPalette.ThemeInk.ToArgb() + "|" + FishBowlPalette.IconAccent.ToArgb();
 			if (num != artSize || text != artStyle || coverImages.Images.Count == 0)
 			{
@@ -11074,11 +11109,17 @@ namespace EmulatorHub
 
 		private void LoadVisibleArtwork()
 		{
-			if (!polishReady || !artworkView || thumbnailBusy || !games.Visible || !games.IsHandleCreated || games.Items.Count == 0)
+			if (!polishReady || thumbnailBusy || !games.Visible || !games.IsHandleCreated || games.Items.Count == 0)
 			{
 				return;
 			}
 			HashSet<ListViewItem> hashSet = new HashSet<ListViewItem>();
+            if (!artworkView) {
+                ListViewItem top = games.TopItem;
+                int first = top == null ? 0 : top.Index;
+                int count = games.ClientSize.Height / Math.Max(1, densityHeight) + 2;
+                for (int row = first; row < Math.Min(games.Items.Count, first + count); row++) hashSet.Add(games.Items[row]);
+            }
 			for (int i = 8; i < games.ClientSize.Height; i += 32)
 			{
 				for (int j = 8; j < games.ClientSize.Width; j += 32)
@@ -11181,7 +11222,7 @@ namespace EmulatorHub
 											}
 											thumbnailSlots[key] = use;
 											slotOwners[use] = new HashSet<ListViewItem> { item };
-											if (item.ListView == games)
+											if (item.ListView == games && item.Tag is GameEntry && ((GameEntry)item.Tag).ArtworkPath == path && ((GameEntry)item.Tag).Title == title)
 											{
 												item.ImageIndex = use;
 											}
@@ -11363,7 +11404,7 @@ namespace EmulatorHub
 			}
 			detailPane.Visible = library.Cosmetics != null && library.Cosmetics.DetailPreview && base.ClientSize.Width >= 900;
 			GameEntry gameEntry = SelectedGame();
-			string text = ((gameEntry == null) ? "" : (gameEntry.Id + "|" + gameEntry.ArtworkPath + "|" + gameEntry.Description));
+			string text = ((gameEntry == null) ? "" : (gameEntry.Id + "|" + gameEntry.Title + "|" + gameEntry.ConsoleLabel + "|" + gameEntry.Genre + "|" + gameEntry.ArtworkPath + "|" + Immersion.ArtworkStamp(gameEntry.ArtworkPath) + "|" + gameEntry.Description));
 			if (text == detailStamp)
 			{
 				return;
@@ -11705,6 +11746,9 @@ namespace EmulatorHub
 
 		private string suggestedTitle;
 
+        private bool titleEdited;
+        private bool suggestingTitle;
+
 		public GameEntry Game { get; private set; }
 
 		public GameDialog(GameEntry existing, IEnumerable<EmulatorProfile> profiles)
@@ -11809,6 +11853,7 @@ namespace EmulatorHub
 			favorite.Checked = existing.Favorite;
 			preferredEmulator.SelectedIndex = Math.Max(0, preferredEmulator.Items.Cast<EmulatorChoice>().ToList().FindIndex((EmulatorChoice item) => item.Id == existing.PreferredEmulatorId));
             suggestedTitle = (existing.Title == "New game" || string.IsNullOrWhiteSpace(existing.Title) || existing.Title == GameRecognition.CleanTitle(existing.Path ?? "")) ? existing.Title : null;
+            title.TextChanged += delegate { if (!suggestingTitle) titleEdited = true; };
             path.Leave += delegate { SuggestGame(); };
 		}
 
@@ -11858,8 +11903,8 @@ namespace EmulatorHub
                 var emulator = emulators.FirstOrDefault(e => choice != null && e.Id == choice.Id);
                 string installed = InstalledGames.Find(emulator, recognized.TitleId, path.Text.Trim());
                 if (recognized.Icon == null && installed != null) InstalledGames.Metadata(installed, recognized);
-                if (string.IsNullOrWhiteSpace(title.Text) || title.Text == "New game" || title.Text == suggestedTitle)
-                { title.Text = recognized.Title; suggestedTitle = recognized.Title; }
+                if (!titleEdited && (string.IsNullOrWhiteSpace(title.Text) || title.Text == "New game" || title.Text == suggestedTitle))
+                { suggestingTitle = true; try { title.Text = recognized.Title; suggestedTitle = recognized.Title; } finally { suggestingTitle = false; } }
             }
         }
 
@@ -11903,9 +11948,27 @@ namespace EmulatorHub
 			Game.Title = title.Text.Trim();
 			Game.Path = path.Text.Trim();
 			Game.ArtworkPath = artwork.Text.Trim();
+            if (!string.IsNullOrWhiteSpace(Game.ArtworkPath) && (File.Exists(Game.ArtworkPath) || !string.Equals(Game.ArtworkPath, existing.ArtworkPath, Platform.PathComparison)))
+            {
+                try {
+                    using (Image selected = Image.FromFile(Game.ArtworkPath)) {
+                        if (selected.Width >= 12000 || selected.Height >= 12000) throw new InvalidDataException("Choose an image smaller than 12000 pixels in each dimension.");
+                    }
+                    Game.ArtworkPath = GameLibraryEditing.RetainArtwork(Game.ArtworkPath, Store.DataDirectory);
+                }
+                catch (Exception error) {
+                    if (!(error is IOException || error is ArgumentException || error is UnauthorizedAccessException || error is OutOfMemoryException || error is System.Runtime.InteropServices.ExternalException)) throw;
+                    Game = null;
+                    MessageBox.Show(this, "The cover image could not be loaded. Choose an existing image file.\n\n" + error.Message, "Game artwork", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    DialogResult = DialogResult.None;
+                    return;
+                }
+            }
+            Game.TitleIsCustom = true;
 			Game.Arguments = arguments.Text.Trim();
 			Game.Notes = notes.Text.Trim();
 			Game.PreferredEmulatorId = ((emulatorChoice == null) ? null : emulatorChoice.Id);
+            if (!string.IsNullOrWhiteSpace(Game.PreferredEmulatorId)) Game.RequiresEmulatorAssignment = false;
 			Game.Favorite = favorite.Checked;
             GameRecognition.Apply(Game, emulators, false);
 		}
@@ -12970,7 +13033,7 @@ namespace EmulatorHub
 				ForeColor = Color.FromArgb(213, 205, 219),
 				Font = new Font("Bahnschrift", 8f),
 				Location = new Point(18, 342),
-				Size = new Size(350, 18)
+				Size = new Size(340, 18)
 			});
 			base.Controls.Add(new FishBowlActionButton
 			{
@@ -13228,7 +13291,7 @@ namespace EmulatorHub
 			{
 				List<GameEntry> games = library.Games;
 				Func<GameEntry, bool> predicate = (GameEntry g) => string.Equals(g.Path, game.Path, StringComparison.OrdinalIgnoreCase);
-				if (!games.Any(predicate))
+				if (!games.Any(predicate) && !GameLibraryRemoval.IsExcluded(library, game.Path) && library.Emulators.Any(emulator => emulator.Id == game.EmulatorId))
 				{
 					library.Games.Add(game);
 					num++;
@@ -16684,6 +16747,15 @@ namespace EmulatorHub
 	}
 	public class AquariumFooter : TableLayoutPanel
 	{
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            var filter = Controls.OfType<Label>().FirstOrDefault(label => label.Text == "Filter:");
+            if (filter != null && ColumnStyles.Count > 0) {
+                int need = TextRenderer.MeasureText(filter.Text, filter.Font).Width + filter.Margin.Horizontal + 12;
+                if (ColumnStyles[0].Width < need) ColumnStyles[0].Width = need;
+            }
+            base.OnLayout(e);
+        }
 		private readonly Color deepWater;
 
 		private readonly Color shallowWater;
@@ -16891,9 +16963,10 @@ namespace EmulatorHub
 				return;
 			}
 			int need = TextWidthNeeded();
-			if (base.Width < need && base.Parent is FlowLayoutPanel && base.Dock == DockStyle.None && !base.AutoSize)
+			int fittedWidth = base.MaximumSize.Width > 0 ? Math.Min(need, base.MaximumSize.Width) : need;
+			if (base.Width < fittedWidth && base.Parent is FlowLayoutPanel && base.Dock == DockStyle.None && !base.AutoSize)
 			{
-				base.Width = need;
+				base.Width = fittedWidth;
 			}
 			clippedTip.SetToolTip(this, base.Width < need ? Text : null);
 		}
@@ -17791,6 +17864,7 @@ namespace EmulatorHub
 						collection.GameIds = new List<string>();
 					}
 				}
+				LibraryPaths.Load(libraryData, DataDirectory, PortableMode ? AppDomain.CurrentDomain.BaseDirectory : null);
 				return libraryData;
 			}
 			catch (Exception ex)
@@ -17870,6 +17944,7 @@ namespace EmulatorHub
 			{
 				return;
 			}
+			LibraryPaths.Stamp(data, DataDirectory, PortableMode ? AppDomain.CurrentDomain.BaseDirectory : null);
 			UserTools.SaveActive(data);
 			Directory.CreateDirectory(DataDirectory);
 			string text = FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -20826,7 +20901,7 @@ namespace EmulatorHub
 				{
 					List<string> extensions = item.Extensions;
 					Func<string, bool> predicate = (string ext) => string.Equals(ext.Trim().TrimStart('.'), Path.GetExtension(file).TrimStart('.'), StringComparison.OrdinalIgnoreCase);
-					if (extensions.Any(predicate) && !library.Games.Any((GameEntry game) => string.Equals(game.Path, file, StringComparison.OrdinalIgnoreCase)))
+					if (extensions.Any(predicate) && !GameLibraryRemoval.IsExcluded(library, file) && !library.Games.Any((GameEntry game) => string.Equals(game.Path, file, StringComparison.OrdinalIgnoreCase)))
 					{
 						library.Games.Add(new GameEntry
 						{
@@ -22165,6 +22240,7 @@ namespace EmulatorHub
 
 		public static EmulatorProfile Emulator(LibraryData library, GameEntry game)
 		{
+            if (game.RequiresEmulatorAssignment) return null;
 			if (Hub.Native(game))
 			{
 				return Hub.NativeProfile(game);
@@ -22856,7 +22932,7 @@ namespace EmulatorHub
 			source = Path.GetFullPath(source);
 			if (!visited.Add(source))
 			{
-				throw new IOException("Playlist contains a circular or repeated reference.");
+				throw new IOException("Playlist contains a circular reference.");
 			}
 			if (visited.Count > 10000)
 			{
@@ -22893,6 +22969,7 @@ namespace EmulatorHub
 					list2.Add(text2);
 				}
 			}
+			visited.Remove(source);
 			return list2.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 		}
 
@@ -22901,7 +22978,7 @@ namespace EmulatorHub
 			List<OrganizationPlan> list = new List<OrganizationPlan>();
 			HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			HashSet<string> hashSet2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			foreach (string item in sources.OrderBy((string s) => (!Path.GetExtension(s).Equals(".m3u", StringComparison.OrdinalIgnoreCase)) ? (Path.GetExtension(s).Equals(".cue", StringComparison.OrdinalIgnoreCase) ? 1 : 2) : 0))
+			foreach (string item in sources.Select(s => Path.GetFullPath(Path.IsPathRooted(s) ? s : Path.Combine(Environment.CurrentDirectory, s))).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy((string s) => (!Path.GetExtension(s).Equals(".m3u", StringComparison.OrdinalIgnoreCase)) ? (Path.GetExtension(s).Equals(".cue", StringComparison.OrdinalIgnoreCase) ? 1 : 2) : 0))
 			{
 				token.ThrowIfCancellationRequested();
 				if (hashSet.Contains(item))
@@ -23599,8 +23676,11 @@ namespace EmulatorHub
 			foreach (Button item in summary.Controls.OfType<Button>())
 			{
 				item.AutoSize = false;
-				item.MinimumSize = new Size(140, 42);
-				item.Width = Math.Max(140, TextRenderer.MeasureText(item.Text, item.Font).Width + 60);
+				int available = Math.Max(1, ClientSize.Width - summary.Padding.Horizontal - item.Margin.Horizontal);
+				item.MinimumSize = new Size(Math.Min(140, available), 42);
+				item.MaximumSize = new Size(available, 0);
+				item.AutoEllipsis = true;
+				item.Width = Math.Min(available, Math.Max(140, TextRenderer.MeasureText(item.Text, item.Font).Width + 60));
 				item.Height = Math.Max(42, item.Font.Height + 16);
 			}
 			int num2 = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
@@ -23615,7 +23695,9 @@ namespace EmulatorHub
 				}
 				foreach (Label item2 in control3.Controls.OfType<Label>())
 				{
-					item2.Height = Math.Max((int)(40f * num), item2.Font.Height + 14);
+					int captionWidth = Math.Max(1, control3.Width - control3.Padding.Horizontal - item2.Padding.Horizontal);
+					int captionHeight = TextRenderer.MeasureText(item2.Text, item2.Font, new Size(captionWidth, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl).Height;
+					item2.Height = Math.Max((int)(40f * num), captionHeight + 14);
 				}
 				int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - 2);
 				foreach (Control control4 in flowLayoutPanel.Controls)
@@ -24565,7 +24647,19 @@ namespace EmulatorHub
 	public static class ExperienceTools
 	{
 		public static void Launch(IWin32Window owner, LibraryData library, GameEntry game)
-		{
+        {
+            if (!Hub.Native(game) && (game.RequiresEmulatorAssignment || NextData.LaunchEmulator(library, game) == null)) {
+                var choices = library.Emulators.ToList();
+                if (choices.Count == 0) { MessageBox.Show(owner, "Add an emulator before launching this game.", "FishBowl"); return; }
+                var names = choices.Select(e => string.IsNullOrWhiteSpace(e.Name) ? Path.GetFileNameWithoutExtension(e.Executable) : e.Name).ToList();
+                var labels = names.Select((name, index) => names.Count(n => n == name) > 1 ? name + " (" + (index + 1) + ")" : name).ToList();
+                string choice = Choose(owner, "Preferred emulator", labels, labels[0]);
+                if (choice == null) return;
+                var selected = choices[labels.IndexOf(choice)];
+                game.EmulatorId = selected.Id; game.PreferredEmulatorId = selected.Id;
+                game.PreferredBuildId = null; game.LaunchProfileName = null; game.RequiresEmulatorAssignment = false;
+                Store.Save(library);
+            }
 			string text;
 			try
 			{
@@ -24688,7 +24782,39 @@ namespace EmulatorHub
 			}
 		}
 
-		private static string Choose(IWin32Window owner, string title, IEnumerable<string> items, string current)
+        public static void UndoRemoval(IWin32Window owner, LibraryData library)
+        {
+            int restored = GameLibraryRemoval.Undo(library);
+            Store.Save(library);
+            MessageBox.Show(owner, restored == 0 ? "No entries could be restored. Existing entries were kept." : "Restored entries: " + restored, "FishBowl");
+            foreach (var main in Application.OpenForms.OfType<MainForm>()) main.RefreshUserToolsViews(library);
+        }
+        public static void CleanupArtwork(IWin32Window owner, LibraryData library)
+        {
+            try {
+                var backups = new List<LibraryData>();
+                var paths = new List<string>();
+                if (File.Exists(Store.FileName + ".bak")) paths.Add(Store.FileName + ".bak");
+                if (Directory.Exists(Store.RestorePointDirectory)) paths.AddRange(Directory.EnumerateFiles(Store.RestorePointDirectory, "*.json"));
+                paths.AddRange(Directory.EnumerateFiles(Store.DataDirectory, "*.recovery-*.json"));
+                foreach (var path in paths) {
+                    var backup = Json.Deserialize<LibraryData>(File.ReadAllText(path));
+                    if (backup == null) throw new InvalidDataException("A library backup could not be checked.");
+                    LibraryPaths.Load(backup, Store.DataDirectory, Store.PortableMode ? AppDomain.CurrentDomain.BaseDirectory : null);
+                    backups.Add(backup);
+                }
+                var files = LibraryPaths.ArtworkCandidates(library, Store.DataDirectory, backups);
+                if (files.Count == 0) { MessageBox.Show(owner, "Nothing needs attention.", "FishBowl"); return; }
+                if (!Polish.Review(owner, "Cleanup artwork", "Unused artwork files: " + files.Count + "\r\n\r\n" + string.Join("\r\n", files.Select(Path.GetFileName)) + "\r\n\r\nRemove these unused FishBowl artwork files? Covers used by games, Undo removal and library backups are kept.")) return;
+                // Check references again after the review, including any library edits made while it was open.
+                var current = new HashSet<string>(LibraryPaths.ArtworkCandidates(library, Store.DataDirectory, backups), Platform.PathComparer);
+                int removed = 0;
+                foreach (var file in files) if (current.Contains(file)) { File.Delete(file); removed++; }
+                MessageBox.Show(owner, "Removed artwork files: " + removed, "FishBowl");
+            } catch (Exception error) { MessageBox.Show(owner, "Artwork cleanup could not be completed.\r\n\r\n" + error.Message, "FishBowl"); }
+        }
+
+        private static string Choose(IWin32Window owner, string title, IEnumerable<string> items, string current)
 		{
 			Form dialog = ExperienceUi.Dialog(title, 680, 440);
 			try
@@ -25268,9 +25394,21 @@ namespace EmulatorHub
 						resultsDialog.ShowDialog(dialog);
 					}
 				}));
-				dialog.Controls.Add(list);
-				dialog.Controls.Add(flowLayoutPanel);
-				reload();
+                flowLayoutPanel.Controls.Add(ExperienceUi.Button("Review moved", delegate {
+                    GameEntry selected = list.SelectedItem as GameEntry;
+                    if (selected == null) return;
+                    using (var picker = new FolderBrowserDialog { Description = "Choose the new folder containing " + Path.GetFileName(selected.Path) }) {
+                        if (picker.ShowDialog(dialog) != DialogResult.OK) return;
+                        string oldRoot = Path.GetDirectoryName(selected.Path), newRoot = picker.SelectedPath;
+                        int count = LibraryPaths.Rebase(library, oldRoot, newRoot, false);
+                        if (count == 0) { MessageBox.Show(dialog, "No matching files found in this folder.", "FishBowl"); return; }
+                        if (!Polish.Review(dialog, "Review game path repair", "Old folder: " + oldRoot + "\r\nNew folder: " + newRoot + "\r\n\r\nMatching paths: " + count + "\r\nGame identity, notes and save associations stay together. No files are moved.")) return;
+                        LibraryPaths.Rebase(library, oldRoot, newRoot, true); Store.Save(library); reload();
+                    }
+                }));
+                dialog.Controls.Add(list);
+                dialog.Controls.Add(flowLayoutPanel);
+                reload();
 				dialog.ShowDialog(owner);
 			}
 			finally
@@ -26049,7 +26187,7 @@ namespace EmulatorHub
 				foreach (string file in SafeFiles.Tree(item.ScanFolder, token))
 				{
 					token.ThrowIfCancellationRequested();
-					if (!SafeFiles.Within(file, root) && file.IndexOf(".fishbowl-", StringComparison.OrdinalIgnoreCase) < 0 && item.Extensions.Any((string ext) => ext.Trim().TrimStart('.').Equals(Path.GetExtension(file).TrimStart('.'), StringComparison.OrdinalIgnoreCase)) && hashSet.Add(file))
+					if (!SafeFiles.Within(file, root) && file.IndexOf(".fishbowl-", StringComparison.OrdinalIgnoreCase) < 0 && item.Extensions.Any((string ext) => ext.Trim().TrimStart('.').Equals(Path.GetExtension(file).TrimStart('.'), StringComparison.OrdinalIgnoreCase)) && !GameLibraryRemoval.IsExcluded(library, file) && hashSet.Add(file))
 					{
 						list.Add(new GameEntry
 						{
@@ -31785,6 +31923,7 @@ namespace EmulatorHub
 					Idle(d);
 					foreach (ListViewItem checkedItem in list.CheckedItems)
 					{
+						GameLibraryRemoval.AllowPath(d, ((GameEntry)checkedItem.Tag).Path);
 						d.Games.Add((GameEntry)checkedItem.Tag);
 					}
 					Record(d, "Imported " + list.CheckedItems.Count + " games");
@@ -31862,6 +32001,7 @@ namespace EmulatorHub
 								Native = true
 							}
 						});
+						GameLibraryRemoval.AllowPath(d, d.Games.Last().Path);
 						GameRecognition.Apply(d.Games.Last(), d.Emulators, false);
                         Record(d, "Added PC game: " + textPromptDialog2.Value);
 						Store.Save(d);

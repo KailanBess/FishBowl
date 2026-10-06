@@ -412,6 +412,9 @@ namespace EmulatorHub
 	}
 	public class GameEntry
 	{
+        public bool RequiresEmulatorAssignment { get; set; }
+        public bool TitleIsCustom { get; set; }
+
 #if NETCOREAPP
 		// Keep fields from newer versions when this one saves (Linux build; JavaScriptSerializer on Windows ignores this).
 		[System.Text.Json.Serialization.JsonExtensionData]
@@ -646,6 +649,9 @@ namespace EmulatorHub
 	}
 	public class LibraryData
 	{
+        public List<LibraryRemoval> RemovalHistory { get; set; }
+        public string SavedDataRoot { get; set; }
+        public string SavedPortableRoot { get; set; }
 #if NETCOREAPP
 		// Keep fields from newer versions when this one saves (Linux build; JavaScriptSerializer on Windows ignores this).
 		[System.Text.Json.Serialization.JsonExtensionData]
@@ -666,6 +672,8 @@ namespace EmulatorHub
 		public List<EmulatorProfile> Emulators { get; set; }
 
 		public List<GameEntry> Games { get; set; }
+
+        public List<string> RemovedGamePaths { get; set; }
 
 		public List<WebsiteLink> Links { get; set; }
 
@@ -1176,4 +1184,26 @@ namespace EmulatorHub
 			return dictionary;
 		}
 	}
+    public class RemovedAssignment
+    {
+#if NETCOREAPP
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
+        public string GameId { get; set; }
+        public string EmulatorId { get; set; }
+        public string PreferredEmulatorId { get; set; }
+    }
+    public class LibraryRemoval
+    {
+#if NETCOREAPP
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
+        public List<GameEntry> Games { get; set; }
+        public EmulatorProfile Emulator { get; set; }
+        public Dictionary<string, List<string>> Collections { get; set; }
+        public List<string> Queue { get; set; }
+        public List<RemovedAssignment> Assignments { get; set; }
+    }
 }

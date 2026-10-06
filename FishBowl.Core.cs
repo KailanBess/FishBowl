@@ -52,6 +52,7 @@ namespace EmulatorHub
                 foreach (var emulator in data.Emulators) { if (emulator.LaunchProfiles == null) emulator.LaunchProfiles = new List<LaunchProfile>(); if (emulator.Builds == null) emulator.Builds = new List<EmulatorBuild>(); }
                 foreach (var game in data.Games) if (game.Tags == null) game.Tags = new List<string>();
                 foreach (var collection in data.Collections) if (collection.GameIds == null) collection.GameIds = new List<string>();
+                LibraryPaths.Load(data, DataDirectory, PortableMode ? AppDomain.CurrentDomain.BaseDirectory : null);
                 return data;
             }
             catch (Exception error)
@@ -71,6 +72,7 @@ namespace EmulatorHub
 
         public static void Save(LibraryData data)
         {
+            LibraryPaths.Stamp(data, DataDirectory, PortableMode ? AppDomain.CurrentDomain.BaseDirectory : null);
             Directory.CreateDirectory(DataDirectory);
             var temporary = FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try

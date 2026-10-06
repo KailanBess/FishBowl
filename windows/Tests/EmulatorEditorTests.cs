@@ -26,7 +26,7 @@ class EmulatorEditorTests
     static void Run()
     {
         Application.EnableVisualStyles();Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
-        string executable=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"fixture-emulator.exe");File.WriteAllText(executable,"test fixture; never executed");
+        string executable=Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),"fixture-emulator.exe");File.WriteAllText(executable,"test fixture; never executed");
         foreach(int percent in new[]{100,150,200})foreach(bool edit in new[]{false,true})
         {
             NextUi.TextPercent=percent;
@@ -40,7 +40,7 @@ class EmulatorEditorTests
                 var body=(Panel)NextUi.Descendants(d).First(c=>c.Name=="EmulatorEditorBody");Check(body.AutoScroll,"Fields can scroll at larger text sizes");
                 Check(!body.Bounds.IntersectsWith(footer.Bounds),"Body cannot cover footer");
                 Point before=accept.PointToScreen(Point.Empty);body.AutoScrollPosition=new Point(0,10000);Application.DoEvents();Check(before==accept.PointToScreen(Point.Empty),"Scrolling fields cannot hide action button");
-                using(var image=new Bitmap(d.Width,d.Height)){d.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,(edit?"Edit":"Add")+"-Emulator-"+percent+".png"));}
+                using(var image=new Bitmap(d.Width,d.Height)){d.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),(edit?"Edit":"Add")+"-Emulator-"+percent+".png"));}
                 Field(d,"name","Added through visible button");Field(d,"executable",executable);accept.PerformClick();
                 Check(d.DialogResult==DialogResult.OK&&d.Profile!=null&&d.Profile.Name=="Added through visible button"&&d.Profile.Executable==executable,"Visible action creates/updates emulator profile");
             }

@@ -22,3 +22,4 @@ obj/
 
 # Overflow audit output
 windows/overflow-audit/
+windows/overflow-audit-compact/

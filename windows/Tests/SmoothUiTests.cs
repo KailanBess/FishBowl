@@ -19,7 +19,7 @@ class SmoothUiTests
     }
     static void Run()
     {
-        string dir=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"smooth-ui-previews"); Directory.CreateDirectory(dir);
+        string dir=Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),"smooth-ui-previews"); Directory.CreateDirectory(dir);
         var data=Store.Load(); NextData.Ensure(data);
         using(var main=new MainForm(true))
         {

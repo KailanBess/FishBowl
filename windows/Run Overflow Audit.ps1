@@ -1,7 +1,8 @@
 # Opens every FishBowl window at 100%, 150% and 200% text size and reports text that doesn't fit.
 # Output: overflow-audit\overflow-report.md and screenshots (red outlines mark clipped text). Run after Build.ps1.
+param([switch]$Compact)
 $ErrorActionPreference = 'Stop'
-$output = Join-Path $PSScriptRoot 'overflow-audit'
+$output = Join-Path $PSScriptRoot $(if ($Compact) { 'overflow-audit-compact' } else { 'overflow-audit' })
 $fixture = Join-Path $env:TEMP ('FishBowl-Overflow-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture | Out-Null
 Copy-Item (Join-Path $PSScriptRoot 'FishBowl.exe'),(Join-Path $PSScriptRoot 'OverflowAudit.cs') $fixture
@@ -11,6 +12,8 @@ Push-Location $fixture
 try {
     & $compiler /nologo /r:FishBowl.exe /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:OverflowAudit.exe OverflowAudit.cs
     if ($LASTEXITCODE -ne 0) { throw 'Overflow audit compilation failed' }
-    & '.\OverflowAudit.exe' $output
+    $auditArgs = @($output)
+    if ($Compact) { $auditArgs += '--compact' }
+    & '.\OverflowAudit.exe' @auditArgs
     if ($LASTEXITCODE -ne 0) { throw 'Overflow audit failed to run' }
 } finally { Pop-Location; Remove-Item $fixture -Recurse -Force -ErrorAction SilentlyContinue }

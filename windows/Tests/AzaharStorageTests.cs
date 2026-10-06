@@ -14,7 +14,7 @@ class AzaharStorageTests
     }
     static void Run()
     {
-        string root=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"azahar-storage-"+Guid.NewGuid().ToString("N").Substring(0,8));
+        string root=Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),"azahar-storage-"+Guid.NewGuid().ToString("N").Substring(0,8));
         string roaming=Path.Combine(root,"roaming"), plus=Path.Combine(roaming,"AzaharPlus"), program=Path.Combine(root,"azaharplus-build");
         Directory.CreateDirectory(program); Directory.CreateDirectory(Path.Combine(plus,"config"));
         var e=new EmulatorProfile { Name="Azahar Plus", Preset="Azahar Plus", Executable=Path.Combine(program,"azahar.exe") };
