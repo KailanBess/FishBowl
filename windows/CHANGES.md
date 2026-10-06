@@ -3,6 +3,7 @@
 - Compact control sizing is the default, reducing box/button padding, toolbar/banner spacing and Home card dimensions while preserving configured fonts and text scaling. Standard and Roomy remain available; the controller preset uses Roomy.
 - Input, button and selection colors follow the active theme, with readable text and consistent backgrounds. Original colors and custom palettes remain available.
 - Corrected stale colors after switching themes. Home previews and Show all retain every option.
+- Fixed repeated Library text scaling and overlapping enlarged filters; smaller viewports scroll to keep actions and game rows reachable.
 
 # Windows 1.26.1 Home layout
 

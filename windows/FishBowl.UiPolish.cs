@@ -203,6 +203,7 @@ namespace EmulatorHub
                     {
                         int height = Math.Max(button.Font.Height + Choose(10, 16, 20), Choose(28, 34, 42));
                         button.MinimumSize = new Size(Compact ? Math.Min(metric.Minimum.Width, 84) : metric.Minimum.Width, Math.Min(metric.Minimum.Height, height));
+                        if (!Compact) height = Math.Max(height, metric.Height);
                         if (button.Dock == DockStyle.None && !button.AutoSize) button.Height = height;
                     }
                     TableLayoutPanel table = control as TableLayoutPanel;
@@ -234,6 +235,40 @@ namespace EmulatorHub
                 }
             }
             TextFit.FitLabels(form);
+        }
+    }
+
+    public sealed class LibraryFilterPanel : FlowLayoutPanel
+    {
+        private bool arranging;
+
+        protected override void OnLayout(LayoutEventArgs args)
+        {
+            if (arranging) return;
+            arranging = true;
+            try
+            {
+                base.OnLayout(args);
+                // Native dropdown preferred heights can lag behind a font change.
+                // Arrange rows using their actual heights so enlarged inputs cannot overlap.
+                int available = Math.Max(1, ClientSize.Width - Padding.Horizontal - 8);
+                int x = 0, y = Padding.Top, rowHeight = 0;
+                foreach (Control control in Controls)
+                {
+                    int width = control.Width + control.Margin.Horizontal;
+                    int height = Math.Max(control.Height, control.Font.Height + 12) + control.Margin.Vertical;
+                    if (x > 0 && x + width > available)
+                    {
+                        x = 0;
+                        y += rowHeight;
+                        rowHeight = 0;
+                    }
+                    control.Location = new Point(Padding.Left + x + control.Margin.Left, y + control.Margin.Top);
+                    x += width;
+                    rowHeight = Math.Max(rowHeight, height);
+                }
+            }
+            finally { arranging = false; }
         }
     }
 

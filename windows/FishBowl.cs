@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -423,6 +423,9 @@ namespace EmulatorHub
 						{
 							ShowNotifications();
 						}
+                        // Startup preferences change the Home cache key; settle it before later selection updates.
+                        if (homeSurface != null) homeSurface.Reload(false);
+                        if (emulatorHome != null) emulatorHome.Reload(false);
 					}
 				});
 			};
@@ -5719,6 +5722,7 @@ namespace EmulatorHub
 			FluidStyle.Configure(library);
             ControlDensityTools.Apply(this);
 			UpdateFluidHeader();
+            if (embeddedLibrary != null) embeddedLibrary.FitEmbeddedViewport();
 			if (homeSurface != null)
 			{
 				homeSurface.RefreshLayout();
@@ -9770,6 +9774,8 @@ namespace EmulatorHub
 			RefreshGames();
 			InitializePolish();
 			InitializeHubLibrary();
+            SizeChanged += delegate { FitEmbeddedViewport(); };
+            panel.SizeChanged += delegate { FitEmbeddedViewport(); };
 		}
 
 		private void AddButton(FlowLayoutPanel panel, string text, Action action)
@@ -10064,12 +10070,12 @@ namespace EmulatorHub
 		{
 			ExperienceData.Ensure(library);
 			buildingLibraryFilters = true;
-			FlowLayoutPanel filters = new FlowLayoutPanel
+			FlowLayoutPanel filters = new LibraryFilterPanel
 			{
 				Dock = DockStyle.Bottom,
 				Height = 66,
 				WrapContents = true,
-				AutoScroll = true,
+				AutoScroll = false,
 				Padding = new Padding(10, 4, 10, 4)
 			};
 			Action<ComboBox, string, IEnumerable<string>, int> action = delegate(ComboBox box, string name, IEnumerable<string> items, int width)
@@ -10434,6 +10440,35 @@ namespace EmulatorHub
 			}
 		}
 
+        private Panel embeddedScroll, embeddedPage;
+        private bool fittingEmbeddedViewport;
+        public void FitEmbeddedViewport() {
+            if (TopLevel || fittingEmbeddedViewport || ClientSize.Height <= 0) return;
+            fittingEmbeddedViewport = true;
+            try {
+                if (embeddedPage == null) {
+                    var toolbar = Controls.OfType<FlowLayoutPanel>().FirstOrDefault(c => c.Name == "FishBowlToolbar");
+                    var header = search.Parent;
+                    if (toolbar == null || header == null || toolbar.Height + header.Height + 140 <= ClientSize.Height) return;
+                    Control[] existing = Controls.Cast<Control>().ToArray();
+                    embeddedScroll = new Panel { Name = "FishBowlLibraryScroll", Dock = DockStyle.Fill, AutoScroll = true, BackColor = BackColor };
+                    embeddedPage = new Panel { Name = "FishBowlLibraryPage", Dock = DockStyle.Top, BackColor = BackColor };
+                    Controls.Clear();
+                    embeddedPage.Controls.AddRange(existing);
+                    for (int i = 0; i < existing.Length; i++) embeddedPage.Controls.SetChildIndex(existing[i], i);
+                    embeddedScroll.Controls.Add(embeddedPage); Controls.Add(embeddedScroll);
+                    SizeChanged += delegate { FitEmbeddedViewport(); };
+                }
+                embeddedScroll.Bounds = ClientRectangle;
+                embeddedPage.Width = Math.Max(1, embeddedScroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
+                FitLibraryHeader();
+                var actions = NextUi.Descendants(embeddedPage).OfType<FlowLayoutPanel>().First(c => c.Name == "FishBowlToolbar");
+                int minimum = search.Parent.Height + actions.Height + Math.Max(140, games.Font.Height * 5);
+                embeddedPage.Height = Math.Max(embeddedScroll.ClientSize.Height, minimum);
+                embeddedPage.PerformLayout();
+            } finally { fittingEmbeddedViewport = false; }
+        }
+
 		private void FitLibraryHeader()
 		{
 			if (fittingHeader || search.Parent == null)
@@ -10462,6 +10497,7 @@ namespace EmulatorHub
 					int val = TextRenderer.MeasureText(item.Text, item.Font).Width + 42;
 					item.Width = Math.Max(120, Math.Min(300, val));
 				}
+				flowLayoutPanel.PerformLayout();
 				int num2 = 0;
 				int num3 = 0;
 				int num4 = 0;
@@ -27451,13 +27487,22 @@ namespace EmulatorHub
 		public static int TextPercent = 100;
 
 		public static string FontFamily = "Bahnschrift";
+        private sealed class FontBaseline { public float Size; }
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, FontBaseline> originalFonts = new System.Runtime.CompilerServices.ConditionalWeakTable<Control, FontBaseline>();
+
 
 		public static void ApplyAccessibility(Form form)
 		{
-			if (!(form is MainForm))
+			if (!(form is MainForm) && !(form is GameLibraryDialog && !form.TopLevel))
 			{
 				Control[] array = Descendants(form).Concat(new Control[1] { form }).ToArray();
-				float[] array2 = array.Select((Control c) => c.Font.Size).ToArray();
+				float[] array2 = array.Select(delegate(Control c) {
+                    FontBaseline baseline;
+                    if (!originalFonts.TryGetValue(c, out baseline)) {
+                        baseline = new FontBaseline { Size = c.Font.Size }; originalFonts.Add(c, baseline);
+                    }
+                    return baseline.Size;
+                }).ToArray();
 				for (int i = 0; i < array.Length; i++)
 				{
 					array[i].Font = new Font(FontFamily, array2[i] * (float)TextPercent / 100f, array[i].Font.Style);

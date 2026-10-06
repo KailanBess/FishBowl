@@ -33,9 +33,9 @@ try {
  foreach ($legacyTest in @('AdditionTests','CompactTests','CosmeticTests','UserToolsTests','PolishTests','AuditTests','HubTests','ImmersionTests','FluidTests','TextFieldTests','RowPaintTests','PauseAnimationTests')) {
   Write-Output "Running $legacyTest"
   $legacyFixture = $fixture
-  if ($legacyTest -eq 'CosmeticTests') {
+  if (@('CosmeticTests','FluidTests') -contains $legacyTest) {
    # Appearance fixtures must not inherit settings changed by earlier test executables.
-   $legacyFixture = Join-Path $fixture 'cosmetic-isolated'
+   $legacyFixture = Join-Path $fixture ($legacyTest + '-isolated')
    New-Item -ItemType Directory -Path $legacyFixture -Force | Out-Null
    Copy-Item -LiteralPath (Join-Path $fixture 'FishBowl.exe') -Destination $legacyFixture
    Set-Content -LiteralPath (Join-Path $legacyFixture 'portable.flag') -Value ''

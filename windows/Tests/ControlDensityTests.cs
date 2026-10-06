@@ -30,6 +30,28 @@ class ControlDensityTests {
    Rectangle beforeHint=hint.Bounds,beforeStartup=startup.Bounds;ControlDensityTools.Apply(settings);Application.DoEvents();
    Check(hint.Bounds==beforeHint&&startup.Bounds==beforeStartup,"backup hint spacing stable after repeated apply");Capture(settings,"settings-200");settings.Close();
   }
+  foreach(int percent in new[]{100,150,200}){
+   data.Enhancements.TextPercent=percent;data.Theme.ControlDensity="Compact";data.Experience.StartPage="Library";Store.Save(data);NextUi.TextPercent=percent;TextFit.WorkingAreaOverride=new Rectangle(0,0,1024,720);
+   using(var main=new MainForm(true)){
+    main.ShowInTaskbar=false;main.MinimumSize=new Size(800,600);main.Size=new Size(1024,720);main.Show();Application.DoEvents();
+    ((TabControl)typeof(MainForm).GetField("workspaceNavigation",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main)).SelectedIndex=2;Application.DoEvents();
+    var embedded=NextUi.Descendants(main).OfType<GameLibraryDialog>().Single();
+    var title=NextUi.Descendants(embedded).OfType<Label>().Single(c=>c.Text=="Game Library");
+    Check(Math.Abs(title.Font.Size-16f*percent/100f)<0.1f,"embedded library text scales exactly once at "+percent+" actual="+title.Font.Size);
+    var bar=NextUi.Descendants(embedded).OfType<FlowLayoutPanel>().Single(c=>c.Name=="FishBowlToolbar");
+    var games=NextUi.Descendants(embedded).OfType<ListView>().Single(c=>c.AccessibleName=="FishBowl game list");
+    var filters=NextUi.Descendants(embedded).OfType<ComboBox>().Where(c=>c.Parent is FlowLayoutPanel).ToArray();
+    Check(filters.All(a=>filters.All(b=>a==b||!a.Bounds.IntersectsWith(b.Bounds))),"Library filters never overlap at "+percent+" "+string.Join(";",filters.Select(c=>c.Text+" "+c.Bounds)));
+    Capture(main,"library-before-"+percent);Check(bar.Visible&&bar.Bottom<=bar.Parent.ClientSize.Height&&games.Height>=100,"library actions and list retain space at "+percent+" bar="+bar.Bounds+" visible="+bar.Visible+" list="+games.Bounds+" client="+embedded.ClientSize);
+    for(int repeat=0;repeat<2;repeat++){typeof(MainForm).GetMethod("ApplyAppearanceNow",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(main,null);Application.DoEvents();}
+    Check(Math.Abs(title.Font.Size-16f*percent/100f)<0.1f,"live theme apply preserves library scale at "+percent);
+    Check(bar.Parent.Width>=embedded.ClientSize.Width-24,"library scroll page spans workspace at "+percent+" page="+bar.Parent.Bounds+" dock="+bar.Parent.Dock+" scroll="+bar.Parent.Parent.Bounds+" sdock="+bar.Parent.Parent.Dock);Capture(main,"library-"+percent);
+    var live=(LibraryData)typeof(MainForm).GetField("library",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main);
+    live.Enhancements.TextPercent=100;typeof(MainForm).GetMethod("ApplyAppearanceNow",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(main,null);Application.DoEvents();
+    Check(Math.Abs(title.Font.Size-16f)<0.1f&&filters.All(c=>c.Height<=c.Font.Height+16),"returning to 100% restores Library text and input heights after "+percent);
+    main.Close();
+   }
+  }
   data.Theme.ControlDensity="Roomy";FluidStyle.Configure(data);Check(FluidStyle.Roomier,"Roomy overrides older spacing preference");data.Theme.ControlDensity=null;FluidStyle.Configure(data);Check(!FluidStyle.Roomier,"Compact suppresses older Roomier default without modifying it");UiPolishTools.ApplyAccessibility(data,"Controller");Check(data.Theme.ControlDensity=="Roomy","controller preset selects roomy controls");NextUi.TextPercent=100;TextFit.WorkingAreaOverride=null;
  }
  static void Capture(Form form,string name){using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine("density-previews",name+".png"));}}
