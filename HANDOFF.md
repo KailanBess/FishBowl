@@ -16,13 +16,12 @@ _Last updated: 2026-10-06, by the Linux side._
 
 | PR | What | Notes |
 | --- | --- | --- |
-| #11 | Fix cut-off and overlapping text in the Windows app | Audit findings 309 → 88 (2 at 100% text size). Adds `windows/FishBowl.TextFit.cs`. |
-| #9 | Linux easter egg (Tux in the banner) | Linux only. |
-| #12 | README rewrite and repository tidy-up | Removes unused files, moves binaries to Releases, adds these handoff files. |
+| #14 | Share game identification between Windows and Linux | First step of Linux parity. Includes the handoff update from #13. |
 
 ## Known issues
 
 - **#10, Windows CI test failure.** "multi-disc support files grouped once" in `windows/Tests/IntegrationTests.cs` passes locally but fails on GitHub's Windows runner. Every Windows CI run fails until it is fixed. This is Windows-side work.
+- **Windows CI runs stop at #10.** Because `IntegrationTests` fails first, the rest of the Windows suite (including the twelve legacy tests moved into `windows/Tests/` in #12) is not run in CI until #10 is fixed.
 - **Remaining text overflow (88 findings).** Mostly at 200% text in dense dialogs (Library Maintenance, Settings), which need a layout redesign. The report is in the `overflow-audit` artifact of each audit run.
 
 ## In progress on the Linux side
@@ -50,7 +49,7 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 
 ## Next steps (Linux parity)
 
-1. **Move Windows non-UI logic into shared files:** game recognition, library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
+1. **Move Windows non-UI logic into shared files:** game recognition (done: `FishBowl.GameRecognition.cs`), then library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
 2. **Build Linux screens on that shared logic:** Home, Library, game details, profiles and living-room mode.
 3. **Finish and submit the Linux-only features above.**
 
@@ -59,6 +58,8 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 ## Log
 
 - **2026-10-06:**
+  - Shared game identification: `windows/GameRecognition.cs` moved to the root as `FishBowl.GameRecognition.cs` and is compiled by both builds. Its WinForms helpers (`SmoothPainting`, `ConsistentInputs`) moved to `windows/FishBowl.InputPainting.cs`. Linux uses `FishBowl.LinuxShims.cs` for the `System.Drawing` types (built-in PNG encoder). Fixed Linux storing its library in the current directory when `~/.local/share` doesn't exist yet.
+  - Merged #8 (shared data model), #9 (Tux easter egg), #11 (text overflow fixes; Windows build now compiles `windows/FishBowl.TextFit.cs`) and #12 (README, tidy-up, handoff). Published release v1.25.8.
   - Rewrote the README and tidied the repository: removed superseded source and test files, the old root `FishBowl.cs`, and obsolete review notes.
   - Moved the Windows binaries to the v1.25.8 release, and added `AGENTS.md`, `CLAUDE.md` and this file.
   - Opened #11 (text overflow) and #9 (Tux easter egg). Filed #10.

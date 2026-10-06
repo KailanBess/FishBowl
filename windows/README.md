@@ -27,7 +27,8 @@ Run `Build.ps1` first. The tests never open or modify your real library, games o
 | File | Purpose |
 | --- | --- |
 | `FishBowl.cs` | The Windows application |
-| `GameRecognition.cs` | Game identification from local metadata |
+| `FishBowl.InputPainting.cs`, `FishBowl.TextFit.cs` | Painting, input and text-fitting helpers |
+| `../FishBowl.GameRecognition.cs` | Game identification from local metadata, shared with the Linux version |
 | `FishBowl.Setup.cs` | The installer |
 | `../FishBowl.Model.cs` | The library data model, shared with the Linux version |
 | `Tests\` | Regression tests |

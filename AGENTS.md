@@ -16,7 +16,7 @@ FishBowl is developed by two people, each working with a coding agent: one maint
 
 ## Code rules
 
-- **C# 5 in shared files:** `FishBowl.Model.cs`, `FishBowl.Core.cs`, `FishBowl.Platform.cs` and everything in `windows/` must compile with the .NET Framework C# 5 compiler.
+- **C# 5 in shared files:** `FishBowl.Model.cs`, `FishBowl.GameRecognition.cs`, `FishBowl.Core.cs`, `FishBowl.Platform.cs` and everything in `windows/` must compile with the .NET Framework C# 5 compiler.
   - **Not allowed:** `?.`, `??=`, `$"..."`, `=>` members, `nameof`, `out var`, `is T x`, tuples, local functions, property initializers.
   - **Linux-only APIs** go behind `#if NETCOREAPP`.
 - **Saved data:** `FishBowl.Model.cs` defines `library.json` for both versions. Add new fields as optional; never rename or remove one.
