@@ -16,6 +16,7 @@ _Last updated: 2026-10-06, by the Linux side._
 
 | PR | What | Notes |
 | --- | --- | --- |
+| #18 | Windows themes and accents (1.25.12) | Windows side. Linux themes follow after it merges. |
 | #19 | Linux: dialogs no longer trap the mouse | Linux only. |
 
 ## Recently merged: Windows 1.25.11 (#15)
@@ -60,7 +61,7 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 
 ## Log
 
-- **2026-10-06 (Linux dialogs):** dialogs no longer trap the mouse on focus-follows-mouse desktops (Hyprland, Sway, i3). Avalonia's X11 modal dialogs pulled focus back whenever the owner window was hovered, and the compositor warped the pointer back. `FishDialog.Present` now shows dialogs owned (still above the owner) and blocks the owner's input until they close. Merged #15 and #16.
+- **2026-10-06 (Linux dialogs):** dialogs no longer trap the mouse on focus-follows-mouse desktops (Hyprland, Sway, i3). Avalonia's X11 modal dialogs pulled focus back whenever the owner window was hovered, and the compositor warped the pointer back. `FishDialog.Present` now shows dialogs owned (still above the owner) and blocks the owner's input until they close. Merged #15, #16 and #17.
 
 - **2026-10-06 (Windows CI multi-disc diagnostics):** reviewed the failing Windows Actions run `37421288794` and confirmed the original clean-runner failure was the `IntegrationTests` multi-disc grouping assertion. Added grouped-plan diagnostics to that assertion so future failures print `grouped.Count` plus each plan's source/files, making runner-only path or ordering differences visible in logs.
 
