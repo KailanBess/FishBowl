@@ -1,3 +1,9 @@
+# Windows 1.26.1 Home layout
+
+- Home uses up to two wider columns, more internal spacing and a shared row for a card's primary/More actions.
+- Game/emulator cards show three preview entries; information cards show one summary line. Show all reveals the remaining content, and Show less returns to the preview. All games, details and actions remain available.
+- Expanded cards retain their state when Home refreshes. Home card ordering/visibility and page scrolling remain supported.
+
 # Windows and Linux 1.26.0 source
 
 - Added Home page scrolling, primary/More actions, theme/accent previews, accessibility presets, cover proportions, card ordering/visibility and restrained accents using current controls.

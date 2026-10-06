@@ -8,7 +8,7 @@ _Last updated: 2026-10-06, expansion integration._
 
 | | State |
 | --- | --- |
-| Windows | Source **1.26.0** on `fishbowl-expansion`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.26.1** on `fishbowl-expansion`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
@@ -16,13 +16,17 @@ _Last updated: 2026-10-06, expansion integration._
 
 Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dialog focus). PR #20 includes and supersedes #18; it can be reviewed directly against main. Both platform implementations are included.
 
+## Home layout 1.26.1
+
+Windows Home now uses wider cards in up to two columns, more padding and a single row for primary/More actions. Game/emulator cards preview three entries; information cards preview one summary line. Show all/Show less reveals every remaining item and preserves expansion across Home refreshes. No data or commands are removed. Existing style, card preferences and page scrolling remain in use. Native layout checks and Home interaction validation are pending.
+
 ## Expansion 1.26.0
 
 Home page scrolling, primary/More actions, 40 theme/28 accent previews, card ordering/visibility, cover proportions, restrained accents and accessibility presets use current controls. Added unified game setup, Steam manifests and reviewed native executable imports, verified mod overlay journals and rollback, IPS patch copies, media links/gallery, monthly/session history, reviewed save timeline/transfers, RetroAchievements completion cache, metadata catalogs, declarative extensions and a paired read-only companion.
 
 Linux adds library/profiles/collections/removal Undo/reassignment/path repair/cover editing and shared expansion tools. File save timelines use SaveTools; folder saves use EmulatorBackups. Living-room input is keyboard/buttons; new gamepad polling is not included. Existing Linux-maintainer launch wrappers and in-progress native integrations below remain separate.
 
-Validation: Windows build and 2,310 expansion layout checks passed across 132 captures at three text sizes on normal/compact screens; UI settings tests passed 184 checks; game tools passed 36 checks. Full Windows run passed 13,141 checks; targeted final integration/game/UI reruns passed 46/36/184 checks. Normal and compact audits report zero findings. Clean-runner Linux build, core tests, 193 schema preservation checks and self-contained publish passed on PR #20. Windows regression/package and text audit CI are pending. Linux metadata selection/importers/retained covers and paired companion lifecycle are integrated. Closing records observed playtime once without stopping games; crash recovery and launcher handoff tracking remain limited. Local semantic Avalonia compilation passed; this is not a native Linux desktop smoke test. Account-dependent achievement/network metadata calls need real credentials/providers for live verification.
+Validation: Windows build and 2,310 expansion layout checks passed across 132 captures at three text sizes on normal/compact screens; UI settings tests passed 184 checks; game tools passed 36 checks. Full Windows run passed 13,141 checks; targeted final integration/game/UI reruns passed 46/36/184 checks. Normal and compact audits report zero findings. Clean-runner Linux build, core tests, 193 schema preservation checks and self-contained publish passed on PR #20. Windows build, all 13,144 regression checks, packaging and the zero-finding text audit passed for 1.26.0. Linux metadata selection/importers/retained covers and paired companion lifecycle are integrated. Closing records observed playtime once without stopping games; crash recovery and launcher handoff tracking remain limited. Local semantic Avalonia compilation passed; this is not a native Linux desktop smoke test. Account-dependent achievement/network metadata calls need real credentials/providers for live verification.
 
 Release packaging now produces a complete six-file app folder, app ZIP, source ZIP and SHA256 checksums. Tagged reviewed versions produce draft releases; no binary build output is committed. App/installer/source versions must match.
 
@@ -67,6 +71,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-06 (Home spacing 1.26.1):** simplified Windows Home card previews with wider layouts, grouped actions and reversible expansion, keeping all existing options.
 
 - **2026-10-06 (expansion 1.26.0):** added matching Windows/Linux library and expansion tools, optional shared settings, declarative integrations and verified file recovery. Windows compact popup bounds now use the actual working area; startup popup fixes remain supported. Added native expansion layout fixtures and release packaging/version checks. #19 is merged; #18 is included as the expansion dependency.
 

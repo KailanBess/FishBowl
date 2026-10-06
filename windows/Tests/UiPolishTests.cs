@@ -82,6 +82,8 @@ class UiPolishTests
         data.Games.Clear(); data.Emulators.Clear();
         for (int i = 0; i < 12; i++) data.Games.Add(new GameEntry { Id = "polish" + i, Title = "A long library title " + i, Favorite = true, Pinned = true, LastLaunched = DateTime.Now.ToString("o"), ArtworkPath = "missing" });
         data.Experience.HomeTileCount = 12;
+        for (int i = 0; i < 12; i++) data.Emulators.Add(new EmulatorProfile { Id = "polish-emulator" + i, Name = "Favorite emulator " + i, Favorite = true, Executable = "missing.exe" });
+        Directory.CreateDirectory("home-layout-previews");
         foreach (int textSize in new[] { 100, 150, 200 })
         {
             NextUi.TextPercent = textSize;
@@ -119,26 +121,74 @@ class UiPolishTests
                 timer.Start(); UiPolishTools.Open(null, data, null);
             }
             if (dialogError != null) throw dialogError;
-            using (var host = new Form { ClientSize = new Size(800, 600), ShowInTaskbar = false })
-            using (var home = new HomeSurface(data, delegate { }))
+            foreach (bool compact in new[] { false, true })
             {
-                host.Controls.Add(home); host.Show(); Application.DoEvents(); home.RefreshLayout(); Application.DoEvents();
-                var cards = (FlowLayoutPanel)typeof(HomeSurface).GetField("cards", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(home);
-                Check(cards.AutoScroll, "Home page owns scrolling at " + textSize);
-                foreach (Control card in cards.Controls)
+                TextFit.WorkingAreaOverride = compact ? new Rectangle(0, 0, 1024, 720) : new Rectangle(0, 0, 1280, 900);
+                var invoked = new List<string>();
+                using (var host = new Form { ClientSize = compact ? new Size(1000, 650) : new Size(1200, 780), ShowInTaskbar = false })
+                using (var home = new HomeSurface(data, delegate(string command, GameEntry chosenGame, EmulatorProfile emulator) { invoked.Add(command); }))
                 {
-                    var content = (FlowLayoutPanel)card.Tag;
-                    Check(!content.AutoScroll, "cards do not own nested scrollbars: " + card.AccessibleName);
-                    Check(content.Controls.Cast<Control>().All(c => c.Bottom <= content.ClientSize.Height), "all card content fits: " + card.AccessibleName + " / " + textSize + " card=" + card.Height + " content=" + content.Height + " controls=" + string.Join(";", content.Controls.Cast<Control>().Select(c => c.Text + ":" + c.Bounds)));
+                    home.Visible = false; host.Controls.Add(home); host.Show(); Application.DoEvents();
+                    home.Visible = true; Application.DoEvents();
+                    var cards = (FlowLayoutPanel)typeof(HomeSurface).GetField("cards", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(home);
+                    Check(cards.AutoScroll, "Home page owns scrolling at " + textSize);
+                    Check(cards.Controls.Cast<Control>().Select(c => c.Left).Distinct().Count() <= 2, "Home uses no more than two wider columns");
+                    Geometry(cards, textSize);
+                    Capture(host, "collapsed-" + (compact ? "compact" : "normal") + "-" + textSize);
+                    var quick = cards.Controls.Cast<Control>().First(c => c.AccessibleName == "Quick actions");
+                    var quickButtons = NextUi.Descendants(quick).OfType<Button>().ToArray();
+                    Check(quickButtons.Length == 2, "one primary utility action and one More menu");
+                    var more = quickButtons.Single(button => button.Text == "More");
+                    var menu = (ContextMenuStrip)more.Tag;
+                    Check(menu.Items.Count == 5, "all secondary actions remain available");
+                    quickButtons.Single(button => button.Text != "More").PerformClick();
+                    foreach (ToolStripItem item in menu.Items) item.PerformClick();
+                    Check(invoked.SequenceEqual(new[] { "Add emulator", "Organize games", "Library", "Save history", "Readiness", "Customize Home" }), "primary and all secondary Home commands still dispatch");
+                    var pinned = cards.Controls.Cast<Control>().Single(c => c.AccessibleName == "Pinned games");
+                    Check(NextUi.Descendants(pinned).OfType<PictureBox>().Count(c => c.Visible) == 3, "collapsed game card previews three games");
+                    int collapsedHeight = pinned.Height;
+                    Button expand = NextUi.Descendants(pinned).OfType<Button>().Single(c => c.AccessibleName == "Pinned games expand or collapse");
+                    expand.PerformClick(); Application.DoEvents(); home.RefreshLayout();
+                    Check(NextUi.Descendants(pinned).OfType<PictureBox>().Count(c => c.Visible) == 12 && pinned.Height > collapsedHeight, "expanding reveals every configured game and grows card");
+                    Check(expand.Text == "Show less", "expanded card offers collapse");
+                    home.Reload(); Application.DoEvents();
+                    pinned = cards.Controls.Cast<Control>().Single(c => c.AccessibleName == "Pinned games");
+                    Check(NextUi.Descendants(pinned).OfType<PictureBox>().Count(c => c.Visible) == 12, "reload retains expanded state and all games");
+                    expand = NextUi.Descendants(pinned).OfType<Button>().Single(c => c.AccessibleName == "Pinned games expand or collapse");
+                    Geometry(cards, textSize);
+                    Capture(host, "expanded-" + (compact ? "compact" : "normal") + "-" + textSize);
+                    expand.PerformClick(); Application.DoEvents();
+                    Check(NextUi.Descendants(pinned).OfType<PictureBox>().Count(c => c.Visible) == 3 && pinned.Height < collapsedHeight + 20, "collapse restores concise preview");
+                    var favorites = cards.Controls.Cast<Control>().Single(c => c.AccessibleName == "Favorite emulators");
+                    Check(NextUi.Descendants(favorites).OfType<Button>().Count(c => c.Visible && c.Tag is EmulatorProfile) == 3, "emulator card previews three profiles");
+                    NextUi.Descendants(favorites).OfType<Button>().Single(c => c.AccessibleName == "Favorite emulators expand or collapse").PerformClick(); Application.DoEvents();
+                    Check(NextUi.Descendants(favorites).OfType<Button>().Count(c => c.Visible && c.Tag is EmulatorProfile) == 12, "all emulator profiles remain available after expansion");
+                    var attention = cards.Controls.Cast<Control>().Single(c => c.AccessibleName == "Attention");
+                    var attentionBody = (FlowLayoutPanel)attention.Tag;
+                    Check(attentionBody.Controls.OfType<Label>().Count(c => c.Visible) == 1, "text card previews one status line");
+                    NextUi.Descendants(attention).OfType<Button>().Single(c => c.AccessibleName == "Attention expand or collapse").PerformClick(); Application.DoEvents();
+                    Check(attentionBody.Controls.OfType<Label>().Count(c => c.Visible) == 2, "expanded text card retains remaining status information");
+                    Geometry(cards, textSize);
+                    host.Close();
                 }
-                var quick = cards.Controls.Cast<Control>().First(c => c.AccessibleName == "Quick actions");
-                var quickContent = (FlowLayoutPanel)quick.Tag;
-                Check(quickContent.Controls.OfType<Button>().Count() == 2, "one primary utility action and one More menu");
-                var more = quickContent.Controls.OfType<Button>().Single(b => b.Text == "More");
-                Check(((ContextMenuStrip)more.Tag).Items.Count == 5, "all secondary actions remain available");
-                host.Close();
             }
         }
-        NextUi.TextPercent = 100;
+
+        NextUi.TextPercent = 100; TextFit.WorkingAreaOverride = null;
+    }
+    static void Geometry(FlowLayoutPanel cards, int textSize)
+    {
+        foreach (Control card in cards.Controls)
+        {
+            var content = (FlowLayoutPanel)card.Tag;
+            Check(!content.AutoScroll, "cards do not own nested scrollbars: " + card.AccessibleName);
+            Check(content.Controls.Cast<Control>().Where(c => c.Visible).All(c => c.Bottom <= content.ClientSize.Height), "visible card content fits: " + card.AccessibleName + " / " + textSize + " card=" + card.Height + " content=" + content.Height);
+            foreach (FlowLayoutPanel row in content.Controls.OfType<FlowLayoutPanel>().Where(c => c.Visible))
+                Check(row.Controls.Cast<Control>().Where(c => c.Visible).All(c => c.Right <= row.ClientSize.Width && c.Bottom <= row.ClientSize.Height), "nested action or game row fits: " + card.AccessibleName + " / " + textSize);
+        }
+    }
+    static void Capture(Form form, string name)
+    {
+        using (Bitmap image = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size)); image.Save(Path.Combine("home-layout-previews", name + ".png")); }
     }
 }

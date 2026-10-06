@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.26.0.0")]
+[assembly: AssemblyFileVersion("1.26.1.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.26.0.0")]
+[assembly: AssemblyVersion("1.26.1.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.26.0";
+		private const string FishBowlVersion = "1.26.1";
 
-		private const string FishBowlTitleVersion = "1.26.0";
+		private const string FishBowlTitleVersion = "1.26.1";
 
 		private Icon ownedAppIcon;
 
@@ -315,7 +315,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.26.0";
+			Text = "FishBowl 1.26.1";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -401,11 +401,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.26.0" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.26.1" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.26.0";
+						library.Theme.LastSeenBuild = "1.26.1";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -3388,7 +3388,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.26.0"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.26.1"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3396,7 +3396,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.26.0"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.26.1"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3404,7 +3404,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.26.0"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.26.1"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -23293,6 +23293,10 @@ namespace EmulatorHub
 
 		private bool layingOutCards;
 
+		private readonly HashSet<Control> collapsedRows = new HashSet<Control>();
+
+		private readonly HashSet<string> expandedCards = new HashSet<string>();
+
 		public int ContentRevision { get; private set; }
 
 		private int DataStamp()
@@ -23333,6 +23337,7 @@ namespace EmulatorHub
 				LayoutCards();
 			};
 			base.Resize += value;
+			base.VisibleChanged += value;
 			Reload();
 		}
 
@@ -23409,7 +23414,7 @@ namespace EmulatorHub
 				item.Height = Math.Max(42, item.Font.Height + 16);
 			}
 			int num2 = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
-			int num3 = Math.Max(1, Math.Min(3, num2 / (int)(350f * num)));
+			int num3 = Math.Max(1, Math.Min(2, num2 / (int)(430f * num)));
 			foreach (Control control3 in cards.Controls)
 			{
 				control3.Width = Math.Max(1, num2 / num3 - control3.Margin.Horizontal - 2);
@@ -23442,6 +23447,15 @@ namespace EmulatorHub
 						flowLayoutPanel2.Width = num5;
 						Button button = flowLayoutPanel2.Controls.OfType<Button>().FirstOrDefault();
 						PictureBox pictureBox = flowLayoutPanel2.Controls.OfType<PictureBox>().FirstOrDefault();
+						if (pictureBox == null)
+                        {
+                            foreach (Button item in flowLayoutPanel2.Controls.OfType<Button>())
+                            {
+                                item.MaximumSize = new Size(Math.Max(1, num5 - item.Margin.Horizontal), 0);
+                                item.Size = new Size(Math.Min(Math.Max(116, TextRenderer.MeasureText(item.Text, item.Font).Width + (int)(40f * num)), Math.Max(1, num5 - item.Margin.Horizontal)), Math.Max(item.Font.Height + 16, (int)(42f * num)));
+                            }
+                            flowLayoutPanel2.Height = flowLayoutPanel2.GetPreferredSize(new Size(num5, 0)).Height;
+                        }
 						if (button != null && pictureBox != null)
 						{
 							button.AutoEllipsis = true;
@@ -23454,7 +23468,7 @@ namespace EmulatorHub
 					}
 				}
 				int headingHeight = control3.Controls.OfType<Label>().Sum(l => l.Height);
-				int val = flowLayoutPanel.Controls.Cast<Control>().Sum(item => ((item is Label) ? item.GetPreferredSize(new Size(Math.Max(1, num4 - item.Margin.Horizontal), 0)).Height : item.Height) + item.Margin.Vertical) + headingHeight + control3.Padding.Vertical + (int)(20f * num);
+				int val = flowLayoutPanel.Controls.Cast<Control>().Where(item => !collapsedRows.Contains(item)).Sum(item => ((item is Label) ? item.GetPreferredSize(new Size(Math.Max(1, num4 - item.Margin.Horizontal), 0)).Height : item.Height) + item.Margin.Vertical) + headingHeight + control3.Padding.Vertical + (int)(20f * num);
 				control3.Height = Math.Max((int)((Immersion.Ensure(library).Roomier ? 180f : 120f) * num), val);
 			}
 		}
@@ -23465,8 +23479,8 @@ namespace EmulatorHub
 			panel.Height = (Immersion.Ensure(library).Roomier ? 300 : (library.Experience.CompactHome ? 210 : 260));
 			panel.Width = 370;
 			panel.BackColor = FishBowlPalette.ThemeSurface;
-			panel.Margin = new Padding(10);
-			panel.Padding = new Padding(16);
+			panel.Margin = new Padding(12);
+			panel.Padding = new Padding(22);
 			panel.AccessibleName = title;
 			Panel panel2 = panel;
 			Label label = ExperienceUi.Label(title, 40);
@@ -23510,10 +23524,38 @@ namespace EmulatorHub
 			{
 				action(command, game, emulator);
 			});
+			fishBowlActionButton.Tag = (object)game ?? emulator;
 			fishBowlActionButton.MaximumSize = new Size(340, 42);
 			fishBowlActionButton.AutoEllipsis = true;
 			flowLayoutPanel.Controls.Add(fishBowlActionButton);
 		}
+
+        private void SimplifyCard(Panel card)
+        {
+            var body = (FlowLayoutPanel)card.Tag;
+            var actions = body.Controls.OfType<Button>().Where(button => !(button.Tag is GameEntry) && !(button.Tag is EmulatorProfile)).ToArray();
+            if (actions.Length > 0)
+            {
+                var row = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, WrapContents = true, AutoSize = false, Margin = new Padding(0, 10, 0, 2), AccessibleName = "Home card actions" };
+                foreach (var button in actions) { body.Controls.Remove(button); row.Controls.Add(button); }
+                body.Controls.Add(row);
+            }
+            var content = body.Controls.Cast<Control>().Where(item => item is Label || item.Tag is EmulatorProfile || item is FlowLayoutPanel && item.AccessibleName != "Home card actions").ToArray();
+            int preview = content.Any(item => !(item is Label)) ? 3 : 1;
+            var extras = content.Skip(preview).ToArray();
+            if (extras.Length == 0) return;
+            var toggle = ExperienceUi.Button("Show all (" + content.Length + ")", delegate { });
+            toggle.AccessibleName = card.AccessibleName + " expand or collapse";
+            Action apply = delegate {
+                bool expanded = expandedCards.Contains(card.AccessibleName);
+                foreach (var item in extras) { item.Visible = expanded; if (expanded) collapsedRows.Remove(item); else collapsedRows.Add(item); }
+                toggle.Text = expanded ? "Show less" : "Show all (" + content.Length + ")";
+                LayoutCards();
+            };
+            toggle.Click += delegate { if (!expandedCards.Add(card.AccessibleName)) expandedCards.Remove(card.AccessibleName); apply(); };
+            body.Controls.Add(toggle);
+            apply();
+        }
 
 		private void TextLine(Panel card, string text)
 		{
@@ -23593,6 +23635,7 @@ namespace EmulatorHub
 			try
 			{
 				ExperienceData.Ensure(library);
+				collapsedRows.Clear();
 				while (cards.Controls.Count > 0)
 				{
 					cards.Controls[0].Dispose();
@@ -23743,6 +23786,7 @@ namespace EmulatorHub
 					}
 					}
 				}
+				foreach (Panel card in cards.Controls.OfType<Panel>()) SimplifyCard(card);
 				if (Math.Abs(visualScale - 1f) > 0.01f)
 				{
 					foreach (Control control3 in cards.Controls)
