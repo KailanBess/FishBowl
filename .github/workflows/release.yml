@@ -1,0 +1,69 @@
+name: Release packages
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Reviewed source version, for example 1.26.0'
+        required: true
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and test
+        shell: pwsh
+        run: |
+          ./windows/Build.ps1
+          & './windows/Run Tests.ps1'
+      - name: Package matching app, installer and source
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { $env:REQUESTED_VERSION }
+          ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion $version
+      - uses: actions/upload-artifact@v7
+        with:
+          name: FishBowl-release-windows
+          path: artifacts/windows/
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build FishBowl.Avalonia -c Release
+      - run: dotnet run --project tests/FishBowl.Tests -c Release
+      - run: dotnet run --project tests/FishBowl.SchemaTests -c Release
+      - run: dotnet publish FishBowl.Avalonia -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o artifacts/linux-x64
+      - name: Archive Linux executable with permissions
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_REF_TYPE" != tag ]; then version="$REQUESTED_VERSION"; fi
+          grep -q "<Version>$version</Version>" FishBowl.Avalonia/FishBowl.Avalonia.csproj
+          tar -czf "artifacts/FishBowl-$version-linux-x64.tar.gz" -C artifacts/linux-x64 .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: FishBowl-release-linux-x64
+          path: artifacts/*.tar.gz
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: packages
+      - name: Publish complete draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          find packages/FishBowl-release-windows -type f \( -name '*.zip' -o -name 'SHA256SUMS.txt' -o -name '*.exe' -o -name '*.ico' -o -name '*.bat' -o -name '*.ps1' -o -name 'README.md' \) -print0 | xargs -0 gh release create "$GITHUB_REF_NAME" "packages/FishBowl-release-linux-x64/FishBowl-${GITHUB_REF_NAME#v}-linux-x64.tar.gz" --draft --title "FishBowl $GITHUB_REF_NAME" --generate-notes

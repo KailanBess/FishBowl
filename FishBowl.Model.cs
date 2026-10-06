@@ -166,6 +166,7 @@ namespace EmulatorHub
 	}
 	public class EmulatorAdapter
 	{
+        public string ExtensionId { get; set; }
 #if NETCOREAPP
 		// Keep fields from newer versions when this one saves (Linux build; JavaScriptSerializer on Windows ignores this).
 		[System.Text.Json.Serialization.JsonExtensionData]
@@ -412,6 +413,8 @@ namespace EmulatorHub
 	}
 	public class GameEntry
 	{
+        public GameToolsSettings Tools { get; set; }
+
         public bool RequiresEmulatorAssignment { get; set; }
         public bool TitleIsCustom { get; set; }
 
@@ -649,6 +652,9 @@ namespace EmulatorHub
 	}
 	public class LibraryData
 	{
+        public GameToolsLibrarySettings GameTools { get; set; }
+        public IntegrationSettings Integrations { get; set; }
+
         public List<LibraryRemoval> RemovalHistory { get; set; }
         public string SavedDataRoot { get; set; }
         public string SavedPortableRoot { get; set; }
@@ -1011,6 +1017,13 @@ namespace EmulatorHub
 	}
 	public class ThemeSettings
 	{
+        public List<string> HomeCardOrder { get; set; }
+        public List<string> HiddenHomeCards { get; set; }
+        public bool RestrainedAccents { get; set; }
+        public string CoverAspect { get; set; }
+        public string ControlDensity { get; set; }
+        public string ColorHarmony { get; set; }
+
 #if NETCOREAPP
 		// Keep fields from newer versions when this one saves (Linux build; JavaScriptSerializer on Windows ignores this).
 		[System.Text.Json.Serialization.JsonExtensionData]

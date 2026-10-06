@@ -1,3 +1,35 @@
+# Windows 1.26.2 compact controls and theme harmony
+
+- Compact control sizing is the default, reducing box/button padding, toolbar/banner spacing and Home card dimensions while preserving configured fonts and text scaling. Standard and Roomy remain available; the controller preset uses Roomy.
+- Input, button and selection colors follow the active theme, with readable text and consistent backgrounds. Original colors and custom palettes remain available.
+- Corrected stale colors after switching themes. Home previews and Show all retain every option.
+- Fixed repeated Library text scaling and overlapping enlarged filters; smaller viewports scroll to keep actions and game rows reachable.
+
+# Windows 1.26.1 Home layout
+
+- Home uses up to two wider columns, more internal spacing and a shared row for a card's primary/More actions.
+- Game/emulator cards show three preview entries; information cards show one summary line. Show all reveals the remaining content, and Show less returns to the preview. All games, details and actions remain available.
+- Expanded cards retain their state when Home refreshes. Home card ordering/visibility and page scrolling remain supported.
+
+# Windows and Linux 1.26.0 source
+
+- Added Home page scrolling, primary/More actions, theme/accent previews, accessibility presets, cover proportions, card ordering/visibility and restrained accents using current controls.
+- Added unified game setup, native executable imports and installed Steam discovery; declarative import catalogs can cover additional storefronts with explicit executable selection.
+- Added verified mod overlay backups and resumable rollback, IPS patch copies, manuals/trailer links, screenshot galleries, monthly summaries and session notes.
+- Added reviewed file save timeline/comparison/transfer and backup-before-overwrite recovery. Folder archives use the emulator backup manager.
+- Added RetroAchievements completion caching, reviewed metadata provider catalogs, declarative extensions and a paired read-only companion.
+- Added Linux Home/Library/profiles/collections/living-room keyboard screens and matching title/cover/removal/recovery/game tool actions. Linux remains a preview requiring desktop smoke testing.
+- Added complete app/source packaging, checksums and version-checked draft-release automation. No executable is committed to source.
+- Windows popup bounds fit compact desktops. Existing startup popup fixes and appearance remain supported.
+
+# Windows 1.25.12
+
+- Expanded themes from 18 to 40, with distinct dark, light, warm, cool and neutral surfaces. Existing saved theme names remain supported.
+- Expanded accents from 7 to 28. Appearance, Settings and app icon colors share the same catalog; Match accent follows all new colors.
+- Removed the sand, pebbles and plants from the footer. Its water background follows live theme changes.
+- Kept the existing UI layouts, controls and wording. Custom palette overrides and Windows high contrast preferences remain supported.
+- Added coverage for all 1,120 theme/accent combinations, readable text, saved choices, settings selectors, app icon colors and footer painting. Linux needs matching theme/accent choices and footer styling; saved fields are unchanged.
+
 # Windows 1.25.11
 
 - Normalized organization source paths before grouping playlists, cues and tracks. Repeated references are deduplicated; circular playlists are rejected. Tests cover Windows short temp paths, relative paths and enumeration order (#10).

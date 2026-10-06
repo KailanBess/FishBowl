@@ -16,5 +16,9 @@
     <Compile Include="CoreTests.cs" />
     <Compile Include="../../FishBowl.Library.cs" Link="Shared/FishBowl.Library.cs" />
     <Compile Include="RecognitionTests.cs" />
+      <Compile Include="../../FishBowl.GameTools.cs" Link="Shared/FishBowl.GameTools.cs" />
+    <Compile Include="../../FishBowl.Integrations.cs" Link="Shared/FishBowl.Integrations.cs" />
+      <Compile Include="../../FishBowl.SaveTools.cs" Link="Shared/FishBowl.SaveTools.cs" />
+      <Compile Include="SaveToolsTests.cs" />
   </ItemGroup>
 </Project>

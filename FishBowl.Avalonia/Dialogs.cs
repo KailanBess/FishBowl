@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -249,6 +249,9 @@ namespace EmulatorHub
         {
             var original = currentTheme ?? new ThemeSettings { Name = "Twilight", AutoBackupDays = 7, ShowStartupAssistant = true };
             var theme = Ui.Combo(Palette.Themes, original.Name ?? "Twilight");
+            var preview = new Border { Height = 76, CornerRadius = new CornerRadius(6), Padding = new Thickness(12) };
+            Action refreshPreview = () => { var selected = Palette.From(new ThemeSettings { Name = theme.SelectedItem as string, AccentColor = original.AccentColor }); preview.Background = selected.SurfaceBrush; preview.Child = Ui.Text(theme.SelectedItem as string, 20, true, selected.InkBrush); };
+            theme.SelectionChanged += delegate { refreshPreview(); }; refreshPreview();
             var backup = Ui.Field(currentBackupFolder);
             var startup = Ui.Check("Show the setup assistant when FishBowl opens", !original.StartupAssistantPreferenceSet || original.ShowStartupAssistant);
             var storage = Ui.Check("Show the game storage assistant when FishBowl opens", !original.GameStorageAssistantPreferenceSet || original.ShowGameStorageAssistant);
@@ -259,6 +262,8 @@ namespace EmulatorHub
             var fonts = Palette.FontChoices.ToList(); if (!String.IsNullOrWhiteSpace(original.FontFamily) && !fonts.Contains(original.FontFamily)) fonts.Add(original.FontFamily);
             var font = Ui.Combo(fonts, String.IsNullOrWhiteSpace(original.FontFamily) ? "Bahnschrift" : original.FontFamily);
             var scale = Ui.Combo(new[] { "75%", "80%", "85%", "90%", "100%", "110%", "120%", "125%", "130%", "140%" }, (original.UiScalePercent <= 0 ? 100 : original.UiScalePercent) + "%");
+            var coverAspect = Ui.Combo(new[] { "Portrait", "Square", "Landscape" }, original.CoverAspect ?? "Portrait");
+            var restrained = Ui.Check("Use restrained accents", original.RestrainedAccents);
             var density = Ui.Combo(new[] { "Compact", "Standard", "Comfortable" }, String.IsNullOrWhiteSpace(original.ListDensity) ? "Standard" : original.ListDensity);
             var banner = Ui.Check("Show FishBowl banner", original.ShowBanner);
             var statusBar = Ui.Check("Show filter and status bar", original.ShowStatusBar);
@@ -278,14 +283,14 @@ namespace EmulatorHub
             };
             Func<string, Control, StackPanel> labelled = (text, control) => new StackPanel { Children = { Ui.Caption(text), control } };
             var content = new StackPanel { Margin = new Thickness(0, 0, 14, 0), Spacing = 2, Children = {
-                Ui.Caption("Theme"), theme,
+                Ui.Caption("Theme"), theme, preview,
                 Ui.Caption("Cloud-synced backup folder (optional)"), Ui.WithButton(backup, Ui.Action("Browse", async () => { var folder = await Ui.PickFolder(this, "Choose a backup folder", backup.Text); if (folder != null) backup.Text = folder; })),
                 Ui.Hint("Choose a Nextcloud, Syncthing, Dropbox, or other synced folder to store emulator backups."),
                 startup, storage, maximized, autoSync,
                 Ui.Caption("Backup reminder interval (days)"), days,
                 section("Appearance", orange),
                 columns(new Control[] { labelled("Accent color", accent), labelled("Interface font", font), labelled("Interface scale", scale) }),
-                labelled("List density", density),
+                labelled("List density", density), labelled("Cover proportions", coverAspect), restrained,
                 columns(new Control[] { new StackPanel { Children = { banner, statusBar, information } }, new StackPanel { Children = { icons, motion } } }),
                 section("Fine tuning", orange),
                 alternate,
@@ -295,12 +300,38 @@ namespace EmulatorHub
             {
                 int percent; if (!Int32.TryParse(((scale.SelectedItem as string) ?? "100").TrimEnd('%'), out percent)) percent = 100;
                 // Keep fields this version does not edit (e.g. newer Windows settings), or saving Settings would erase them.
-                ChosenTheme = new ThemeSettings { AdditionalFields = original.AdditionalFields, Name = theme.SelectedItem as string, AutoBackupDays = (int)(days.Value ?? 7), LastBackupAt = original.LastBackupAt, DiscordRichPresenceEnabled = original.DiscordRichPresenceEnabled,
-                    ShowStartupAssistant = startup.IsChecked == true, StartupAssistantPreferenceSet = true, ShowGameStorageAssistant = storage.IsChecked == true, GameStorageAssistantPreferenceSet = true,
-                    StartMaximized = maximized.IsChecked == true, AutoSyncGameFolders = autoSync.IsChecked == true, ConfirmBeforeGameLaunch = original.ConfirmBeforeGameLaunch,
-                    AccentColor = accent.SelectedItem as string, FontFamily = font.SelectedItem as string, UiScalePercent = percent, ListDensity = density.SelectedItem as string,
-                    ShowBanner = banner.IsChecked == true, ShowStatusBar = statusBar.IsChecked == true, ShowInformationPanel = information.IsChecked == true, ShowEmulatorIcons = icons.IsChecked == true,
-                    EnableMotion = motion.IsChecked == true, AlternateRowShading = alternate.IsChecked == true, SelectionContrast = contrast.SelectedItem as string, IconTileShape = shape.SelectedItem as string, CustomizationVersion = 3 };
+                ChosenTheme = Json.Deserialize<ThemeSettings>(Json.Serialize(original));
+                ChosenTheme.AdditionalFields = original.AdditionalFields;
+                ChosenTheme.Name = theme.SelectedItem as string;
+                ChosenTheme.AutoBackupDays = (int)(days.Value ?? 7);
+                ChosenTheme.LastBackupAt = original.LastBackupAt;
+                ChosenTheme.DiscordRichPresenceEnabled = original.DiscordRichPresenceEnabled;
+                ChosenTheme.ShowStartupAssistant = startup.IsChecked == true;
+                ChosenTheme.StartupAssistantPreferenceSet = true;
+                ChosenTheme.ShowGameStorageAssistant = storage.IsChecked == true;
+                ChosenTheme.GameStorageAssistantPreferenceSet = true;
+                ChosenTheme.StartMaximized = maximized.IsChecked == true;
+                ChosenTheme.AutoSyncGameFolders = autoSync.IsChecked == true;
+                ChosenTheme.ConfirmBeforeGameLaunch = original.ConfirmBeforeGameLaunch;
+                ChosenTheme.AccentColor = accent.SelectedItem as string;
+                ChosenTheme.FontFamily = font.SelectedItem as string;
+                ChosenTheme.UiScalePercent = percent;
+                ChosenTheme.ListDensity = density.SelectedItem as string;
+                ChosenTheme.ShowBanner = banner.IsChecked == true;
+                ChosenTheme.ShowStatusBar = statusBar.IsChecked == true;
+                ChosenTheme.ShowInformationPanel = information.IsChecked == true;
+                ChosenTheme.ShowEmulatorIcons = icons.IsChecked == true;
+                ChosenTheme.EnableMotion = motion.IsChecked == true;
+                ChosenTheme.AlternateRowShading = alternate.IsChecked == true;
+                ChosenTheme.SelectionContrast = contrast.SelectedItem as string;
+                ChosenTheme.IconTileShape = shape.SelectedItem as string;
+                ChosenTheme.CustomizationVersion = 3;
+                ChosenTheme.HomeCardOrder = original.HomeCardOrder;
+                ChosenTheme.HiddenHomeCards = original.HiddenHomeCards;
+                ChosenTheme.RestrainedAccents = restrained.IsChecked == true;
+                ChosenTheme.CoverAspect = coverAspect.SelectedItem as string;
+                ChosenTheme.ControlDensity = original.ControlDensity;
+                ChosenTheme.ColorHarmony = original.ColorHarmony;
                 BackupFolder = (backup.Text ?? "").Trim();
                 return Task.FromResult(true);
             });

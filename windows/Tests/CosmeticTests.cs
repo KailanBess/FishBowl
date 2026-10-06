@@ -21,7 +21,8 @@ class CosmeticTests {
             timer.Start();typeof(MainForm).GetMethod("ShowCosmetics",flags).Invoke(main,null);
         }
     }
-    [STAThread] static int Main() {
+    [STAThread] static int Main() { try { return Run(); } catch(Exception error) { Console.Error.WriteLine(error); return 1; } }
+    static int Run() {
         Application.EnableVisualStyles();Application.ThreadException+=(s,e)=> {Console.WriteLine(e.Exception);Environment.Exit(1);};
         Check(CosmeticRuntime.Parse("#Aa00ff").ToArgb()==Color.FromArgb(170,0,255).ToArgb(),"hex palette parses");
         bool rejected=false;try {CosmeticRuntime.Parse("#oops");} catch(ArgumentException){rejected=true;}Check(rejected,"invalid palette rejected");
@@ -50,6 +51,8 @@ class CosmeticTests {
         using(var main=new MainForm(true)) {
             main.ShowInTaskbar=false;main.StartPosition=FormStartPosition.Manual;main.Location=new Point(-4000,-4000);main.Show();Application.DoEvents();
             var data=(LibraryData)typeof(MainForm).GetField("library",flags).GetValue(main);
+            // This legacy geometry fixture covers Standard spacing; Compact is checked by ControlDensityTests.
+            data.Theme.ControlDensity="Standard"; ControlDensityTools.Configure(data);
             data.Cosmetics=new CosmeticSettings();typeof(MainForm).GetMethod("ApplyAppearanceNow",flags).Invoke(main,null);
             Dialog(main,dialog=> {
                 var tabs=NextUi.Descendants(dialog).OfType<FishBowlTabs>().Single();Check(tabs.TabCount==4,"cosmetics organized in four tabs");
@@ -88,6 +91,19 @@ class CosmeticTests {
                 Capture(library,"cosmetic-library.png");
                 data.Cosmetics.IconOnlyToolbars=false;CosmeticRuntime.Configure(data.Cosmetics);CosmeticRuntime.Apply(library);Check(buttons.All(b=>!b.IconOnly && b.Width>=100),"toolbar text mode restores widths");
             }
+            data.Theme.ControlDensity="Compact";ControlDensityTools.Configure(data);
+            data.Cosmetics.IconOnlyToolbars=false;CosmeticRuntime.Configure(data.Cosmetics);
+            using(var library=new GameLibraryDialog(data)) {
+                library.ShowInTaskbar=false;library.Show();Application.DoEvents();
+                var buttons=NextUi.Descendants(library).OfType<FishBowlActionButton>().Where(b=>b.Parent.Name=="FishBowlToolbar").ToList();
+                var widths=buttons.ToDictionary(b=>b,b=>b.Width);
+                Check(buttons.Count>0 && buttons.All(b=>!b.IconOnly),"Compact toolbar starts with text labels");
+                data.Cosmetics.IconOnlyToolbars=true;CosmeticRuntime.Configure(data.Cosmetics);CosmeticRuntime.Apply(library);
+                Check(buttons.All(b=>b.IconOnly && !string.IsNullOrWhiteSpace(b.AccessibleName)),"Compact icon toolbar preserves names");
+                data.Cosmetics.IconOnlyToolbars=false;CosmeticRuntime.Configure(data.Cosmetics);CosmeticRuntime.Apply(library);
+                Check(buttons.All(b=>!b.IconOnly && b.Width==widths[b]),"Compact toolbar restores its actual pre-icon widths");
+            }
+            data.Theme.ControlDensity="Standard";ControlDensityTools.Configure(data);
             data.Cosmetics=new CosmeticSettings {BackgroundStyle="Dots",ArtworkFrame="Rounded",ArtworkShadow=true,IconStyle="Filled",CornerRadius=12,BadgeStyle="Pill",ShowFooter=false};
             typeof(MainForm).GetMethod("ApplyAppearanceNow",flags).Invoke(main,null);Capture(main,"cosmetic-home.png");
             data.Enhancements.TextPercent=200;typeof(MainForm).GetMethod("ApplyAppearanceNow",flags).Invoke(main,null);

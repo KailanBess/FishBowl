@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -35,7 +35,7 @@ namespace EmulatorHub
         // Sets a button's label, icon and colours; primary actions use the accent colour like "Add emulator".
         public static void SetAction(Button button, string text, bool primary = false)
         {
-            var background = primary ? P.Blue : P.Surface; var foreground = primary ? P.Top : P.Ink;
+            var background = primary && !P.Restrained ? P.Blue : P.Surface; var foreground = primary && !P.Restrained ? Palette.ReadableInk(P.Blue) : P.Ink;
             bool darkInk = Palette.Brightness(foreground) < 0.55f;
             var icon = new FishIcon(FishIcon.ForText(text), 20, darkInk ? foreground : Palette.Rgb(224, 208, 255), darkInk ? foreground : Palette.Rgb(255, 180, 105));
             var label = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center, FontWeight = primary ? FontWeight.Bold : FontWeight.Normal };

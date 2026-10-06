@@ -22,6 +22,10 @@ class AdditionTests {
         }
     }
     [STAThread] static int Main() {
+        try { return Run(); }
+        catch(Exception error) { Console.Error.WriteLine(error); return 1; }
+    }
+    static int Run() {
         Application.EnableVisualStyles();
         Application.ThreadException+=(sender,eventArgs)=> {Console.WriteLine(eventArgs.Exception.ToString()); Environment.Exit(1);};
         var data=new LibraryData {Games=new List<GameEntry>(),Emulators=new List<EmulatorProfile>(),Collections=new List<GameCollection>(),Theme=new ThemeSettings()}; ExperienceData.Ensure(data); NextData.Ensure(data); LibraryAdditions.Ensure(data);
@@ -59,7 +63,7 @@ class AdditionTests {
                 using(var ui=new GameLibraryDialog(library)) {
                     FishBowlPalette.StyleWindow(ui);
                     var buttons=NextUi.Descendants(ui).OfType<Button>().ToList();
-                    Check(buttons.Count>0 && buttons.All(button=>button.BackColor==FishBowlPalette.MenuSelection),theme+"/"+accent+" themed Library actions");
+                    Check(buttons.Count>0 && buttons.All(button=>button.BackColor==ColorHarmony.Button),theme+"/"+accent+" Library actions use the current button surface role");
                     Check(buttons.All(button=>FishBowlPalette.Contrast(button.ForeColor,button.BackColor)>=4.5),theme+"/"+accent+" button text contrast");
                     Check(FishBowlPalette.Contrast(FishBowlPalette.DisabledText,FishBowlPalette.DisabledSurface)>=4.5,theme+"/"+accent+" disabled contrast");
                     Check(buttons.All(button=>FishBowlPalette.Contrast(FishBowlPalette.EnsureReadable(button.ForeColor,FishBowlHighlights.Blend(button.BackColor,36)),FishBowlHighlights.Blend(button.BackColor,36))>=4.5),theme+"/"+accent+" pressed contrast");

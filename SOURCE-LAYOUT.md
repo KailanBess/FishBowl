@@ -4,7 +4,7 @@ FishBowl has two front ends that share their data model and emulator logic.
 
 ## Windows (`windows/`)
 
-The Windows application, currently version **1.25.8**, is built from:
+The Windows application, source version **1.26.2**, is built from:
 
 - `windows/FishBowl.cs`, `windows/FishBowl.InputPainting.cs` and `windows/FishBowl.TextFit.cs`: the WinForms application
 - `FishBowl.Model.cs` and `FishBowl.GameRecognition.cs` (repository root): the shared data model and game identification
@@ -32,3 +32,5 @@ It must not compile `windows/FishBowl.cs`. Windows behaviour reaches Linux by mo
   - New `library.json` fields must be optional. Never rename or remove an existing field.
   - The Linux build adds `[JsonExtensionData]` to each model class, so fields from newer versions survive a Linux save.
 - **Artwork:** `FishBowl.png` and `FishBowl.ico` at the root are used by the Linux app and installer. Windows keeps its own copies in `windows/`.
+
+Shared expansion helpers: `FishBowl.GameTools.cs` (imports, mods, media and history), `FishBowl.Integrations.cs` (catalogs, achievements and companion) and `FishBowl.SaveTools.cs` (verified file save snapshots). Both platforms compile these helpers.
