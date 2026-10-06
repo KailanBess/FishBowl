@@ -165,7 +165,7 @@ class OverflowAudit {
   if (group != null) { int need = TextRenderer.MeasureText(text, font).Width + 16; return need > group.Width + 2 ? "caption needs " + need + "px, box is " + group.Width + "px" : null; }
   var button = c as ButtonBase;
   if (button != null) {
-   if (button.AutoEllipsis) return null;
+   if (button.AutoEllipsis || button.AutoSize) return null; // Windows sizes these to their text.
    var own = button.GetType().GetMethod("TextWidthNeeded"); // FishBowlActionButton drops its icon when space is tight
    if (own != null) { int textNeed = (int)own.Invoke(button, null); return textNeed > button.Width + 2 ? "text needs " + textNeed + "px of width, has " + button.Width + "px" : (lineHeight > button.Height + 2 ? "text needs " + lineHeight + "px of height, has " + button.Height + "px" : null); }
    int need = TextRenderer.MeasureText(text.Replace("&&", "&"), font).Width + button.Padding.Horizontal + 8;
