@@ -16,7 +16,7 @@ New-Item -ItemType Directory -Path $output -Force | Out-Null
 $bundle = Join-Path $output ('FishBowl-' + $version)
 $expectedNames = @('FishBowl.exe','FishBowl Setup.exe','FishBowl.ico','Uninstall FishBowl.bat','Uninstall FishBowl.ps1','README.md')
 if (Test-Path -LiteralPath $bundle) {
- $extra = Get-ChildItem -LiteralPath $bundle | Where-Object { $_.PSIsContainer -or $_.Name -notin $expectedNames }
+ $extra = Get-ChildItem -LiteralPath $bundle -Force | Where-Object { $_.PSIsContainer -or $_.Name -notin $expectedNames }
  if ($extra) { throw 'Existing bundle contains unrelated files; choose a fresh output directory.' }
 }
 New-Item -ItemType Directory -Path $bundle -Force | Out-Null

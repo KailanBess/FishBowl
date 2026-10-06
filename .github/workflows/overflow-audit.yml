@@ -9,6 +9,10 @@ on:
   pull_request:
     paths: ['windows/**']
 
+concurrency:
+  group: overflow-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   audit:
     runs-on: windows-latest
