@@ -224,12 +224,12 @@ namespace EmulatorHub
                 Button browse = form.Controls.OfType<Button>().FirstOrDefault(c => c.Text == "Browse");
                 if (hint != null && browse != null)
                 {
-                    int oldBottom = hint.Bottom;
+                    int oldTop = hint.Top;
                     int nextTop = Math.Max(hint.Top, browse.Bottom + 6);
                     int delta = nextTop - hint.Top;
                     if (delta > 0)
                         foreach (Control sibling in form.Controls)
-                            if (sibling != hint && sibling.Top >= oldBottom) sibling.Top += delta;
+                            if (sibling != hint && sibling.Top >= oldTop) sibling.Top += delta;
                     hint.Top = nextTop;
                 }
             }

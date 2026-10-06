@@ -18,7 +18,7 @@ Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dial
 
 ## Compact controls and color harmony 1.26.2
 
-Windows compact density reduces control/card spacing without reducing user-selected fonts. Optional `ThemeSettings.ControlDensity` and `ColorHarmony` preserve the choice across both platforms; default values use Compact and Harmonized. Standard/Roomy density, Original color behavior, custom palettes and accessibility settings remain available. Controller presets use Roomy. Theme switching updates previous themed backgrounds, avoiding mixed palettes. Windows build, 34 density checks, 17,129 color/selection checks and 199 schema preservation checks pass. Full regressions and fresh normal/compact text audits are required in PR #20. Linux UI density/color styling is unchanged; the new optional choices survive Linux settings and profile saves.
+Windows compact density reduces control/card spacing without reducing user-selected fonts. Optional `ThemeSettings.ControlDensity` and `ColorHarmony` preserve the choice across both platforms; default values use Compact and Harmonized. Standard/Roomy density, Original color behavior, custom palettes and accessibility settings remain available. Controller presets use Roomy. Theme switching updates previous themed backgrounds, avoiding mixed palettes. Windows build, 36 density checks, 17,129 color/selection checks and 199 schema preservation checks pass. Full regressions and fresh normal/compact text audits are required in PR #20. Linux UI density/color styling is unchanged; the new optional choices survive Linux settings and profile saves.
 
 ## Home layout 1.26.1
 

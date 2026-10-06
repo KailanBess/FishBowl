@@ -20,6 +20,16 @@ class ControlDensityTests {
     var fields=NextDialog.Fields(form.Body);var input=new TextBox{Text="Editable input"};var button=ExperienceUi.Button("Review selected game",delegate{});NextDialog.Field(fields,"Game title",input);NextDialog.Field(fields,"Options",button);form.Action("Close",form.Close);form.Show();Application.DoEvents();float font=input.Font.Size;ControlDensityTools.Apply(form);Application.DoEvents();var bounds=NextUi.Descendants(form).Select(c=>c.Bounds).ToArray();ControlDensityTools.Apply(form);Application.DoEvents();Check(NextUi.Descendants(form).Select(c=>c.Bounds).SequenceEqual(bounds),"repeated density apply is stable at "+percent+" / "+small);Check(input.Font.Size==font&&data.Enhancements.TextPercent==percent&&data.Theme.FontFamily=="Segoe UI","density keeps exact text and font preference");Check(button.Height>=button.Font.Height+8,"compact button retains readable text height");Check(button.Bottom<=button.Parent.ClientSize.Height&&input.Bottom<=input.Parent.ClientSize.Height,"compact field rows retain all controls");Capture(form,"fields-"+percent+"-"+(small?"compact":"normal"));form.Close();
    }
   }
+  NextUi.TextPercent=200;
+  using(var settings=new SettingsDialog(data.Theme,data.BackupFolder)){
+   settings.ShowInTaskbar=false;settings.Show();Application.DoEvents();
+   var hint=NextUi.Descendants(settings).OfType<Label>().Single(c=>c.Text.StartsWith("Choose a OneDrive"));
+   var startup=NextUi.Descendants(settings).OfType<CheckBox>().Single(c=>c.Text.StartsWith("Show the setup assistant"));
+   var browse=NextUi.Descendants(settings).OfType<Button>().Single(c=>c.Text=="Browse");
+   Check(hint.Parent==startup.Parent&&hint.Parent==browse.Parent&&!hint.Bounds.IntersectsWith(browse.Bounds)&&!hint.Bounds.IntersectsWith(startup.Bounds),"large-text backup hint fits between Browse and following preference");
+   Rectangle beforeHint=hint.Bounds,beforeStartup=startup.Bounds;ControlDensityTools.Apply(settings);Application.DoEvents();
+   Check(hint.Bounds==beforeHint&&startup.Bounds==beforeStartup,"backup hint spacing stable after repeated apply");Capture(settings,"settings-200");settings.Close();
+  }
   data.Theme.ControlDensity="Roomy";FluidStyle.Configure(data);Check(FluidStyle.Roomier,"Roomy overrides older spacing preference");data.Theme.ControlDensity=null;FluidStyle.Configure(data);Check(!FluidStyle.Roomier,"Compact suppresses older Roomier default without modifying it");UiPolishTools.ApplyAccessibility(data,"Controller");Check(data.Theme.ControlDensity=="Roomy","controller preset selects roomy controls");NextUi.TextPercent=100;TextFit.WorkingAreaOverride=null;
  }
  static void Capture(Form form,string name){using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine("density-previews",name+".png"));}}
