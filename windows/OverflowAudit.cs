@@ -120,6 +120,7 @@ class OverflowAudit {
   foreach (Control c in NextUi.Descendants(form)) {
    if (!c.Visible || c.Width <= 1 || c.Height <= 1 || notText.Any(t => t.IsInstanceOfType(c))) continue;
    string problem = Problem(c);
+   if (problem == null) problem = Overlap(c);
    if (problem == null) continue;
    found.Add(c);
    issues.Add(new Issue { Window = window, Percent = percent, Path = PathOf(c), Text = Short(c.Text), Problem = problem });
@@ -152,9 +153,11 @@ class OverflowAudit {
    int width = label.ClientSize.Width - label.Padding.Horizontal, height = label.ClientSize.Height - label.Padding.Vertical;
    if (label.AutoSize) return null;
    var single = TextRenderer.MeasureText(text, font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix);
-   if (single.Width <= width + 2 && single.Height <= height + 2) return null;
+   if (single.Width <= width + 2 && single.Height <= height + 4) return null;
+   // Compare whole lines: a label a few pixels short of its font height still shows its text.
    var wrapped = TextRenderer.MeasureText(text, font, new Size(Math.Max(1, width), int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl);
-   if (wrapped.Height > height + 2) return "text needs " + wrapped.Height + "px of height, has " + height + "px";
+   int linesNeeded = (int)Math.Round(wrapped.Height / (double)lineHeight), linesShown = Math.Max(1, (height + lineHeight / 3) / lineHeight);
+   if (linesNeeded > linesShown) return "text needs " + linesNeeded + " lines, has room for " + linesShown;
    if (LongestWord(text, font) > width + 2) return "a word is wider (" + LongestWord(text, font) + "px) than the label (" + width + "px)";
    return null;
   }
@@ -162,7 +165,9 @@ class OverflowAudit {
   if (group != null) { int need = TextRenderer.MeasureText(text, font).Width + 16; return need > group.Width + 2 ? "caption needs " + need + "px, box is " + group.Width + "px" : null; }
   var button = c as ButtonBase;
   if (button != null) {
-   if (button.AutoEllipsis) return null;
+   if (button.AutoEllipsis || button.AutoSize) return null; // Windows sizes these to their text.
+   var own = button.GetType().GetMethod("TextWidthNeeded"); // FishBowlActionButton drops its icon when space is tight
+   if (own != null) { int textNeed = (int)own.Invoke(button, null); return textNeed > button.Width + 2 ? "text needs " + textNeed + "px of width, has " + button.Width + "px" : (lineHeight > button.Height + 2 ? "text needs " + lineHeight + "px of height, has " + button.Height + "px" : null); }
    int need = TextRenderer.MeasureText(text.Replace("&&", "&"), font).Width + button.Padding.Horizontal + 8;
    if (button.Image != null && (button.TextImageRelation == TextImageRelation.ImageBeforeText || button.TextImageRelation == TextImageRelation.TextBeforeImage)) need += button.Image.Width + 4;
    var check = c as CheckBox; var radio = c as RadioButton;
@@ -174,6 +179,17 @@ class OverflowAudit {
   return null;
  }
 
+ // Text controls drawn on top of a sibling with text (e.g. an auto-sized check box running into the next label).
+ static string Overlap(Control c) {
+  if (c.Parent == null || String.IsNullOrWhiteSpace(c.Text) || !(c is Label || c is ButtonBase)) return null;
+  foreach (Control other in c.Parent.Controls) {
+   if (other == c || !other.Visible || String.IsNullOrWhiteSpace(other.Text) || !(other is Label || other is ButtonBase || other is ComboBox || other is TextBoxBase)) continue;
+   if (c.Parent.Controls.GetChildIndex(other) > c.Parent.Controls.GetChildIndex(c) && (other is Label || other is ButtonBase)) continue; // report each pair once
+   var shared = Rectangle.Intersect(c.Bounds, other.Bounds);
+   if (shared.Width > 3 && shared.Height > 3) return "overlaps \"" + Short(other.Text) + "\"";
+  }
+  return null;
+ }
  static int LongestWord(string text, Font font) { return text.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries).Select(w => TextRenderer.MeasureText(w, font).Width).DefaultIfEmpty(0).Max(); }
  static string PathOf(Control c) { var parts = new List<string>(); for (var x = c; x != null && !(x is Form); x = x.Parent) parts.Insert(0, String.IsNullOrEmpty(x.Name) ? x.GetType().Name : x.Name); return String.Join(" › ", parts.Skip(Math.Max(0, parts.Count - 4)).ToArray()); }
  static string Short(string text) { text = (text ?? "").Replace("\r", " ").Replace("\n", " ").Replace("|", "/"); return text.Length > 60 ? text.Substring(0, 57) + "…" : text; }
