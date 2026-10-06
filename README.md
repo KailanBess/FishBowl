@@ -7,7 +7,7 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 | Windows | 1.25.8 | Current release |
 | Linux | Preview | Emulator hub; the Windows library features are being ported |
 
-Source version **1.25.11** is under review in [PR #15](../../pull/15). It includes library editing fixes, Undo removal, portable path recovery, explicit emulator reassignment, artwork cleanup and large-text layout fixes. The public release remains 1.25.8 until review and CI complete.
+Source version **1.25.12** is under review in the [theme update](../../compare/main...windows-themes-1.25.12). It adds 40 distinct themes, 28 accents and a clean water footer alongside library editing fixes, Undo removal, portable path recovery, explicit emulator reassignment, artwork cleanup and large-text layout fixes. The public release remains 1.25.8 until review and CI complete.
 
 ## Features
 
