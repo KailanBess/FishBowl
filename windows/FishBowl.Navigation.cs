@@ -69,6 +69,8 @@ namespace EmulatorHub {
   [DllImport("xinput9_1_0.dll",EntryPoint="XInputGetState")]static extern uint GetLegacy(uint index,out State state);
   [DllImport("user32.dll")]static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr window,out uint process);
+  [DllImport("user32.dll")]static extern IntPtr GetAncestor(IntPtr window,uint flags);
+  [DllImport("user32.dll")]static extern bool IsWindowEnabled(IntPtr window);
   static readonly ControllerInput input=new ControllerInput();static ToolStripDropDown openMenu;
   static readonly HashSet<ToolStrip> attached=new HashSet<ToolStrip>();
   static readonly HashSet<ToolStripMenuItem> wired=new HashSet<ToolStripMenuItem>();
@@ -77,7 +79,16 @@ namespace EmulatorHub {
   public static void Attach(Form form){foreach(var strip in NextUi.Descendants(form).OfType<MenuStrip>()){if(attached.Add(strip)){WireItems(strip);strip.Disposed+=delegate{attached.Remove(strip);};}}foreach(var control in NextUi.Descendants(form))if(control.ContextMenuStrip!=null)Register(control.ContextMenuStrip);}
   static bool Read(out State state,out int device){state=default(State);device=-1;for(uint i=0;i<4;i++){uint result=1;try{result=Get(i,out state);}catch(DllNotFoundException){try{result=GetOld(i,out state);}catch(DllNotFoundException){try{result=GetLegacy(i,out state);}catch(DllNotFoundException){return false;}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}if(result==0){device=(int)i;return true;}}return false;}
   public static void Reset(){input.Sample(false,-1,0,0,0,0,false);}
-  public static void Poll(Form owner){State state;int device;bool connected=Read(out state,out device);uint foreground;GetWindowThreadProcessId(GetForegroundWindow(),out foreground);Form active=Form.ActiveForm;bool allowed=active!=null&&foreground==(uint)System.Diagnostics.Process.GetCurrentProcess().Id&&!(active is ControllerLauncher);ushort pressed=input.Sample(connected,device,state.Pad.Buttons,state.Pad.X,state.Pad.Y,DateTime.UtcNow.Ticks/TimeSpan.TicksPerMillisecond,allowed);if(allowed&&pressed!=0)ApplyButtons(active,owner,pressed);}
+  public static bool CanNavigate(Form active,IntPtr foreground) {
+   if(active==null||active.IsDisposed||!active.IsHandleCreated||active is ControllerLauncher||foreground==IntPtr.Zero||!IsWindowEnabled(active.Handle))return false;
+   uint process;GetWindowThreadProcessId(foreground,out process);
+   if(process!=(uint)System.Diagnostics.Process.GetCurrentProcess().Id)return false;
+   IntPtr root=GetAncestor(foreground,2);
+   if(root==GetAncestor(active.Handle,2))return true;
+   return openMenu!=null&&!openMenu.IsDisposed&&openMenu.Visible&&openMenu.IsHandleCreated&&root==GetAncestor(openMenu.Handle,2);
+  }
+  public static void Poll(Form owner){State state;int device;bool connected=Read(out state,out device);Form active=Form.ActiveForm;bool allowed=CanNavigate(active,GetForegroundWindow());ushort pressed=input.Sample(connected,device,state.Pad.Buttons,state.Pad.X,state.Pad.Y,DateTime.UtcNow.Ticks/TimeSpan.TicksPerMillisecond,allowed);if(allowed&&pressed!=0)ApplyButtons(active,owner,pressed);}
+
   static Control Focused(Form form){Control control=form.ActiveControl;while(control is ContainerControl&&((ContainerControl)control).ActiveControl!=null)control=((ContainerControl)control).ActiveControl;return control;}
   static void MenuMove(ToolStrip strip,int offset){var items=strip.Items.Cast<ToolStripItem>().Where(i=>i.Available&&i.Enabled&&!(i is ToolStripSeparator)).ToArray();if(items.Length==0)return;int current=Array.FindIndex(items,i=>i.Selected);if(current<0)current=offset<0?0:-1;items[(current+offset+items.Length)%items.Length].Select();}
   public static void ApplyButtons(Form form,Form owner,ushort buttons){

@@ -14,7 +14,7 @@ _Last updated: 2026-10-06, expansion integration._
 
 ## Open pull requests
 
-PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.27.0 work is on `fishbowl-session-remote-play` and targets main. Both platform implementations are included.
+PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.27.0 work is in PR #21 on `fishbowl-session-remote-play` and targets main. Both platform implementations are included.
 
 ## Session, navigation and remote play 1.27.0
 
@@ -129,3 +129,7 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 ### 2026-10-06 — sessions, navigation and remote play
 
 Added profile-owned crash journals, exact launcher tree tracking, Windows controller/appearance integration, Linux joystick/session parity and the browser media client/private token service. Main through merged PR #20 is the base. Updated bounded completion fixtures, C#5/build/package references and service CI. Service/device smoke testing remains explicitly required.
+
+### 2026-10-06 — native controller modal guard
+
+Controller navigation now checks the actual enabled native form and foreground root window, so file/folder pickers and unrelated modal windows cannot activate controls underneath. Registered FishBowl popup menus remain available. Navigation tests pass 55 checks; the preceding complete Windows regression run passed 31,069 checks. Normal/compact UI audits report zero findings. PR #21 includes the complete 1.27.0 source, media-client resources and token-service setup; current-commit CI is required before merge.
