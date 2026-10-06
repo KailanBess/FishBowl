@@ -28,7 +28,7 @@ foreach ($name in @('FishBowl.exe','FishBowl Setup.exe','FishBowl.ico','Uninstal
 
 Run FishBowl.exe, or keep these six files together and run FishBowl Setup.exe to install.
 
-Home and appearance settings offer theme samples, restrained accents, cover proportions, card ordering and accessibility presets. Game tools includes native imports, Steam discovery, launch profiles, mod backups and rollback, media links, save history and play insights. Integrations includes reviewed metadata catalogs, declarative extensions, RetroAchievements progress and a paired read-only browser companion. API keys and pairing addresses stay private; online progress needs your own RetroAchievements account.
+Home and appearance settings offer Compact/Standard/Roomy control spacing, Harmonized/Original color blending, theme samples, restrained accents, cover proportions, card ordering and accessibility presets. Compact spacing keeps your selected font and text size. Game tools includes native imports, Steam discovery, launch profiles, mod backups and rollback, media links, save history and play insights. Integrations includes reviewed metadata catalogs, declarative extensions, RetroAchievements progress and a paired read-only browser companion. API keys and pairing addresses stay private; online progress needs your own RetroAchievements account.
 
 Game titles and artwork are stored in the library without renaming game files. Removing games/emulators supports Undo. Review mod changes and save restore destinations before applying them. Game files and emulator programs are supplied separately.
 

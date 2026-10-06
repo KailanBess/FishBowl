@@ -222,7 +222,16 @@ namespace EmulatorHub
             {
                 Label hint = form.Controls.OfType<Label>().FirstOrDefault(c => c.Text.StartsWith("Choose a OneDrive", StringComparison.Ordinal));
                 Button browse = form.Controls.OfType<Button>().FirstOrDefault(c => c.Text == "Browse");
-                if (hint != null && browse != null) hint.Top = Math.Max(hint.Top, browse.Bottom + 6);
+                if (hint != null && browse != null)
+                {
+                    int oldBottom = hint.Bottom;
+                    int nextTop = Math.Max(hint.Top, browse.Bottom + 6);
+                    int delta = nextTop - hint.Top;
+                    if (delta > 0)
+                        foreach (Control sibling in form.Controls)
+                            if (sibling != hint && sibling.Top >= oldBottom) sibling.Top += delta;
+                    hint.Top = nextTop;
+                }
             }
             TextFit.FitLabels(form);
         }
