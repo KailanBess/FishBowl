@@ -2,13 +2,13 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-06, by the Windows side._
+_Last updated: 2026-10-06, by the Linux side._
 
 ## Current state
 
 | | State |
 | --- | --- |
-| Windows | **1.25.8**, released as [v1.25.8](../../releases/tag/v1.25.8). Source in `windows/`. |
+| Windows | Source **1.25.11** on `main` (#15). Latest release is still [v1.25.8](../../releases/tag/v1.25.8). Source in `windows/`. |
 | Linux | Preview. Emulator hub with Linux integration (Flatpak, AppImage, XDG folder routing). Not yet at parity with the Windows game library features. |
 | Shared | The `library.json` data model (`FishBowl.Model.cs`) is shared by both builds. Linux preserves every Windows field when it saves. |
 
@@ -16,22 +16,17 @@ _Last updated: 2026-10-06, by the Windows side._
 
 | PR | What | Notes |
 | --- | --- | --- |
-| #15 | Windows 1.25.11 library recovery and layout fixes | Includes 1.25.9 removal and 1.25.10 title/cover fixes; needs Linux UI port and review. |
+| #18 | Windows themes and accents (1.25.12) | Windows side. Linux themes follow after it merges. |
+| #19 | Linux: dialogs no longer trap the mouse | Linux only. |
 
-## Windows change awaiting review
+## Recently merged: Windows 1.25.11 (#15)
 
-Branch `fix-library-title-artwork` ([PR #15](../../pull/15)) proposes source version **1.25.11**. It includes the earlier removal and title/cover fixes, plus all six follow-up improvements: normalized multi-disc grouping, large-text layouts, persisted Undo removal, portable/moved-folder path recovery, explicit emulator reassignment after removal, and reviewed artwork cleanup. Existing UI themes, control styles and wording are retained.
-
-Shared changes: `GameEntry.RequiresEmulatorAssignment`, `LibraryData.RemovalHistory`, `SavedDataRoot` and `SavedPortableRoot`, and the recovery record types are optional in `FishBowl.Model.cs`. `FishBowl.Library.cs` contains the recovery, path-repair and artwork-reference helpers. Both Store implementations record roots on save and repair missing paths on load when matching relocated files exist. Linux schema tests cover the new optional fields and nested recovery records; matching Linux UI actions still need a port. No Avalonia UI or Linux integration files changed.
-
-Undo retains the last 20 removal batches across restarts. It skips conflicts with re-added entries and retains partially recovered batches, protects newer emulator assignments, and leaves game/save/executable files untouched. Cleanup is manual, reviewed, and limited to generated files in managed artwork folders. References in the active library, inactive profiles, undo history and readable local backup/restore libraries are protected; an unreadable backup blocks cleanup. Root repair matches exact relative paths rather than guessing titles.
-
-Validation: Windows app/installer build, full regression runner (2,738 checks including 43 recovery checks), 62 general dialog previews plus reassignment prompts at 100/150/200% text size, and Framework C# 5 shared compilation. The expanded overflow audit covers six previously skipped dialogs; only the generic background-worker form remains outside the constructor fixture. Normal and compact desktop checks reported zero clipping or overlap findings at 100%, 150% and 200% text size. Use `Run Overflow Audit.ps1 -Compact` to reproduce the 1024x720 desktop check. Audit screenshots now include every text size. Windows fixture roots are normalized so long and short temporary path names produce equivalent expectations. The runner prints each test name, captures its output and limits each executable to three minutes (ten with FullVisual) so an unattended modal cannot stall CI indefinitely. Linux/Avalonia build, core tests and schema preservation passed on CI; Windows CI also passed all 2,738 checks before integrating the newly merged shared game recognizer. The combined-source checks are pending.
+Library recovery and layout fixes: normalized multi-disc grouping, large-text layouts, persisted Undo removal (last 20 batches), portable/moved-folder path recovery, explicit emulator reassignment after removal, and reviewed artwork cleanup. Shared parts: optional `GameEntry.RequiresEmulatorAssignment`, `LibraryData.RemovalHistory`, `SavedDataRoot`, `SavedPortableRoot` and the recovery record types in `FishBowl.Model.cs`, and the helpers in `FishBowl.Library.cs`. **Linux still needs the matching screens** (see Next steps). Not yet released; publish a 1.25.11 release when ready.
 
 ## Known issues
 
-- **#10:** source normalization addresses the Windows runner multi-disc grouping failure. Regression coverage now includes short Windows paths, relative paths, source order and repeated/circular playlist references. The clean Windows runner now passes this grouping check. The existing integration save assertion also needed normalized path comparison.
-- Linux library recovery and reassignment screens need a matching UI port before platform parity.
+- **Flaky Windows test:** "actual emulator-process session time recorded" in `IntegrationTests` failed once on `main` and passed on re-run with no changes. It depends on timing; make it wait for the session instead of a fixed delay.
+- **Remaining text overflow:** the 1.25.11 audit reports zero findings at 100/150/200% on normal and compact desktops.
 
 ## In progress on the Linux side
 
@@ -58,13 +53,15 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 
 ## Next steps (Linux parity)
 
-1. **Move Windows non-UI logic into shared files:** game recognition (done: `FishBowl.GameRecognition.cs`), then library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
+1. **Move Windows non-UI logic into shared files:** game recognition, library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
 2. **Build Linux screens on that shared logic:** Home, Library, game details, profiles and living-room mode.
 3. **Finish and submit the Linux-only features above.**
 
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-06 (Linux dialogs):** dialogs no longer trap the mouse on focus-follows-mouse desktops (Hyprland, Sway, i3). Avalonia's X11 modal dialogs pulled focus back whenever the owner window was hovered, and the compositor warped the pointer back. `FishDialog.Present` now shows dialogs owned (still above the owner) and blocks the owner's input until they close. Merged #15, #16 and #17.
 
 - **2026-10-06 (Windows CI multi-disc diagnostics):** reviewed the failing Windows Actions run `37421288794` and confirmed the original clean-runner failure was the `IntegrationTests` multi-disc grouping assertion. Added grouped-plan diagnostics to that assertion so future failures print `grouped.Count` plus each plan's source/files, making runner-only path or ordering differences visible in logs.
 

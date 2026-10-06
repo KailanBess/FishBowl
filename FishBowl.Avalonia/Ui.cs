@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -183,10 +184,22 @@ namespace EmulatorHub
             KeyDown += (sender, e) => { if (e.Key == Key.Escape) { Close(); e.Handled = true; } };
         }
         public Control Body { set { Content = new Border { Padding = new Thickness(18), Child = value }; } }
+        // Not ShowDialog: on X11 a modal dialog takes focus back whenever its disabled owner is activated, and on
+        // focus-follows-mouse desktops (Hyprland, Sway, i3) that warps the pointer back into the dialog, trapping it.
+        // Instead the dialog stays above its owner, and the owner ignores input until the dialog closes.
         public async Task Present(Window owner)
         {
-            if (owner != null && owner.IsVisible) await ShowDialog(owner);
-            else { var closed = new TaskCompletionSource<bool>(); Closed += delegate { closed.TrySetResult(true); }; Show(); await closed.Task; }
+            var closed = new TaskCompletionSource<bool>(); Closed += delegate { closed.TrySetResult(true); };
+            if (owner == null || !owner.IsVisible) { Show(); await closed.Task; return; }
+            EventHandler<RoutedEventArgs> block = (sender, e) => e.Handled = true;
+            var events = new RoutedEvent[] { InputElement.PointerPressedEvent, InputElement.PointerReleasedEvent, InputElement.PointerWheelChangedEvent, InputElement.KeyDownEvent, InputElement.KeyUpEvent, InputElement.TextInputEvent, DragDrop.DragOverEvent, DragDrop.DropEvent };
+            foreach (var routed in events) owner.AddHandler(routed, block, RoutingStrategies.Tunnel, true);
+            try { Show(owner); await closed.Task; }
+            finally
+            {
+                foreach (var routed in events) owner.RemoveHandler(routed, block);
+                owner.Activate();
+            }
         }
         // Standard right-aligned Save/Cancel row; save returns false to keep the dialog open.
         public Control Footer(string confirm, Func<Task<bool>> save, params Control[] extra)
