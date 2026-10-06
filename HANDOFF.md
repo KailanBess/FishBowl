@@ -58,7 +58,7 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 ## Log
 
 - **2026-10-06:**
-  - `AGENTS.md`: agents keep all work on GitHub (pull at start, branch, push often, pull request, no uploads) and walk contributors new to Git through it.
+  - `AGENTS.md`: agents keep all work on GitHub (pull at start, branch, push often, pull request, no uploads), walk contributors new to Git through it, and keep branches tidy (one per pull request, check the base targets `main`, delete after merging). Deleted the leftover branches from merged pull requests.
   - Shared game identification: `windows/GameRecognition.cs` moved to the root as `FishBowl.GameRecognition.cs` and is compiled by both builds. Its WinForms helpers (`SmoothPainting`, `ConsistentInputs`) moved to `windows/FishBowl.InputPainting.cs`. Linux uses `FishBowl.LinuxShims.cs` for the `System.Drawing` types (built-in PNG encoder). Fixed Linux storing its library in the current directory when `~/.local/share` doesn't exist yet.
   - Merged #8 (shared data model), #9 (Tux easter egg), #11 (text overflow fixes; Windows build now compiles `windows/FishBowl.TextFit.cs`) and #12 (README, tidy-up, handoff). Published release v1.25.8.
   - Rewrote the README and tidied the repository: removed superseded source and test files, the old root `FishBowl.cs`, and obsolete review notes.

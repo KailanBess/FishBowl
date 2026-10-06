@@ -19,6 +19,13 @@ Both maintainers stay in sync only through this GitHub repository. Some contribu
 
 **If a contributor asks for something that would bypass this,** suggest the GitHub-backed way instead and offer to do it for them. Examples: working outside the repository, uploading files by hand, or skipping the pull request.
 
+## Branch housekeeping
+
+- **One branch per pull request.** Name it for the change (e.g. `fix-library-covers`), and don't create branches you won't open a pull request from.
+- **Check the base before merging.** A pull request must target `main`. If it was opened against another branch (because it built on another pull request), wait until GitHub retargets it to `main` after the first one merges, or change the base yourself. Merging into an old branch strands the work.
+- **Delete a branch once its pull request is merged or closed** (the "Delete branch" button on the pull request, or `git push origin --delete <branch>`). Leftover branches pile up quickly.
+- **Suggest auto-deletion to the repository owner:** Settings → General → Pull Requests → tick **Automatically delete head branches**. GitHub then removes merged branches by itself.
+
 ## Helping someone new to Git and GitHub
 
 If the person you work with isn't familiar with Git, guide them gently:
