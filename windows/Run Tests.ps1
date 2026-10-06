@@ -18,7 +18,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "$testName failed." }
  }
  foreach ($legacyTest in @('AdditionTests','CompactTests','CosmeticTests','UserToolsTests','PolishTests','AuditTests','HubTests','ImmersionTests','FluidTests','TextFieldTests','RowPaintTests','PauseAnimationTests')) {
-  Copy-Item -LiteralPath (Join-Path $PSScriptRoot ($legacyTest + '.cs')) -Destination $fixture
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('Tests\' + $legacyTest + '.cs')) -Destination $fixture
   & $compiler /nologo /r:FishBowl.exe /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/out:$legacyTest.exe" "$legacyTest.cs"
   if ($LASTEXITCODE -ne 0) { throw "$legacyTest compilation failed." }
   $legacyArgs = @()

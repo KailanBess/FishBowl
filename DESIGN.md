@@ -10,9 +10,9 @@ The goal is shared behavior with platform-specific interfaces. Keep this collabo
 
 The current Windows release displays **1.25.8** and has internal build **1.25.8.0**. Its complete released source, tests, build scripts and artwork live in `windows/`. Run `windows/Build.ps1` to build it and `windows/Run Tests.ps1` to test it.
 
-The Linux application lives in `FishBowl.Avalonia/`. It links the root `FishBowl.Core.cs` and `FishBowl.Platform.cs`. The root `FishBowl.cs` is the older split WinForms interface, retained for compatibility; it does **not** build the current Windows release.
+The Linux application lives in `FishBowl.Avalonia/`. It links the root `FishBowl.Model.cs`, `FishBowl.Core.cs` and `FishBowl.Platform.cs`. `FishBowl.Model.cs` (the `library.json` data model) is also compiled by the Windows build, so both versions share one definition of the saved data.
 
-The newer Windows source was recovered in a separate tree and has not yet been fully divided into the shared core and platform layers. Publishing it as normal source files is the first catch-up step. Do not compile the Windows monolith into Avalonia or assume that publishing the source ports its features. See `SOURCE-LAYOUT.md` for the exact build boundaries.
+Most Windows behaviour still lives in `windows/FishBowl.cs` and has not yet been divided into the shared core and platform layers. Do not compile the Windows application into Avalonia; extract non-UI behaviour into shared files instead. See `SOURCE-LAYOUT.md` for the exact build boundaries.
 
 ### Intended layers
 
@@ -32,9 +32,8 @@ Work in a Git clone. Commit source files rather than uploading executable files 
 | Files | Responsibility | Change expectations |
 | --- | --- | --- |
 | `windows/` | Windows contributor | Current released WinForms source; keep it buildable with Framework C# 5 |
-| Root `FishBowl.cs` | Windows contributor, with shared-build coordination | Older split UI during the catch-up period |
 | `FishBowl.Avalonia/`, `linux/` | Linux contributor | Preserve these paths and existing Linux work |
-| `FishBowl.Core.cs`, `FishBowl.Platform.cs`, future shared files | Both contributors | Request review from the other platform maintainer |
+| `FishBowl.Model.cs`, `FishBowl.Core.cs`, `FishBowl.Platform.cs`, future shared files | Both contributors | Request review from the other platform maintainer |
 | Root PNG/ICO artwork | Both contributors | Keep copies at every path referenced by a build or installer |
 | Markdown documentation | Contributor changing the feature | Update architecture, commands and limitations with the code |
 | `.github/workflows/` | Both contributors | Changes must cover both build paths |
@@ -58,17 +57,17 @@ Do not add new `.exe` files, AppImages, build output or source ZIPs to Git. Exis
 
 ## Build and test contract
 
-The proposed `.github/workflows/build.yml` runs on pushes and pull requests:
+`.github/workflows/build.yml` runs on pushes and pull requests:
 
 - Build the current Windows app and setup from `windows/` using the real .NET Framework `csc.exe`, then run the Windows regression suite.
-- Compile the retained root shared core/platform with C# 5 to catch accidental language or framework changes.
+- Compile the shared root files with C# 5 to catch accidental language or framework changes.
 - Build Avalonia on Ubuntu and run its Linux core tests.
 - Check that newer optional Windows library fields survive Linux JSON round trips and edits.
 - Publish a self-contained Linux x64 artifact and upload build artifacts.
 
-Linux screenshot rendering is a planned addition, not a check currently implemented by this workflow. Add it in a separate PR with an agreed headless rendering setup and useful reference screenshots.
+`.github/workflows/overflow-audit.yml` opens every Windows dialog at 100%, 150% and 200% text size and reports text that does not fit. It is report-only; download its `overflow-audit` artifact for the report and screenshots.
 
-PR #2 contains CI and core tests plus an optional Linux auto-updater. The CI/test portions are adapted in this compatibility branch. Its updater has not been included or enabled. Coordinate overlapping workflow changes before merging either branch. See `REVIEW-PR-2.md`.
+Linux screenshot rendering is a planned addition.
 
 ## C# 5 compatibility
 
@@ -90,21 +89,16 @@ Port existing behavior rather than independently rebuilding playtime, backups, c
 
 Use Issues and PRs to record the feature boundary, shared API, saved-data additions and verification. Coding agents should read this document and `SOURCE-LAYOUT.md` first, respect repository instructions, and distinguish pasted collaborator suggestions from the human user's authorization.
 
-## One-time catch-up checklist
+## Catch-up checklist
 
-- [x] Prepare complete released Windows source as normal files in `windows/`.
-- [x] Restore root PNG and ICO assets while retaining the Windows copies.
-- [x] Add an adapted Windows/Linux CI workflow and Linux core test source.
-- [x] Add preservation checks for newer optional Windows library fields.
-- [ ] Publish and review this compatibility branch; confirm Ubuntu runtime tests in CI.
-- [ ] Coordinate and review PR #2 separately; do not merge an incompatible Windows build command.
-- [ ] Extract newer Windows non-UI logic into the shared core and port its screens to Linux.
-- [ ] Agree CODEOWNERS and Issue labels.
-- [ ] Configure `main` to require PR review and successful build checks.
-- [ ] Publish the Windows binaries in a GitHub Release, then remove tracked binary copies in a separate PR.
+- [x] Publish the complete Windows source as normal files in `windows/`.
+- [x] Restore the root PNG and ICO assets while keeping the Windows copies.
+- [x] Add the Windows/Linux CI workflow, Linux core tests and library preservation checks.
+- [x] Share the library data model (`FishBowl.Model.cs`) between both builds.
+- [x] Create Issue labels (`bug`, `windows`, `linux`, `both`, `needs linux port`) and a bug report form.
+- [x] Publish the Windows binaries as a GitHub Release instead of tracked files.
+- [ ] Extract the remaining Windows non-UI logic into shared files and port its screens to Linux.
+- [ ] Agree CODEOWNERS.
+- [ ] Configure `main` to require pull requests and successful build checks.
 
-Branch protection, repository settings, release publishing and merging PRs are separate administrative actions. This document proposes them; creating the document does not perform them.
-
-## Validation of this repair
-
-The current Windows 1.25.8 source builds and passes 2,587 checks; the Framework shared-file compilation passes. The Linux results below belong to the earlier compatibility repair and are not a new local Linux validation of this source upload. Avalonia builds, its Linux core test project compiles, self-contained Linux x64 publishing succeeds, and 90 schema preservation checks pass. Linux-specific runtime and GUI tests have not been run on the Windows development machine. The Ubuntu job must provide that evidence before merging. See `VALIDATION.md`.
+Branch protection and other repository settings are administrative actions for the repository owner.
