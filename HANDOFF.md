@@ -16,7 +16,7 @@ _Last updated: 2026-10-06, by the Linux side._
 
 | PR | What | Notes |
 | --- | --- | --- |
-| #PRNUM | Share game identification between Windows and Linux | First step of Linux parity. Includes the handoff update from #13. |
+| #14 | Share game identification between Windows and Linux | First step of Linux parity. Includes the handoff update from #13. |
 
 ## Known issues
 
