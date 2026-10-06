@@ -11,9 +11,12 @@ namespace EmulatorHub
 	// with it. Labels side by side share one shift so rows stay aligned. Nothing ever shrinks.
 	public static class TextFit
 	{
+		private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Form, object> scaled = new System.Runtime.CompilerServices.ConditionalWeakTable<Form, object>();
+
 		public static void FitLabels(Form form)
 		{
 			if (form == null || form.IsDisposed) return;
+			ScaleFixedLayout(form);
 			int grown = Fit(form);
 			if (grown <= 0) return;
 			Rectangle area = Screen.FromControl(form).WorkingArea;
@@ -21,6 +24,24 @@ namespace EmulatorHub
 			if (height < form.ClientSize.Height + grown) form.AutoScroll = true;
 			if (form.MinimumSize.Height > 0 && form.MinimumSize.Height < form.Height + grown) form.MinimumSize = new Size(form.MinimumSize.Width, Math.Min(form.MinimumSize.Height + grown, area.Height));
 			form.ClientSize = new Size(form.ClientSize.Width, height);
+			if (form.Bottom > area.Bottom) form.Top = Math.Max(area.Top, area.Bottom - form.Height);
+		}
+
+		// Older dialogs place every control at fixed pixel positions, so larger text sizes enlarge the fonts but not the
+		// layout. Scale their layout by the text size once, keeping the dialog on screen. Table and flow layouts already adapt.
+		private static void ScaleFixedLayout(Form form)
+		{
+			object done;
+			if (NextUi.TextPercent <= 100 || scaled.TryGetValue(form, out done)) return;
+			scaled.Add(form, true);
+			int positioned = form.Controls.Cast<Control>().Count(c => c.Dock == DockStyle.None && !(c is TableLayoutPanel) && !(c is FlowLayoutPanel));
+			if (positioned < 3 || form.Controls.Cast<Control>().Any(c => c.Dock == DockStyle.Fill && (c is TableLayoutPanel || c is FlowLayoutPanel))) return;
+			Rectangle area = Screen.FromControl(form).WorkingArea;
+			float factor = NextUi.TextPercent / 100f;
+			factor = Math.Min(factor, Math.Min(area.Width * 0.95f / Math.Max(1, form.Width), area.Height * 0.95f / Math.Max(1, form.Height)));
+			if (factor <= 1.01f) return;
+			form.Scale(new SizeF(factor, factor));
+			if (form.Right > area.Right) form.Left = Math.Max(area.Left, area.Right - form.Width);
 			if (form.Bottom > area.Bottom) form.Top = Math.Max(area.Top, area.Bottom - form.Height);
 		}
 
