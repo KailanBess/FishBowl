@@ -18,7 +18,7 @@ _Last updated: 2026-10-06, by the Linux side._
 | --- | --- | --- |
 | #11 | Fix cut-off and overlapping text in the Windows app | Audit findings 309 → 88 (2 at 100% text size). Adds `windows/FishBowl.TextFit.cs`. |
 | #9 | Linux easter egg (Tux in the banner) | Linux only. |
-| This PR | README rewrite and repository tidy-up | Removes unused files, moves binaries to Releases, adds these handoff files. |
+| #12 | README rewrite and repository tidy-up | Removes unused files, moves binaries to Releases, adds these handoff files. |
 
 ## Known issues
 
