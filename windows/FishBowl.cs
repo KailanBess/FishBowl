@@ -6655,6 +6655,8 @@ namespace EmulatorHub
 			CosmeticRuntime.Apply(this);
 			SectionMotion.Attach(this);
 			StartupPromptLayout.Apply(this);
+			// After styling sets the final fonts: larger text sizes can wrap labels onto lines a fixed layout hides.
+			TextFit.FitLabels(this);
 		}
 
 	}
