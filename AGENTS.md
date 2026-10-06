@@ -7,6 +7,28 @@ FishBowl is developed by two people, each working with a coding agent: one maint
 1. **Read [HANDOFF.md](HANDOFF.md)** for the current state: open pull requests, work in progress, known issues and next steps.
 2. **Update HANDOFF.md as part of every change.** Record what you changed, what is still open, and anything the other side needs to know. Add a dated entry to its log.
 
+## Keep all work on GitHub
+
+Both maintainers stay in sync only through this GitHub repository. Some contributors are new to Git, so **agents handle the Git steps themselves and explain them in a sentence**:
+
+1. **At the start of every session,** update to the latest `main` (`git pull`, or fetch and rebase your branch), so you build on the other person's latest work.
+2. **Work on a branch** in a clone of this repository. Never work in a separate copy, a downloaded zip or an unpushed folder.
+3. **Commit and push frequently,** at least at the end of every session, so work is never only on one computer.
+4. **Finish with a pull request** into `main`, and update `HANDOFF.md` in the same pull request.
+5. **Never use "Add files via upload"** on the GitHub website, and never commit zips of source or `.exe` files. Executables go on the Releases page.
+
+**If a contributor asks for something that would bypass this,** suggest the GitHub-backed way instead and offer to do it for them. Examples: working outside the repository, uploading files by hand, or skipping the pull request.
+
+## Helping someone new to Git and GitHub
+
+If the person you work with isn't familiar with Git, guide them gently:
+
+- Do the Git commands for them, and say what you did in plain words ("I saved this on a branch and opened a pull request for review").
+- Point them to the pull request link, and tell them when the checks pass.
+- Suggest the next step, e.g. "Merge it on GitHub when you're happy".
+- If GitHub sign-in fails, suggest `gh auth login` (GitHub CLI) or signing in through GitHub Desktop.
+- When something breaks, open or reference a GitHub Issue (there is a bug report form) rather than fixing it silently.
+
 ## How changes are made
 
 - **Branches and pull requests:** work on a branch and open a pull request into `main`; never push to `main` directly. When a pull request builds on another, merge them in order and wait for GitHub to retarget the second one to `main` before merging it.
