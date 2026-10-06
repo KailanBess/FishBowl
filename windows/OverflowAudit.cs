@@ -27,6 +27,8 @@ class OverflowAudit {
   string output = Path.GetFullPath(args.Length > 0 ? args[0] : "overflow-audit"); Directory.CreateDirectory(output);
   Application.EnableVisualStyles(); Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
   Application.ThreadException += (s, e) => skipped.Add("UI exception: " + e.Exception.Message);
+  Console.WriteLine("Audit working area: " + Screen.PrimaryScreen.WorkingArea);
+  using (var font = new Font("Bahnschrift", 8f)) Console.WriteLine("Audit font: " + font.Name);
   data = Fixture();
   var dialogs = typeof(MainForm).Assembly.GetTypes().Where(t => typeof(Form).IsAssignableFrom(t) && !t.IsAbstract && t != typeof(MainForm) && t.IsPublic).OrderBy(t => t.Name).ToList();
   foreach (int percent in new[] { 100, 150, 200 }) {
@@ -37,6 +39,7 @@ class OverflowAudit {
   NextUi.TextPercent = 100;
   WriteReport(output, dialogs.Count);
   Console.WriteLine("Overflow audit: " + issues.Count + " clipped text findings; report in " + output);
+  Console.WriteLine(File.ReadAllText(Path.Combine(output, "overflow-report.md")));
   return 0;
  }
 

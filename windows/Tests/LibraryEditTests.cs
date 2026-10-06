@@ -37,7 +37,7 @@ class LibraryEditTests
     {
         Application.EnableVisualStyles();
         var data=Store.Load();ExperienceData.Ensure(data);NextData.Ensure(data);LibraryAdditions.Ensure(data);UserTools.Ensure(data);if(data.Cosmetics==null)data.Cosmetics=new CosmeticSettings();data.Games.Clear();data.Emulators.Clear();data.Collections.Clear();
-        string folder=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"library-edit-fixture");Directory.CreateDirectory(folder);
+        string folder=Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),"library-edit-fixture");Directory.CreateDirectory(folder);
         string gamePath=Path.Combine(folder,"Example.nds"),green=Path.Combine(folder,"green.png"),blue=Path.Combine(folder,"blue.png");
         byte[] bytes=new byte[0x940];Encoding.ASCII.GetBytes("ABCE").CopyTo(bytes,12);BitConverter.GetBytes((uint)0x100).CopyTo(bytes,0x68);Encoding.Unicode.GetBytes("Embedded game title").CopyTo(bytes,0x440);File.WriteAllBytes(gamePath,bytes);
         using(var image=new Bitmap(80,80)){using(var graphics=Graphics.FromImage(image))graphics.Clear(Color.Lime);image.Save(green);using(var graphics=Graphics.FromImage(image))graphics.Clear(Color.Blue);image.Save(blue);}

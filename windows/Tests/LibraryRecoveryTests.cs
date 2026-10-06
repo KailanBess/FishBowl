@@ -8,7 +8,7 @@ class LibraryRecoveryTests
  [STAThread] static int Main() { try { Application.EnableVisualStyles(); Run(); Console.WriteLine("PASS: " + checks + " recovery, portable paths, artwork retention and multi-disc checks."); return 0; } catch(Exception e) { Console.WriteLine(e); return 1; } }
  static void Run()
  {
-  string root=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Recovery with spaces "+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+  string root=Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),"Recovery with spaces "+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
   string rom=Path.Combine(root,"Game.gba"),exe=Path.Combine(root,"Emulator.exe"); File.WriteAllText(rom,"rom"); File.WriteAllText(exe,"exe");
   var d=Library(); var emu=new EmulatorProfile{Id="emu",Name="Test",Executable=exe}; d.Emulators.Add(emu);
   var a=new GameEntry{Id="a",Title="Custom title",TitleIsCustom=true,Path=rom,EmulatorId="emu",ArtworkPath=Path.Combine(root,"art.png"),Notes="keep notes",Tags=new List<string>{"tag"},TotalPlaySeconds=99};

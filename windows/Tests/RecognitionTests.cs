@@ -41,7 +41,7 @@ class RecognitionTests
     static void Run()
     {
         Application.EnableVisualStyles();
-        string root=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"recognition-fixture"); Directory.CreateDirectory(root);
+        string root=Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),"recognition-fixture"); Directory.CreateDirectory(root);
         ulong id=0x0004000000033500; string idText=id.ToString("X16");
         string app=Path.Combine(root,"fixture.app"); File.WriteAllBytes(app,Ncch(id));
         using(var r=GameRecognition.Inspect(app)) { Check(r.Title=="Example Adventure Full Title","NCCH title"); Check(r.TitleId==idText,"NCCH title ID"); Check(r.Developer=="Example Studio","SMDH publisher"); Check(r.Icon.Width==48 && r.Icon.GetPixel(9,11).R==255,"Embedded tiled RGB565 icon"); }

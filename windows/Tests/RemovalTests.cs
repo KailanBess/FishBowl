@@ -37,7 +37,7 @@ class RemovalTests
     {
         Application.EnableVisualStyles();
         var data = Store.Load(); data.Games.Clear(); data.Emulators.Clear(); data.Collections.Clear();
-        string folder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "remove-fixture"); Directory.CreateDirectory(folder);
+        string folder = Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory), "remove-fixture"); Directory.CreateDirectory(folder);
         string one = Path.Combine(folder, "One.rom"), two = Path.Combine(folder, "Two.rom"), saves = Path.Combine(folder, "One.sav"), executable = Path.Combine(folder, "emulator.exe");
         foreach (string file in new[] { one, two, saves, executable }) File.WriteAllText(file, "preserve");
         var emulator = new EmulatorProfile { Id="remove-emulator", Name="Remove fixture", Executable=executable, ScanFolder=folder, Extensions=new List<string>{"rom"}, Preset="Custom" };

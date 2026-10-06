@@ -42,7 +42,7 @@ class AdditionTests {
         Check(csv.Contains("\"'=SUM(1,2)\""),"CSV keeps formulas literal");
         Check(LibraryAdditions.SurpriseCandidates(data,true).Count==0,"picker excludes missing files");
         File.WriteAllText("picker.gba","test"); a.Path=Path.GetFullPath("picker.gba"); a.EmulatorId="testemu";
-        data.Emulators.Add(new EmulatorProfile {Id="testemu",Name="Fixture",Preset="Custom",Executable=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"FishBowl.exe"),Extensions=new List<string>{"gba"}});
+        data.Emulators.Add(new EmulatorProfile {Id="testemu",Name="Fixture",Preset="Custom",Executable=Path.Combine(Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory),"FishBowl.exe"),Extensions=new List<string>{"gba"}});
         Check(LibraryAdditions.SurpriseCandidates(data,true).Single()==a,"picker accepts a valid unplayed game");
         a.LaunchCount=1; Check(LibraryAdditions.SurpriseCandidates(data,true).Count==0 && LibraryAdditions.SurpriseCandidates(data,false).Count==1,"picker respects unplayed preference"); a.LaunchCount=0;
         data.Emulators[0].Arguments="{unsupported}"; Check(LibraryAdditions.SurpriseCandidates(data,false).Count==0,"picker rejects invalid launch template"); data.Emulators[0].Arguments=null;
