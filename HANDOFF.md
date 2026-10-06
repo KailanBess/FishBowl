@@ -18,7 +18,7 @@ Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dial
 
 ## Home layout 1.26.1
 
-Windows Home now uses wider cards in up to two columns, more padding and a single row for primary/More actions. Game/emulator cards preview three entries; information cards preview one summary line. Show all/Show less reveals every remaining item and preserves expansion across Home refreshes. No data or commands are removed. Existing style, card preferences and page scrolling remain in use. Native layout checks and Home interaction validation are pending.
+Windows Home now uses wider cards in up to two columns, more padding and a single row for primary/More actions. Game/emulator cards preview three entries; information cards preview one summary line. Show all/Show less reveals every remaining item and preserves expansion across Home refreshes. No data or commands are removed. Existing style, card preferences and page scrolling remain in use. Home interaction validation passed 751 checks at 100/150/200% on normal/compact desktops, including all Quick actions, game/emulator/detail expansion, collapse and refresh preservation. Full regression/audit and clean-runner checks are recorded in PR #20.
 
 ## Expansion 1.26.0
 

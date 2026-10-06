@@ -128,7 +128,7 @@ class UiPolishTests
                 using (var host = new Form { ClientSize = compact ? new Size(1000, 650) : new Size(1200, 780), ShowInTaskbar = false })
                 using (var home = new HomeSurface(data, delegate(string command, GameEntry chosenGame, EmulatorProfile emulator) { invoked.Add(command); }))
                 {
-                    home.Visible = false; host.Controls.Add(home); host.Show(); Application.DoEvents();
+                    home.Visible = false; host.Controls.Add(home); NextUi.ApplyAccessibility(host); host.Show(); Application.DoEvents();
                     home.Visible = true; Application.DoEvents();
                     var cards = (FlowLayoutPanel)typeof(HomeSurface).GetField("cards", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(home);
                     Check(cards.AutoScroll, "Home page owns scrolling at " + textSize);
