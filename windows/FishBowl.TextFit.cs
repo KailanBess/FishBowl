@@ -17,6 +17,7 @@ namespace EmulatorHub
 		{
 			if (form == null || form.IsDisposed) return;
 			ScaleFixedLayout(form);
+			FitRows(form);
 			int grown = Fit(form);
 			if (grown <= 0) return;
 			Rectangle area = Screen.FromControl(form).WorkingArea;
@@ -43,6 +44,57 @@ namespace EmulatorHub
 			form.Scale(new SizeF(factor, factor));
 			if (form.Right > area.Right) form.Left = Math.Max(area.Left, area.Right - form.Width);
 			if (form.Bottom > area.Bottom) form.Top = Math.Max(area.Top, area.Bottom - form.Height);
+		}
+
+		// In fixed layouts: lay rows of buttons out again at the widths their text needs (left-aligned groups from the
+		// left, right-anchored groups from the right) when the row has room, and let one-line labels that run past
+		// their container wrap at its edge instead.
+		private static void FitRows(Control container)
+		{
+			foreach (Control child in container.Controls.Cast<Control>().ToList())
+				if (child.HasChildren && !(child is FlowLayoutPanel)) FitRows(child);
+			if (container is FlowLayoutPanel || container is TableLayoutPanel) return;
+			int edge = container.ClientSize.Width - 8;
+			foreach (Label label in container.Controls.OfType<Label>())
+				if (label.Visible && label.AutoSize && label.Dock == DockStyle.None && label.Right > edge && label.Left < edge - 40)
+					label.MaximumSize = new Size(edge - label.Left, 0);
+			var buttons = container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None && !b.AutoSize && Need(b) > b.Width).ToList();
+			foreach (var row in container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None && !b.AutoSize).GroupBy(b => b.Top / 8))
+			{
+				if (!row.Any(b => buttons.Contains(b))) continue;
+				var others = container.Controls.Cast<Control>().Where(c => c.Visible && !(c is ButtonBase) && c.Top < row.Max(b => b.Bottom) && c.Bottom > row.Min(b => b.Top)).ToList();
+				var right = row.Where(b => (b.Anchor & AnchorStyles.Right) != 0 && (b.Anchor & AnchorStyles.Left) == 0).OrderByDescending(b => b.Right).ToList();
+				var left = row.Except(right).OrderBy(b => b.Left).ToList();
+				int leftLimit = right.Count > 0 ? right.Min(b => b.Left) - 8 : edge;
+				foreach (var other in others) if (left.Count > 0 && other.Left > left[0].Left) leftLimit = Math.Min(leftLimit, other.Left - 8);
+				Relay(left, leftLimit, false);
+				int rightLimit = left.Count > 0 ? left.Max(b => b.Right) + 8 : 8;
+				foreach (var other in others) if (right.Count > 0 && other.Right < right[0].Right) rightLimit = Math.Max(rightLimit, other.Right + 8);
+				Relay(right, rightLimit, true);
+			}
+		}
+
+		private static int Need(ButtonBase button)
+		{
+			var own = button.GetType().GetMethod("TextWidthNeeded");
+			return own != null ? (int)own.Invoke(button, null) : TextRenderer.MeasureText(button.Text, button.Font).Width + 16;
+		}
+
+		// Re-lays buttons in order with their original gaps, widened to fit, only if the whole group fits before limit.
+		private static void Relay(List<ButtonBase> group, int limit, bool fromRight)
+		{
+			if (group.Count == 0) return;
+			var widths = group.Select(b => Math.Max(b.Width, Need(b))).ToList();
+			var gaps = new List<int>();
+			for (int i = 1; i < group.Count; i++) gaps.Add(Math.Max(6, fromRight ? group[i - 1].Left - group[i].Right : group[i].Left - group[i - 1].Right));
+			int total = widths.Sum() + gaps.Sum();
+			if (fromRight ? group[0].Right - total < limit : group[0].Left + total > limit) return;
+			int x = fromRight ? group[0].Right : group[0].Left;
+			for (int i = 0; i < group.Count; i++)
+			{
+				if (fromRight) { group[i].SetBounds(x - widths[i], group[i].Top, widths[i], group[i].Height); x -= widths[i] + (i < gaps.Count ? gaps[i] : 0); }
+				else { group[i].SetBounds(x, group[i].Top, widths[i], group[i].Height); x += widths[i] + (i < gaps.Count ? gaps[i] : 0); }
+			}
 		}
 
 		// Fits labels inside container and returns how much taller its content became.
