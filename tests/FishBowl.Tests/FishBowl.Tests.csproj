@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="../../FishBowl.Core.cs" Link="Shared/FishBowl.Core.cs" />
     <Compile Include="../../FishBowl.Platform.cs" Link="Shared/FishBowl.Platform.cs" />
+    <Compile Include="../../FishBowl.Model.cs" Link="Shared/FishBowl.Model.cs" />
     <Compile Include="CoreTests.cs" />
   </ItemGroup>
 </Project>
