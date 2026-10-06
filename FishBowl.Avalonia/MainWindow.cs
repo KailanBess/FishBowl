@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -60,8 +60,8 @@ namespace EmulatorHub
             p = Palette.Apply(library.Theme);
             ((App)Application.Current).ApplyPalette(p);
             Ui.Font = Palette.Font(library.Theme);
-            Title = "FishBowl 1.0"; Icon = Ui.AppIcon(); FontFamily = DisplayFont;
-            MinWidth = 1100; MinHeight = 700; Width = 1340; Height = 820;
+            Title = "FishBowl"; Icon = Ui.AppIcon(); FontFamily = DisplayFont;
+            MinWidth = 640; MinHeight = 480; Width = 1340; Height = 820;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             RestoreWindowLayout();
             if (library.Theme.StartMaximized) WindowState = WindowState.Maximized;
@@ -69,7 +69,7 @@ namespace EmulatorHub
             BuildLayout();
             RefreshHub();
             ConfigureGameFolderWatchers();
-            SetStatus("Double-click an emulator to open it. Manage games inside the emulator.");
+            SetStatus("Select a game in Library to play, or open an emulator.");
             // Bubble, so open menus and drop-downs handle Escape/Enter before the hub shortcuts.
             AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Bubble);
             // Watches every key on the way in (lists consume arrows) without handling it: the Konami code wakes Tux.
@@ -90,7 +90,7 @@ namespace EmulatorHub
                 try { SaveProfileNotes(); SaveWindowLayout(); }
                 catch (Exception error) { e.Cancel = true; Ui.Post(async () => await Ui.Message(this, "Your notes could not be saved.\n\n" + error.Message)); }
             };
-            Closed += delegate { runtimeTimer.Stop(); foreach (var watcher in gameFolderWatchers) watcher.Dispose(); };
+            Closed += delegate { companionServer?.Dispose(); runtimeTimer.Stop(); foreach (var watcher in gameFolderWatchers) watcher.Dispose(); };
         }
 
         // ----- Layout ------------------------------------------------------------------------------------------------
@@ -105,18 +105,18 @@ namespace EmulatorHub
             banner.Children.Add(logo);
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0) };
             titles.Children.Add(Ui.Text("FishBowl", 24, true));
-            titles.Children.Add(Ui.Text("Your emulators, together. Add and play games inside each emulator.", 12, false, p.SubtleBrush));
+            titles.Children.Add(Ui.Text("Your games and emulators, together.", 12, false, p.SubtleBrush));
             Grid.SetColumn(titles, 1); banner.Children.Add(titles);
             Grid.SetColumnSpan(tux, 2); banner.Children.Add(tux);
             Grid.SetRow(banner, 1); shell.Children.Add(banner);
             var actions = BuildPrimaryActions(); Grid.SetRow(actions, 2); shell.Children.Add(actions);
 
             split = new Grid { ColumnDefinitions = new ColumnDefinitions("3*,8,2*") };
-            split.ColumnDefinitions[0].MinWidth = 450; split.ColumnDefinitions[2].MinWidth = 370;
+            split.ColumnDefinitions[0].MinWidth = 220; split.ColumnDefinitions[2].MinWidth = 200;
             split.Children.Add(BuildEmulatorList());
             var splitter = new GridSplitter { Background = p.TopBrush, ResizeDirection = GridResizeDirection.Columns }; Grid.SetColumn(splitter, 1); split.Children.Add(splitter);
             emulatorInformation = BuildInformationPanel(); Grid.SetColumn(emulatorInformation, 2); split.Children.Add(emulatorInformation);
-            Grid.SetRow(split, 3); shell.Children.Add(split);
+            var pages = BuildLibraryPages(split); Grid.SetRow(pages, 3); shell.Children.Add(pages);
 
             var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,240,*"), Background = p.TopBrush, Height = 44, IsVisible = library.Theme.ShowStatusBar };
             footer.Children.Add(new TextBlock { Text = "Filter:", Foreground = p.SubtleBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
@@ -239,7 +239,7 @@ namespace EmulatorHub
             convertersMenu.SubmenuOpened += delegate { RefreshConvertersMenu(); }; RefreshConvertersMenu();
             linksMenu.SubmenuOpened += delegate { RefreshWebsiteLinksMenu(); }; RefreshWebsiteLinksMenu();
             var help = new MenuItem { Header = "_Help", ItemsSource = new object[] {
-                MenuAction("About FishBowl", "info", () => Ui.Message(this, "FishBowl opens your separately installed emulators.\n\nAdd games, manage libraries, and configure controls inside the dedicated emulator.")),
+                MenuAction("About FishBowl", "info", () => Ui.Message(this, "FishBowl brings games and separately installed emulators together.\n\nUse Library to launch games, edit details, organize collections, and recover removed entries.")),
                 MenuAction("First-run guide...", "info", ShowFirstRunGuide),
                 MenuAction("Game storage guide...", "folder", ShowGameStoragePrompt) } };
             menu.ItemsSource = new[] { file, emulators, tools, view, convertersMenu, linksMenu, help };
@@ -585,7 +585,7 @@ namespace EmulatorHub
             if (!IsActive) return;
             bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             if (ctrl && e.Key == Key.E) { e.Handled = true; await Ui.Run(this, AddEmulator); }
-            else if (ctrl && e.Key == Key.F) { e.Handled = true; filterBox.Focus(); }
+            else if (ctrl && e.Key == Key.F) { e.Handled = true; if (libraryPages.SelectedIndex == 1) gameSearch.Focus(); else filterBox.Focus(); }
             else if (ctrl && e.Key == Key.G) { e.Handled = true; await Ui.Run(this, () => ShowGameStorageOrganizer(null)); }
             else if (e.Key == Key.F11) { e.Handled = true; ToggleFullScreen(); }
             else if (e.Key == Key.Escape)
@@ -593,6 +593,7 @@ namespace EmulatorHub
                 e.Handled = true;
                 if (WindowState == WindowState.FullScreen) ToggleFullScreen(); else if (!String.IsNullOrEmpty(filterBox.Text)) filterBox.Text = ""; else ClearEmulatorSelection();
             }
+            else if (e.Key == Key.Enter && gameList.IsKeyboardFocusWithin) { e.Handled = true; await Ui.Run(this, LaunchLibraryGame); }
             else if (e.Key == Key.Enter && emulatorList.IsKeyboardFocusWithin) { e.Handled = true; await Ui.Run(this, OpenSelectedEmulator); }
         }
 
@@ -610,7 +611,7 @@ namespace EmulatorHub
                 if (!File.Exists(WindowLayoutFile)) return;
                 var values = Json.Deserialize<int[]>(File.ReadAllText(WindowLayoutFile));
                 if (values == null || values.Length != 5) return;
-                Width = Math.Max(1100, values[2]); Height = Math.Max(700, values[3]);
+                Width = Math.Max(640, values[2]); Height = Math.Max(480, values[3]);
                 if (values[0] != Int32.MinValue) { Position = new PixelPoint(values[0], values[1]); WindowStartupLocation = WindowStartupLocation.Manual; }
                 WindowState = values[4] == 1 ? WindowState.Maximized : WindowState.Normal;
             }

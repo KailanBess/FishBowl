@@ -2,22 +2,29 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-06, by the Linux side._
+_Last updated: 2026-10-06, expansion integration._
 
 ## Current state
 
 | | State |
 | --- | --- |
-| Windows | Source **1.25.11** on `main` (#15). Latest release is still [v1.25.8](../../releases/tag/v1.25.8). Source in `windows/`. |
-| Linux | Preview. Emulator hub with Linux integration (Flatpak, AppImage, XDG folder routing). Not yet at parity with the Windows game library features. |
-| Shared | The `library.json` data model (`FishBowl.Model.cs`) is shared by both builds. Linux preserves every Windows field when it saves. |
+| Windows | Source **1.26.0** on `fishbowl-expansion`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
+| Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
-| PR | What | Notes |
-| --- | --- | --- |
-| #18 | Windows themes and accents (1.25.12) | Windows side. Linux themes follow after it merges. |
-| #19 | Linux: dialogs no longer trap the mouse | Linux only. |
+Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dialog focus). Review/merge #18 before the expansion PR. Both platform implementations are included in the expansion.
+
+## Expansion 1.26.0
+
+Home page scrolling, primary/More actions, 40 theme/28 accent previews, card ordering/visibility, cover proportions, restrained accents and accessibility presets use current controls. Added unified game setup, Steam manifests and reviewed native executable imports, verified mod overlay journals and rollback, IPS patch copies, media links/gallery, monthly/session history, reviewed save timeline/transfers, RetroAchievements completion cache, metadata catalogs, declarative extensions and a paired read-only companion.
+
+Linux adds library/profiles/collections/removal Undo/reassignment/path repair/cover editing and shared expansion tools. File save timelines use SaveTools; folder saves use EmulatorBackups. Living-room input is keyboard/buttons; new gamepad polling is not included. Existing Linux-maintainer launch wrappers and in-progress native integrations below remain separate.
+
+Validation: Windows build and 2,310 expansion layout checks passed across 132 captures at three text sizes on normal/compact screens; UI settings tests passed 184 checks; game tools passed 36 checks. Full regression/audit and clean-runner Windows/Linux CI results will be recorded before completion. Local semantic Avalonia compilation passed; this is not a native Linux desktop smoke test. Account-dependent achievement/network metadata calls need real credentials/providers for live verification.
+
+Release packaging now produces a complete six-file app folder, app ZIP, source ZIP and SHA256 checksums. Tagged reviewed versions produce draft releases; no binary build output is committed. App/installer/source versions must match.
 
 ## Recently merged: Windows 1.25.11 (#15)
 
@@ -60,6 +67,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-06 (expansion 1.26.0):** added matching Windows/Linux library and expansion tools, optional shared settings, declarative integrations and verified file recovery. Windows compact popup bounds now use the actual working area; startup popup fixes remain supported. Added native expansion layout fixtures and release packaging/version checks. #19 is merged; #18 is included as the expansion dependency.
 
 - **2026-10-06 (Linux dialogs):** dialogs no longer trap the mouse on focus-follows-mouse desktops (Hyprland, Sway, i3). Avalonia's X11 modal dialogs pulled focus back whenever the owner window was hovered, and the compositor warped the pointer back. `FishDialog.Present` now shows dialogs owned (still above the owner) and blocks the owner's input until they close. Merged #15, #16 and #17.
 

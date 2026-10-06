@@ -15,6 +15,9 @@ class SchemaTests {
   var typed=Json.Deserialize<LibraryData>(fixture);Check(typed.Games[0].Pinned&&typed.Games[0].PlayStatus=="Playing","Linux reads newer Windows game fields as typed data");
   Check(typed.Games[0].TitleIsCustom && typed.RemovedGamePaths.SequenceEqual(new[]{"excluded.nds"}),"Windows title preference and scan exclusions survive Linux roundtrip");
   Check(typed.Games[0].RequiresEmulatorAssignment && typed.RemovalHistory[0].Games[0].Id=="removed" && typed.SavedPortableRoot=="/fixture", "recovery and portable metadata survive Linux roundtrip");
+  const string expansion=@"{""Theme"":{""HomeCardOrder"":[""Continue playing""],""HiddenHomeCards"":[""Tools""],""RestrainedAccents"":true,""CoverAspect"":""Portrait""},""GameTools"":{""SteamLibraryFolders"":[""/fixture/Steam""],""FutureTools"":17},""Integrations"":{""AchievementUser"":""fixture"",""Achievements"":[{""GameID"":1,""Title"":""Game"",""FutureAchievement"":true}],""Extensions"":[{""Id"":""catalog"",""Kind"":""Metadata"",""CatalogPath"":""catalog.json"",""FutureExtension"":2}],""FutureIntegration"":""retained""},""Games"":[{""Tools"":{""MediaLinks"":[{""Title"":""Manual"",""Path"":""manual.pdf"",""FutureMedia"":3}],""ModProfiles"":[{""Id"":""mod"",""FutureMod"":4}],""FutureGameTools"":5}}],""Hub"":{""Adapters"":[{""ExtensionId"":""adapter"",""FutureAdapter"":6}]}}";
+  var expanded=Json.Deserialize<LibraryData>(expansion);expanded.Games[0].Title="Edited";
+  using(var before=JsonDocument.Parse(expansion))using(var after=JsonDocument.Parse(Json.Serialize(expanded)))Preserved(before.RootElement,after.RootElement,"expansion");
   var old=Json.Deserialize<LibraryData>("{\"Version\":1,\"Games\":[],\"Emulators\":[],\"Theme\":{\"Name\":\"Forest\"}}");Check(old.Version==1&&old.Theme.Name=="Forest","old library fixture rejected");
   Console.WriteLine("PASS: "+checks+" schema preservation checks");return 0;
  }catch(Exception e){Console.WriteLine(e);return 1;}}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -77,8 +77,8 @@ namespace EmulatorHub
         {
             var current = CurrentEmulator(); if (current == null) return;
             if (!await Ui.Confirm(this, "Remove " + current.Name + " from FishBowl?\n\nIts emulator program, games, and saves will stay where they are.")) return;
-            library.Emulators.Remove(current); selectedEmulatorId = null;
-            Store.Save(library); RefreshHub(); ConfigureGameFolderWatchers(); SetStatus("Emulator removed from FishBowl.");
+            GameLibraryRemoval.RemoveEmulator(library, current.Id); selectedEmulatorId = null;
+            Store.Save(library); RefreshHub(); ConfigureGameFolderWatchers(); RefreshGameLibrary(); SetStatus("Emulator removed from FishBowl. Use Undo removal in Library to restore it.");
         }
 
         private async Task HandleDroppedPaths(List<string> paths)
@@ -288,16 +288,20 @@ namespace EmulatorHub
         {
             var file = await Ui.PickFile(this, "Import FishBowl settings", "JSON files|*.json");
             if (file == null) return;
+            if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before importing settings.");
             var imported = Json.Deserialize<LibraryData>(File.ReadAllText(file));
             if (imported == null || imported.Emulators == null) throw new InvalidDataException("That file does not contain FishBowl emulator settings.");
             if (!await Ui.Confirm(this, "Replace your FishBowl settings with this backup?")) return;
             Store.Save(library); File.Copy(Store.FileName, Store.FileName + ".before-import.json", true);
-            library.Emulators = imported.Emulators; library.Games = imported.Games ?? new List<GameEntry>();
-            library.Collections = imported.Collections ?? new List<GameCollection>(); library.Links = imported.Links ?? new List<WebsiteLink>();
-            library.Theme = imported.Theme ?? new ThemeSettings { Name = "Twilight", AutoBackupDays = 7 }; library.BackupFolder = imported.BackupFolder; library.EmulatorRootDirectory = imported.EmulatorRootDirectory;
+            foreach (var property in typeof(LibraryData).GetProperties().Where(p => p.CanRead && p.CanWrite)) property.SetValue(library, property.GetValue(imported));
+            library.Games = library.Games ?? new List<GameEntry>(); library.Collections = library.Collections ?? new List<GameCollection>(); library.Links = library.Links ?? new List<WebsiteLink>(); library.Converters = library.Converters ?? new List<GameConverter>();
+            library.Theme = library.Theme ?? new ThemeSettings { Name = "Twilight", AutoBackupDays = 7 };
+            foreach (var game in library.Games) if (game.Tags == null) game.Tags = new List<string>();
+            foreach (var collection in library.Collections) if (collection.GameIds == null) collection.GameIds = new List<string>();
+            LibraryPaths.Load(library, Store.DataDirectory, Store.PortableMode ? AppDomain.CurrentDomain.BaseDirectory : null);
             foreach (var emulator in library.Emulators) { if (emulator.LaunchProfiles == null) emulator.LaunchProfiles = new List<LaunchProfile>(); if (emulator.Builds == null) emulator.Builds = new List<EmulatorBuild>(); }
             selectedEmulatorId = null;
-            Store.Save(library); filterBox.Text = ""; RefreshHub(); SetStatus("Imported FishBowl settings. Reopen FishBowl to apply the theme.");
+            Store.Save(library); filterBox.Text = ""; RefreshHub(); RefreshGameLibrary(); ConfigureGameFolderWatchers(); SetStatus("Imported FishBowl settings. Reopen FishBowl to apply the theme.");
         }
 
         // How to start this copy of FishBowl again: the published executable, or the dotnet host plus FishBowl.dll.
@@ -412,7 +416,7 @@ namespace EmulatorHub
         private void SyncWatchedGameFolders()
         {
             int added = GameLibraryCatalog.Sync(library);
-            if (added > 0) { Store.Save(library); SetStatus("Added " + added + " newly detected game" + (added == 1 ? "." : "s.")); }
+            if (added > 0) { Store.Save(library); RefreshGameLibrary(); SetStatus("Added " + added + " newly detected game" + (added == 1 ? "." : "s.")); }
         }
     }
 }

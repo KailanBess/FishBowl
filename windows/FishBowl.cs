@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.25.11.0")]
+[assembly: AssemblyFileVersion("1.26.0.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.25.11.0")]
+[assembly: AssemblyVersion("1.26.0.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.25.11";
+		private const string FishBowlVersion = "1.26.0";
 
-		private const string FishBowlTitleVersion = "1.25.11";
+		private const string FishBowlTitleVersion = "1.26.0";
 
 		private Icon ownedAppIcon;
 
@@ -315,7 +315,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.25.11";
+			Text = "FishBowl 1.26.0";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -401,11 +401,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.25.11" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.26.0" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.25.11";
+						library.Theme.LastSeenBuild = "1.26.0";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -749,7 +749,7 @@ namespace EmulatorHub
 			splitContainer2.Panel2.Controls.Add(emulatorInformation);
 			splitContainer2.Panel2Collapsed = !library.Theme.ShowInformationPanel;
 			tableLayoutPanel2.Controls.Add(BuildWorkspace(splitContainer2), 0, 3);
-			AquariumFooter aquariumFooter = new AquariumFooter(bottom, top, blue, pink);
+			AquariumFooter aquariumFooter = new AquariumFooter();
 			aquariumFooter.Dock = DockStyle.Fill;
 			aquariumFooter.ColumnCount = 3;
 			aquariumFooter.BackColor = top;
@@ -1881,6 +1881,10 @@ namespace EmulatorHub
 			toolStripMenuItem13.DropDownItems.Add(linksMenu);
 			CompactMenus.Arrange(toolStripMenuItem2, toolStripMenuItem3, toolStripMenuItem8, toolStripMenuItem10);
 			toolStripMenuItem3.DropDownItems.Add(MenuAction("User tools...", "settings", ShowUserTools));
+            toolStripMenuItem3.DropDownItems.Add(MenuAction("Home and appearance...", "settings", delegate { UiPolishTools.Open(this, library, delegate { ApplyAppearanceNow(); homeSurface.Reload(); }); }));
+            toolStripMenuItem3.DropDownItems.Add(MenuAction("Game tools...", "play", delegate { WindowsGameTools.OpenLibrary(this, library, delegate { homeSurface.Reload(); embeddedLibrary.ReloadLibrary(); }); }));
+            toolStripMenuItem3.DropDownItems.Add(MenuAction("Integrations...", "info", delegate { IntegrationTools.Open(this, library, delegate { homeSurface.Reload(); embeddedLibrary.ReloadLibrary(); RefreshHub(); }); }));
+
 			toolStripMenuItem3.DropDownItems.Add(MenuAction("Library extensions...", "library", ShowHubExtensions));
 			ToolStripMenuItem[] array3 = new ToolStripMenuItem[6] { toolStripMenuItem, toolStripMenuItem8, toolStripMenuItem2, toolStripMenuItem3, toolStripMenuItem10, toolStripMenuItem13 };
 			ToolStripMenuItem[] array4 = array3;
@@ -3384,7 +3388,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.25.11"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.26.0"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3392,7 +3396,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.25.11"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.26.0"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3400,7 +3404,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.25.11"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.26.0"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3667,187 +3671,11 @@ namespace EmulatorHub
 
 		private void ApplyThemeColors()
 		{
-			string text = ((library.Theme == null) ? "FishBowl Water" : library.Theme.Name);
-			switch (text)
-			{
-			case "FishBowl Water":
-				ink = Color.FromArgb(241, 247, 255);
-				top = Color.FromArgb(5, 31, 78);
-				bottom = Color.FromArgb(3, 13, 38);
-				surface = Color.FromArgb(12, 59, 122);
-				subtle = Color.FromArgb(190, 211, 240);
-				blue = Color.FromArgb(83, 170, 245);
-				pink = Color.FromArgb(26, 105, 196);
-				break;
-			case "Lavender":
-				ink = Color.FromArgb(44, 37, 54);
-				top = Color.FromArgb(242, 237, 248);
-				bottom = Color.FromArgb(231, 222, 240);
-				surface = Color.FromArgb(255, 250, 255);
-				subtle = Color.FromArgb(105, 91, 119);
-				blue = Color.FromArgb(137, 80, 215);
-				pink = Color.FromArgb(236, 128, 65);
-				break;
-			case "Light":
-				ink = Color.FromArgb(42, 43, 50);
-				top = Color.FromArgb(246, 246, 249);
-				bottom = Color.FromArgb(235, 236, 241);
-				surface = Color.FromArgb(255, 255, 255);
-				subtle = Color.FromArgb(101, 103, 115);
-				blue = Color.FromArgb(103, 82, 171);
-				pink = Color.FromArgb(203, 113, 61);
-				break;
-			case "High Contrast":
-				ink = Color.White;
-				top = Color.Black;
-				bottom = Color.FromArgb(17, 17, 17);
-				surface = Color.FromArgb(30, 30, 30);
-				subtle = Color.FromArgb(224, 224, 224);
-				blue = Color.FromArgb(112, 191, 255);
-				pink = Color.FromArgb(255, 220, 77);
-				break;
-			case "Ember":
-				ink = Color.FromArgb(255, 248, 240);
-				top = Color.FromArgb(47, 28, 25);
-				bottom = Color.FromArgb(64, 38, 32);
-				surface = Color.FromArgb(84, 50, 40);
-				subtle = Color.FromArgb(229, 191, 174);
-				blue = Color.FromArgb(218, 107, 174);
-				pink = Color.FromArgb(255, 176, 72);
-				break;
-			case "Midnight":
-				ink = Color.FromArgb(232, 237, 250);
-				top = Color.FromArgb(16, 20, 33);
-				bottom = Color.FromArgb(21, 27, 43);
-				surface = Color.FromArgb(35, 43, 63);
-				subtle = Color.FromArgb(159, 173, 201);
-				blue = Color.FromArgb(111, 142, 255);
-				pink = Color.FromArgb(121, 211, 255);
-				break;
-			case "Forest":
-				ink = Color.FromArgb(235, 246, 238);
-				top = Color.FromArgb(27, 46, 38);
-				bottom = Color.FromArgb(34, 58, 47);
-				surface = Color.FromArgb(48, 76, 62);
-				subtle = Color.FromArgb(177, 206, 187);
-				blue = Color.FromArgb(111, 202, 150);
-				pink = Color.FromArgb(206, 211, 109);
-				break;
-			case "Rosewood":
-				ink = Color.FromArgb(250, 239, 243);
-				top = Color.FromArgb(52, 30, 40);
-				bottom = Color.FromArgb(67, 38, 52);
-				surface = Color.FromArgb(87, 51, 67);
-				subtle = Color.FromArgb(225, 184, 199);
-				blue = Color.FromArgb(226, 110, 166);
-				pink = Color.FromArgb(255, 169, 116);
-				break;
-			case "Mist":
-				ink = Color.FromArgb(38, 46, 56);
-				top = Color.FromArgb(237, 243, 248);
-				bottom = Color.FromArgb(222, 231, 239);
-				surface = Color.FromArgb(251, 253, 255);
-				subtle = Color.FromArgb(92, 109, 125);
-				blue = Color.FromArgb(69, 135, 191);
-				pink = Color.FromArgb(200, 113, 116);
-				break;
-			case "Deep Ocean":
-				ink = Color.FromArgb(233, 247, 255);
-				top = Color.FromArgb(8, 27, 39);
-				bottom = Color.FromArgb(5, 17, 27);
-				surface = Color.FromArgb(16, 46, 61);
-				subtle = Color.FromArgb(177, 209, 226);
-				break;
-			case "Aurora":
-				ink = Color.FromArgb(236, 250, 248);
-				top = Color.FromArgb(18, 33, 36);
-				bottom = Color.FromArgb(11, 23, 28);
-				surface = Color.FromArgb(29, 54, 55);
-				subtle = Color.FromArgb(178, 218, 211);
-				break;
-			case "Slate":
-				ink = Color.FromArgb(242, 245, 249);
-				top = Color.FromArgb(30, 38, 48);
-				bottom = Color.FromArgb(21, 28, 36);
-				surface = Color.FromArgb(44, 55, 68);
-				subtle = Color.FromArgb(187, 200, 217);
-				break;
-			case "Plum":
-				ink = Color.FromArgb(252, 240, 255);
-				top = Color.FromArgb(43, 25, 49);
-				bottom = Color.FromArgb(29, 18, 36);
-				surface = Color.FromArgb(65, 40, 73);
-				subtle = Color.FromArgb(222, 190, 232);
-				break;
-			case "Sand":
-				ink = Color.FromArgb(52, 43, 32);
-				top = Color.FromArgb(246, 239, 223);
-				bottom = Color.FromArgb(233, 221, 197);
-				surface = Color.FromArgb(255, 250, 237);
-				subtle = Color.FromArgb(108, 88, 64);
-				break;
-			case "Paper":
-				ink = Color.FromArgb(38, 45, 51);
-				top = Color.FromArgb(248, 250, 250);
-				bottom = Color.FromArgb(232, 238, 239);
-				surface = Color.FromArgb(255, 255, 255);
-				subtle = Color.FromArgb(89, 105, 113);
-				break;
-			case "Nordic":
-				ink = Color.FromArgb(30, 49, 56);
-				top = Color.FromArgb(231, 244, 246);
-				bottom = Color.FromArgb(210, 229, 232);
-				surface = Color.FromArgb(248, 254, 254);
-				subtle = Color.FromArgb(75, 105, 114);
-				break;
-			case "Copper":
-				ink = Color.FromArgb(255, 245, 234);
-				top = Color.FromArgb(44, 31, 25);
-				bottom = Color.FromArgb(29, 21, 19);
-				surface = Color.FromArgb(67, 46, 35);
-				subtle = Color.FromArgb(230, 199, 169);
-				break;
-			default:
-				ink = Color.FromArgb(239, 239, 243);
-				top = Color.FromArgb(31, 32, 37);
-				bottom = Color.FromArgb(35, 36, 42);
-				surface = Color.FromArgb(47, 48, 56);
-				subtle = Color.FromArgb(174, 176, 186);
-				blue = Color.FromArgb(183, 150, 245);
-				pink = Color.FromArgb(235, 158, 94);
-				break;
-			}
-			switch (library.Theme.AccentColor ?? ((text == "FishBowl Water") ? "Ocean" : "Sunset"))
-			{
-			case "Ocean":
-				blue = Color.FromArgb(89, 190, 255);
-				pink = Color.FromArgb(67, 220, 187);
-				break;
-			case "Sunset":
-				blue = Color.FromArgb(255, 158, 79);
-				pink = Color.FromArgb(240, 93, 91);
-				break;
-			case "Rose":
-				blue = Color.FromArgb(228, 100, 181);
-				pink = Color.FromArgb(255, 157, 101);
-				break;
-			case "Lime":
-				blue = Color.FromArgb(155, 213, 98);
-				pink = Color.FromArgb(246, 210, 92);
-				break;
-			case "Amethyst":
-				blue = Color.FromArgb(177, 122, 255);
-				pink = Color.FromArgb(222, 109, 244);
-				break;
-			case "Gold":
-				blue = Color.FromArgb(236, 178, 62);
-				pink = Color.FromArgb(255, 219, 122);
-				break;
-			case "Ice":
-				blue = Color.FromArgb(103, 198, 232);
-				pink = Color.FromArgb(173, 235, 255);
-				break;
-			}
+			ThemeColors colors = ThemeCatalog.Get(library.Theme == null ? null : library.Theme.Name);
+			ink = colors.Ink; top = colors.Top; bottom = colors.Bottom; surface = colors.Surface; subtle = colors.Subtle;
+			AccentCatalog.TryGet(library.Theme == null ? null : library.Theme.AccentColor, out blue, out pink);
+            if (library.Theme != null && library.Theme.RestrainedAccents)
+            { blue = UiPolishTools.RestrainAccent(blue, surface); pink = UiPolishTools.RestrainAccent(pink, surface); }
 			ApplyCosmeticPalette();
 			if (SystemInformation.HighContrast)
 			{
@@ -5119,8 +4947,8 @@ namespace EmulatorHub
 			{
 				TableLayoutPanel table = NextDialog.Fields(dialog.Body);
 				ComboBox theme = NextDialog.Choice(ThemeCatalog.Names, library.Theme.Name);
-				ComboBox accent = NextDialog.Choice(new string[7] { "Ocean", "Sunset", "Amethyst", "Rose", "Lime", "Gold", "Ice" }, library.Theme.AccentColor);
-				ComboBox icon = NextDialog.Choice(new string[8] { "Match accent", "Ocean", "Sunset", "Amethyst", "Rose", "Lime", "Gold", "Ice" }, library.Theme.AppIconColor);
+				ComboBox accent = NextDialog.Choice(AccentCatalog.Names, library.Theme.AccentColor);
+				ComboBox icon = NextDialog.Choice(AccentCatalog.IconNames, library.Theme.AppIconColor);
 				ComboBox font = NextDialog.Choice(new string[5] { "Bahnschrift", "Segoe UI", "Arial", "Verdana", "Tahoma" }, library.Theme.FontFamily ?? "Bahnschrift");
 				NumericUpDown text = NextDialog.Number(library.Enhancements.TextPercent, 75m, 200m);
 				CheckBox motion = new CheckBox
@@ -10550,7 +10378,10 @@ namespace EmulatorHub
 			AddActionGroup(bar, "Library tools", delegate(ContextMenuStrip menu)
 			{
 				GroupAction(menu, "List / artwork view", ToggleGameView);
-				GroupAction(menu, "Library extensions...", delegate
+				GroupAction(menu, "Game setup and media...", delegate { WindowsGameTools.Open(this, library, SelectedGame(), ReloadLibrary); }, true);
+                GroupAction(menu, "PC imports and play history...", delegate { WindowsGameTools.OpenLibrary(this, library, ReloadLibrary); });
+                GroupAction(menu, "Integrations...", delegate { IntegrationTools.Open(this, library, ReloadLibrary); });
+                GroupAction(menu, "Library extensions...", delegate
 				{
 					Hub.Show(this, library);
 					ReloadLibrary();
@@ -12783,7 +12614,7 @@ namespace EmulatorHub
 			});
 			AddCaption("Accent color", 18, 396);
 			accent.DropDownStyle = ComboBoxStyle.DropDownList;
-			accent.Items.AddRange(new object[7] { "Sunset", "Amethyst", "Ocean", "Rose", "Lime", "Gold", "Ice" });
+			accent.Items.AddRange(AccentCatalog.Names);
 			accent.SelectedItem = (string.IsNullOrWhiteSpace(originalTheme.AccentColor) ? "Sunset" : originalTheme.AccentColor);
 			StyleCombo(accent, 18, 416, 184);
 			base.Controls.Add(accent);
@@ -12809,7 +12640,7 @@ namespace EmulatorHub
 			base.Controls.Add(uiScale);
 			AddCaption("App icon color", 18, 454);
 			appIconColor.DropDownStyle = ComboBoxStyle.DropDownList;
-			appIconColor.Items.AddRange(new object[8] { "Match accent", "Ocean", "Sunset", "Amethyst", "Rose", "Lime", "Gold", "Ice" });
+			appIconColor.Items.AddRange(AccentCatalog.IconNames);
 			appIconColor.SelectedItem = (string.IsNullOrWhiteSpace(originalTheme.AppIconColor) ? "Match accent" : originalTheme.AppIconColor);
 			if (appIconColor.SelectedIndex < 0)
 			{
@@ -12956,6 +12787,10 @@ namespace EmulatorHub
 				LastLibraryScanAt = originalTheme.LastLibraryScanAt,
 				LastSeenBuild = originalTheme.LastSeenBuild,
 				DisableInGameSaveNotifications = originalTheme.DisableInGameSaveNotifications,
+                HomeCardOrder = originalTheme.HomeCardOrder,
+                HiddenHomeCards = originalTheme.HiddenHomeCards,
+                RestrainedAccents = originalTheme.RestrainedAccents,
+                CoverAspect = originalTheme.CoverAspect,
 				CustomizationVersion = 9
 			};
 			BackupFolder = backupFolder.Text.Trim();
@@ -16286,46 +16121,8 @@ namespace EmulatorHub
 
 		public static void GetColors(out Color light, out Color deep)
 		{
-			if (iconColor == "Ocean")
-			{
-				light = Color.FromArgb(89, 190, 255);
-				deep = Color.FromArgb(67, 220, 187);
-			}
-			else if (iconColor == "Sunset")
-			{
-				light = Color.FromArgb(255, 158, 79);
-				deep = Color.FromArgb(240, 93, 91);
-			}
-			else if (iconColor == "Rose")
-			{
-				light = Color.FromArgb(228, 100, 181);
-				deep = Color.FromArgb(255, 157, 101);
-			}
-			else if (iconColor == "Lime")
-			{
-				light = Color.FromArgb(155, 213, 98);
-				deep = Color.FromArgb(246, 210, 92);
-			}
-			else if (iconColor == "Amethyst")
-			{
-				light = Color.FromArgb(177, 122, 255);
-				deep = Color.FromArgb(222, 109, 244);
-			}
-			else if (iconColor == "Gold")
-			{
-				light = Color.FromArgb(236, 178, 62);
-				deep = Color.FromArgb(255, 219, 122);
-			}
-			else if (iconColor == "Ice")
-			{
-				light = Color.FromArgb(103, 198, 232);
-				deep = Color.FromArgb(173, 235, 255);
-			}
-			else
-			{
-				light = accent;
-				deep = secondaryAccent;
-			}
+			if (!AccentCatalog.TryGet(iconColor, out light, out deep))
+			{ light = accent; deep = secondaryAccent; }
 		}
 
 		private static Color Blend(Color first, Color second, float secondWeight)
@@ -16756,20 +16553,8 @@ namespace EmulatorHub
             }
             base.OnLayout(e);
         }
-		private readonly Color deepWater;
-
-		private readonly Color shallowWater;
-
-		private readonly Color plantColor;
-
-		private readonly Color gravelColor;
-
-		public AquariumFooter(Color deepWater, Color shallowWater, Color plantColor, Color gravelColor)
+		public AquariumFooter()
 		{
-			this.deepWater = deepWater;
-			this.shallowWater = shallowWater;
-			this.plantColor = plantColor;
-			this.gravelColor = gravelColor;
 			SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 		}
 
@@ -16781,7 +16566,7 @@ namespace EmulatorHub
 				return;
 			}
 			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-			using (LinearGradientBrush brush = new LinearGradientBrush(base.ClientRectangle, shallowWater, deepWater, LinearGradientMode.Vertical))
+			using (LinearGradientBrush brush = new LinearGradientBrush(base.ClientRectangle, FishBowlPalette.ThemeTop, FishBowlPalette.ThemeBottom, LinearGradientMode.Vertical))
 			{
 				e.Graphics.FillRectangle(brush, base.ClientRectangle);
 			}
@@ -16806,67 +16591,7 @@ namespace EmulatorHub
 					e.Graphics.FillPath(brush2, graphicsPath);
 				}
 			}
-			int num = Math.Max(base.Height - 14, 36);
-			PointF[] points2 = new PointF[12]
-			{
-				new PointF(-4f, base.Height),
-				new PointF(-4f, num + 4),
-				new PointF((float)base.Width * 0.08f, num),
-				new PointF((float)base.Width * 0.17f, num + 5),
-				new PointF((float)base.Width * 0.28f, num - 2),
-				new PointF((float)base.Width * 0.39f, num + 4),
-				new PointF((float)base.Width * 0.51f, num),
-				new PointF((float)base.Width * 0.63f, num + 5),
-				new PointF((float)base.Width * 0.74f, num - 1),
-				new PointF((float)base.Width * 0.86f, num + 4),
-				new PointF(base.Width + 4, num),
-				new PointF(base.Width + 4, base.Height)
-			};
-			using (GraphicsPath graphicsPath2 = new GraphicsPath())
-			{
-				using (SolidBrush brush3 = new SolidBrush(Color.FromArgb(218, gravelColor)))
-				{
-					graphicsPath2.AddLines(points2);
-					graphicsPath2.CloseFigure();
-					e.Graphics.FillPath(brush3, graphicsPath2);
-				}
-			}
-			DrawPebbles(e.Graphics, num);
-			DrawPlant(e.Graphics, 22, base.Height - 9, -1);
-			DrawPlant(e.Graphics, base.Width - 25, base.Height - 8, 1);
 			DrawBubbles(e.Graphics, base.Width - 72, 16);
-		}
-
-		private void DrawPebbles(Graphics graphics, int top)
-		{
-			int[] array = new int[15]
-			{
-				6, 49, 102, 160, 228, 310, 394, 482, 574, 670,
-				770, 874, 982, 1102, 1230
-			};
-			int[] array2 = array;
-			int[] array3 = array2;
-			foreach (int num in array3)
-			{
-				int num2 = num % Math.Max(1, base.Width + 30) - 14;
-				int num3 = top + num / 7 % 5;
-				Rectangle rect = new Rectangle(num2, num3, 16 + num % 11, 9 + num % 6);
-				using (SolidBrush brush = new SolidBrush(Color.FromArgb(165, (num / 2 % 2 == 0) ? Color.FromArgb(111, 178, 240) : Color.FromArgb(16, 76, 159))))
-				{
-					graphics.FillEllipse(brush, rect);
-				}
-			}
-		}
-
-		private void DrawPlant(Graphics graphics, int x, int y, int direction)
-		{
-			using (Pen pen = new Pen(Color.FromArgb(172, plantColor), 2.2f))
-			{
-				pen.StartCap = LineCap.Round;
-				pen.EndCap = LineCap.Round;
-				graphics.DrawBezier(pen, x, y, x + direction * 2, y - 8, x + direction * 17, y - 15, x + direction * 10, y - 28);
-				graphics.DrawBezier(pen, x + direction * 3, y, x + direction * 15, y - 7, x + direction * 5, y - 18, x + direction * 23, y - 23);
-			}
 		}
 
 		private void DrawBubbles(Graphics graphics, int x, int y)
@@ -23586,7 +23311,7 @@ namespace EmulatorHub
 			{
 				num = num * 31 + (emulator.Name ?? "").GetHashCode() + (emulator.Executable ?? "").GetHashCode() + (emulator.Favorite ? 97 : 0);
 			}
-			return num * 31 + Json.Serialize(library.Experience).GetHashCode();
+			return (num * 31 + Json.Serialize(library.Experience).GetHashCode()) * 31 + Json.Serialize(library.Theme).GetHashCode();
 		}
 
 		public HomeSurface(LibraryData library, Action<string, GameEntry, EmulatorProfile> action)
@@ -23699,7 +23424,7 @@ namespace EmulatorHub
 					int captionHeight = TextRenderer.MeasureText(item2.Text, item2.Font, new Size(captionWidth, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl).Height;
 					item2.Height = Math.Max((int)(40f * num), captionHeight + 14);
 				}
-				int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - 2);
+				int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal - 2);
 				foreach (Control control4 in flowLayoutPanel.Controls)
 				{
 					int num5 = Math.Max(1, num4 - control4.Margin.Horizontal);
@@ -23728,8 +23453,9 @@ namespace EmulatorHub
 						}
 					}
 				}
-				int val = flowLayoutPanel.Controls.Cast<Control>().Sum((Control item) => item.Height + item.Margin.Vertical) + (int)(32f * num) + control3.Padding.Vertical;
-				control3.Height = Math.Max((int)((Immersion.Ensure(library).Roomier ? 180f : 120f) * num), Math.Min((int)((float)(Immersion.Ensure(library).Roomier ? 360 : (library.Experience.CompactHome ? 210 : 300)) * num), val));
+				int headingHeight = control3.Controls.OfType<Label>().Sum(l => l.Height);
+				int val = flowLayoutPanel.Controls.Cast<Control>().Sum(item => ((item is Label) ? item.GetPreferredSize(new Size(Math.Max(1, num4 - item.Margin.Horizontal), 0)).Height : item.Height) + item.Margin.Vertical) + headingHeight + control3.Padding.Vertical + (int)(20f * num);
+				control3.Height = Math.Max((int)((Immersion.Ensure(library).Roomier ? 180f : 120f) * num), val);
 			}
 		}
 
@@ -23750,7 +23476,7 @@ namespace EmulatorHub
 			flowLayoutPanel.Dock = DockStyle.Fill;
 			flowLayoutPanel.FlowDirection = FlowDirection.TopDown;
 			flowLayoutPanel.WrapContents = false;
-			flowLayoutPanel.AutoScroll = true;
+			flowLayoutPanel.AutoScroll = false;
 			flowLayoutPanel.Padding = new Padding(0);
 			FlowLayoutPanel flowLayoutPanel2 = flowLayoutPanel;
 			panel2.Controls.Add(flowLayoutPanel2);
@@ -23763,6 +23489,23 @@ namespace EmulatorHub
 		private void Add(Panel card, string text, string command, GameEntry game = null, EmulatorProfile emulator = null)
 		{
 			FlowLayoutPanel flowLayoutPanel = (FlowLayoutPanel)card.Tag;
+			// A card keeps its first action visible; secondary utilities use the same More menu as the toolbars.
+			if (game == null && emulator == null && flowLayoutPanel.Controls.OfType<Button>().Any())
+			{
+				Button more = flowLayoutPanel.Controls.OfType<Button>().FirstOrDefault(b => b.Text == "More");
+				if (more == null)
+				{
+					ContextMenuStrip menu = new ContextMenuStrip();
+					more = ExperienceUi.Button("More", delegate { });
+					Button anchor = more;
+					more.Click += delegate { menu.Show(anchor, new Point(0, anchor.Height)); };
+					more.Tag = menu; more.ContextMenuStrip = menu;
+					more.Disposed += delegate { menu.Dispose(); };
+					flowLayoutPanel.Controls.Add(more);
+				}
+				((ContextMenuStrip)more.Tag).Items.Add(text, null, delegate { action(command, game, emulator); });
+				return;
+			}
 			FishBowlActionButton fishBowlActionButton = ExperienceUi.Button(text, delegate
 			{
 				action(command, game, emulator);
@@ -23794,36 +23537,15 @@ namespace EmulatorHub
 			flowLayoutPanel2.WrapContents = false;
 			flowLayoutPanel2.MaximumSize = new Size(330, 0);
 			FlowLayoutPanel flowLayoutPanel3 = flowLayoutPanel2;
+			Size coverSize = UiPolishTools.CoverSize(library.Theme.CoverAspect);
 			PictureBox art = new PictureBox
 			{
-				Size = new Size(56, 56),
+				Size = coverSize,
 				SizeMode = PictureBoxSizeMode.Zoom,
 				BackColor = FishBowlPalette.ThemeSurface,
-				AccessibleName = game.Title + " artwork"
+				AccessibleName = game.Title + " artwork",
+				Image = UiPolishTools.Cover(game.ArtworkPath, game.Title, coverSize)
 			};
-			try
-			{
-				if (File.Exists(game.ArtworkPath))
-				{
-					using (Image original = Image.FromFile(game.ArtworkPath))
-					{
-						art.Image = new Bitmap(original, new Size(56, 56));
-					}
-				}
-			}
-			catch
-			{
-			}
-			if (art.Image == null)
-			{
-				Bitmap image = new Bitmap(56, 56);
-				using (Graphics graphics = Graphics.FromImage(image))
-				{
-					graphics.Clear(FishBowlPalette.ThemeSurface);
-					FishBowlText.DrawText(graphics, string.IsNullOrWhiteSpace(game.Title) ? "?" : game.Title.Substring(0, 1), SystemFonts.DefaultFont, new Rectangle(0, 0, 56, 56), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-				}
-				art.Image = image;
-			}
 			art.Disposed += delegate
 			{
 				if (art.Image != null)
@@ -23898,7 +23620,7 @@ namespace EmulatorHub
 					action("Missing games", null, null);
 				}));
 				int count = Math.Max(1, Math.Min(12, library.Experience.HomeTileCount));
-				foreach (string homeCard in library.Experience.HomeCards)
+				foreach (string homeCard in UiPolishTools.ResolveHomeCards(library))
 				{
 					Panel card = Card(homeCard);
 					switch (homeCard)
@@ -27490,6 +27212,19 @@ namespace EmulatorHub
 			base.Controls.Add(Body);
 			base.Controls.Add(Actions);
 		}
+
+        protected override void SetVisibleCore(bool value)
+        {
+            if (value)
+            {
+                Rectangle area = TextFit.WorkingAreaOverride ?? Screen.FromControl(Owner ?? this).WorkingArea;
+                Size limit = new Size(Math.Max(240, area.Width - 24), Math.Max(180, area.Height - 24));
+                MinimumSize = new Size(Math.Min(MinimumSize.Width, limit.Width), Math.Min(MinimumSize.Height, limit.Height));
+                MaximumSize = limit;
+                Size = new Size(Math.Min(Width, limit.Width), Math.Min(Height, limit.Height));
+            }
+            base.SetVisibleCore(value);
+        }
 
 		public void Action(string name, Action run)
 		{
@@ -35836,13 +35571,74 @@ namespace EmulatorHub
 			}
 		}
 	}
+	public sealed class ThemeColors
+	{
+		public readonly string Name;
+		public readonly Color Ink, Top, Bottom, Surface, Subtle;
+		public ThemeColors(string name, Color ink, Color top, Color bottom, Color surface, Color subtle)
+		{ Name = name; Ink = ink; Top = top; Bottom = bottom; Surface = surface; Subtle = subtle; }
+	}
 	public static class ThemeCatalog
 	{
-		public static readonly string[] Names = new string[18]
+		private static readonly ThemeColors[] Palettes = new ThemeColors[]
 		{
-			"FishBowl Water", "Twilight", "Lavender", "Ember", "Light", "High Contrast", "Midnight", "Forest", "Rosewood", "Mist",
-			"Deep Ocean", "Aurora", "Slate", "Plum", "Sand", "Paper", "Nordic", "Copper"
+			new ThemeColors("FishBowl Water", Color.FromArgb(250, 247, 255), Color.FromArgb(5, 31, 78), Color.FromArgb(3, 13, 38), Color.FromArgb(12, 59, 122), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Twilight", Color.FromArgb(250, 247, 255), Color.FromArgb(48, 36, 71), Color.FromArgb(24, 23, 44), Color.FromArgb(73, 56, 93), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Lavender", Color.FromArgb(32, 35, 42), Color.FromArgb(230, 219, 250), Color.FromArgb(210, 190, 235), Color.FromArgb(244, 237, 255), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Ember", Color.FromArgb(250, 247, 255), Color.FromArgb(85, 36, 26), Color.FromArgb(42, 18, 16), Color.FromArgb(113, 56, 41), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Light", Color.FromArgb(32, 35, 42), Color.FromArgb(241, 241, 245), Color.FromArgb(220, 221, 230), Color.FromArgb(255, 255, 255), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("High Contrast", Color.FromArgb(250, 247, 255), Color.FromArgb(0, 0, 0), Color.FromArgb(0, 0, 0), Color.FromArgb(22, 22, 22), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Midnight", Color.FromArgb(250, 247, 255), Color.FromArgb(16, 20, 33), Color.FromArgb(8, 11, 20), Color.FromArgb(37, 43, 66), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Forest", Color.FromArgb(250, 247, 255), Color.FromArgb(22, 60, 41), Color.FromArgb(12, 34, 24), Color.FromArgb(40, 86, 59), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Rosewood", Color.FromArgb(250, 247, 255), Color.FromArgb(84, 29, 53), Color.FromArgb(46, 16, 34), Color.FromArgb(113, 48, 76), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Mist", Color.FromArgb(32, 35, 42), Color.FromArgb(223, 234, 245), Color.FromArgb(201, 216, 233), Color.FromArgb(241, 247, 253), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Deep Ocean", Color.FromArgb(250, 247, 255), Color.FromArgb(0, 60, 84), Color.FromArgb(0, 29, 48), Color.FromArgb(7, 90, 112), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Aurora", Color.FromArgb(250, 247, 255), Color.FromArgb(19, 63, 69), Color.FromArgb(21, 27, 53), Color.FromArgb(36, 89, 88), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Slate", Color.FromArgb(250, 247, 255), Color.FromArgb(53, 68, 79), Color.FromArgb(30, 41, 50), Color.FromArgb(74, 90, 102), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Plum", Color.FromArgb(250, 247, 255), Color.FromArgb(82, 39, 99), Color.FromArgb(45, 22, 58), Color.FromArgb(107, 59, 125), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Sand", Color.FromArgb(32, 35, 42), Color.FromArgb(234, 215, 174), Color.FromArgb(217, 191, 142), Color.FromArgb(255, 240, 211), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Paper", Color.FromArgb(32, 35, 42), Color.FromArgb(245, 240, 228), Color.FromArgb(226, 220, 205), Color.FromArgb(255, 252, 243), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Nordic", Color.FromArgb(32, 35, 42), Color.FromArgb(208, 236, 234), Color.FromArgb(175, 213, 213), Color.FromArgb(232, 250, 248), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Copper", Color.FromArgb(250, 247, 255), Color.FromArgb(99, 59, 37), Color.FromArgb(53, 31, 23), Color.FromArgb(128, 84, 59), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Obsidian", Color.FromArgb(250, 247, 255), Color.FromArgb(22, 22, 22), Color.FromArgb(8, 8, 8), Color.FromArgb(44, 44, 44), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Graphite", Color.FromArgb(250, 247, 255), Color.FromArgb(72, 72, 72), Color.FromArgb(47, 47, 47), Color.FromArgb(92, 92, 92), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Charcoal", Color.FromArgb(250, 247, 255), Color.FromArgb(41, 44, 48), Color.FromArgb(20, 23, 26), Color.FromArgb(62, 67, 73), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Cobalt", Color.FromArgb(250, 247, 255), Color.FromArgb(17, 59, 164), Color.FromArgb(9, 27, 82), Color.FromArgb(36, 84, 191), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Indigo", Color.FromArgb(250, 247, 255), Color.FromArgb(48, 33, 123), Color.FromArgb(23, 18, 62), Color.FromArgb(72, 55, 156), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Ruby", Color.FromArgb(250, 247, 255), Color.FromArgb(101, 27, 43), Color.FromArgb(51, 13, 26), Color.FromArgb(132, 49, 66), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Burgundy", Color.FromArgb(250, 247, 255), Color.FromArgb(73, 35, 55), Color.FromArgb(36, 17, 30), Color.FromArgb(101, 56, 77), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Chocolate", Color.FromArgb(250, 247, 255), Color.FromArgb(76, 50, 41), Color.FromArgb(36, 26, 23), Color.FromArgb(103, 75, 62), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Moss", Color.FromArgb(250, 247, 255), Color.FromArgb(55, 72, 32), Color.FromArgb(29, 41, 20), Color.FromArgb(81, 101, 52), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Pine", Color.FromArgb(250, 247, 255), Color.FromArgb(6, 68, 54), Color.FromArgb(3, 37, 31), Color.FromArgb(18, 97, 78), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Lagoon", Color.FromArgb(250, 247, 255), Color.FromArgb(0, 93, 106), Color.FromArgb(0, 52, 62), Color.FromArgb(20, 123, 134), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Violet", Color.FromArgb(250, 247, 255), Color.FromArgb(101, 40, 124), Color.FromArgb(53, 19, 71), Color.FromArgb(128, 63, 150), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Ivory", Color.FromArgb(32, 35, 42), Color.FromArgb(255, 245, 222), Color.FromArgb(239, 223, 186), Color.FromArgb(255, 252, 240), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Peach", Color.FromArgb(32, 35, 42), Color.FromArgb(255, 219, 200), Color.FromArgb(236, 192, 172), Color.FromArgb(255, 240, 230), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Blush", Color.FromArgb(32, 35, 42), Color.FromArgb(247, 213, 227), Color.FromArgb(221, 183, 204), Color.FromArgb(255, 240, 247), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Mint", Color.FromArgb(32, 35, 42), Color.FromArgb(209, 241, 220), Color.FromArgb(180, 218, 196), Color.FromArgb(237, 255, 242), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Sage", Color.FromArgb(32, 35, 42), Color.FromArgb(215, 223, 201), Color.FromArgb(187, 201, 170), Color.FromArgb(241, 245, 232), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Sky", Color.FromArgb(32, 35, 42), Color.FromArgb(206, 232, 255), Color.FromArgb(173, 210, 243), Color.FromArgb(237, 247, 255), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Lilac", Color.FromArgb(32, 35, 42), Color.FromArgb(235, 214, 250), Color.FromArgb(207, 175, 229), Color.FromArgb(250, 239, 255), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Lemon", Color.FromArgb(32, 35, 42), Color.FromArgb(250, 235, 174), Color.FromArgb(228, 212, 141), Color.FromArgb(255, 249, 217), Color.FromArgb(80, 80, 90)),
+			new ThemeColors("Terracotta", Color.FromArgb(250, 247, 255), Color.FromArgb(153, 64, 39), Color.FromArgb(116, 53, 33), Color.FromArgb(171, 76, 49), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Silver", Color.FromArgb(32, 35, 42), Color.FromArgb(218, 221, 226), Color.FromArgb(185, 190, 199), Color.FromArgb(240, 241, 244), Color.FromArgb(80, 80, 90))
 		};
+		public static readonly string[] Names = Palettes.Select(p => p.Name).ToArray();
+		public static ThemeColors Get(string name)
+		{ return Palettes.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) ?? Palettes[0]; }
+	}
+	public static class AccentCatalog
+	{
+		public static readonly string[] Names = new string[] { "Ocean", "Sunset", "Amethyst", "Rose", "Lime", "Gold", "Ice", "Cobalt", "Indigo", "Violet", "Orchid", "Magenta", "Ruby", "Coral", "Tangerine", "Amber", "Lemon", "Emerald", "Mint", "Teal", "Turquoise", "Sapphire", "Lavender", "Peach", "Copper", "Silver", "Pearl", "Graphite" };
+		public static readonly string[] IconNames = new string[] { "Match accent" }.Concat(Names).ToArray();
+		private static readonly Color[] Primary = new Color[] { Color.FromArgb(89, 190, 255), Color.FromArgb(255, 158, 79), Color.FromArgb(177, 122, 255), Color.FromArgb(228, 100, 181), Color.FromArgb(155, 213, 98), Color.FromArgb(236, 178, 62), Color.FromArgb(103, 198, 232), Color.FromArgb(77, 127, 255), Color.FromArgb(129, 114, 237), Color.FromArgb(193, 86, 237), Color.FromArgb(225, 143, 234), Color.FromArgb(240, 92, 203), Color.FromArgb(240, 91, 112), Color.FromArgb(255, 130, 115), Color.FromArgb(255, 171, 50), Color.FromArgb(240, 196, 70), Color.FromArgb(230, 223, 103), Color.FromArgb(67, 200, 134), Color.FromArgb(131, 226, 188), Color.FromArgb(59, 197, 186), Color.FromArgb(64, 216, 228), Color.FromArgb(72, 158, 221), Color.FromArgb(193, 166, 235), Color.FromArgb(241, 177, 154), Color.FromArgb(207, 145, 101), Color.FromArgb(195, 203, 216), Color.FromArgb(245, 239, 228), Color.FromArgb(135, 149, 166) };
+		private static readonly Color[] Secondary = new Color[] { Color.FromArgb(67, 220, 187), Color.FromArgb(240, 93, 91), Color.FromArgb(222, 109, 244), Color.FromArgb(255, 157, 101), Color.FromArgb(246, 210, 92), Color.FromArgb(255, 219, 122), Color.FromArgb(173, 235, 255), Color.FromArgb(122, 181, 255), Color.FromArgb(178, 158, 255), Color.FromArgb(140, 129, 255), Color.FromArgb(189, 161, 247), Color.FromArgb(247, 151, 222), Color.FromArgb(255, 152, 125), Color.FromArgb(255, 193, 160), Color.FromArgb(255, 221, 124), Color.FromArgb(232, 139, 64), Color.FromArgb(178, 220, 104), Color.FromArgb(146, 229, 176), Color.FromArgb(187, 245, 221), Color.FromArgb(118, 225, 218), Color.FromArgb(136, 241, 238), Color.FromArgb(117, 209, 237), Color.FromArgb(224, 201, 244), Color.FromArgb(255, 219, 192), Color.FromArgb(234, 187, 140), Color.FromArgb(237, 242, 249), Color.FromArgb(207, 197, 184), Color.FromArgb(188, 201, 215) };
+		public static bool TryGet(string name, out Color primary, out Color secondary)
+		{
+			int index = Array.FindIndex(Names, n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+			primary = Primary[index < 0 ? 0 : index]; secondary = Secondary[index < 0 ? 0 : index];
+			return index >= 0;
+		}
 	}
 	public static class FluidStyle
 	{

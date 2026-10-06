@@ -5,9 +5,9 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 | Platform | Version | Status |
 | --- | --- | --- |
 | Windows | 1.25.8 | Current release |
-| Linux | Preview | Emulator hub; the Windows library features are being ported |
+| Linux | Preview | Library and expansion screens; Linux desktop testing remains required |
 
-Source version **1.25.11** is under review in [PR #15](../../pull/15). It includes library editing fixes, Undo removal, portable path recovery, explicit emulator reassignment, artwork cleanup and large-text layout fixes. The public release remains 1.25.8 until review and CI complete.
+Source version **1.26.0** expands both Windows and Linux. It adds Home customization, theme previews, accessibility presets, native imports, game setup tools, reviewed metadata catalogs, mods, media, save recovery, play insights, achievement progress and a paired browser companion. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source.
 
 ## Features
 
@@ -23,14 +23,21 @@ Source version **1.25.11** is under review in [PR #15](../../pull/15). It includ
 - **Profiles:** separate favorites, progress, play time and appearance for each person, plus a temporary guest mode.
 - **Living-room mode and controller navigation** for full-screen, couch-friendly browsing.
 - **Appearance:**
-  - 18 themes, seven accents and custom palettes
+  - 40 themes, 28 accents and custom palettes
   - adjustable text size, corner rounding, icon styles and backgrounds
-  - reduced-motion support
+  - reduced-motion and accessibility presets, theme samples, restrained accents and cover proportions
+  - Home card ordering and visibility with page scrolling
 - **Tools:**
   - command search (Ctrl+K)
   - ROM verification against a local DAT file
   - CSV and HTML catalog export
   - transferring a profile between computers
+  - game-specific setup and launch profiles, Steam discovery and explicit native executable/shortcut imports
+  - reviewed mod overlays with verified backups, resumable rollback and IPS patch copies
+  - manuals, trailer links, screenshot galleries, monthly play summaries and session notes
+  - reviewed local/HTTPS metadata catalogs and declarative importer/emulator extensions
+  - cached RetroAchievements completion progress (your API key is required)
+  - a paired read-only browser companion for a phone on the same private network
 
 ### Linux
 
@@ -42,13 +49,13 @@ The Linux version shares the emulator presets, folder routing, backups and libra
 - **Running emulators** are detected, including Flatpak and AppImage processes. Opening one that is already running brings its window forward on Hyprland, Sway and X11.
 - **Importing:** AppImages and ZIP packages can be imported into a dedicated emulator folder.
 
-The game library, profiles, snapshots and living-room mode are Windows-only for now. The library file is shared, and the Linux version preserves every Windows field when it saves.
+The preview now includes Home, Library, profiles, collections, keyboard living-room browsing, title/cover editing, removal with Undo, game setup, Steam import, integrations, mods, media, play history and verified file save recovery. Folder save archives use the emulator backup manager. Controller polling and some advanced Windows tools remain platform-specific. The library file is shared; Linux preserves unfamiliar fields when it saves.
 
 ## Installation
 
 ### Windows
 
-Download `FishBowl-Setup.exe` from the [latest release](../../releases/latest) and run it, or download `FishBowl.exe` to run FishBowl without installing.
+Download the complete app ZIP or `FishBowl Setup.exe` from the [latest release](../../releases/latest) and run it, or download `FishBowl.exe` to run FishBowl without installing.
 
 ### Linux
 
@@ -84,6 +91,7 @@ The release source lives in [`windows/`](windows/) and builds with the .NET Fram
 
 ```powershell
 windows\Build.ps1          # builds FishBowl.exe and FishBowl Setup.exe
+windows\Package.ps1        # complete six-file app bundle, source ZIP and SHA256SUMS
 & "windows\Run Tests.ps1"  # runs the regression suite against a temporary portable library
 ```
 
@@ -101,6 +109,16 @@ Every push and pull request is checked by GitHub Actions:
 - **Windows:** builds the app with `csc.exe`, runs the Windows regression suite, and checks that the shared files still compile as C# 5.
 - **Linux:** builds and tests the Linux app, and publishes a Linux build.
 - **Text overflow audit:** a separate workflow opens every Windows dialog at 100%, 150% and 200% text size and reports text that doesn't fit.
+
+## Integrations and releases
+
+RetroAchievements progress refreshes only on request and shows up to 500 account games. Achievement unlocking stays in the emulator. Windows can remember a Web API key encrypted for the current Windows account; Linux accepts `FISHBOWL_RA_API_KEY` or a key for the current request. Keys are not part of exported libraries.
+
+Extensions are declarative JSON manifests of kind `Metadata`, `Importer` or `Emulator`. Catalog changes and import entries are reviewed before applying. Metadata matches require a unique normalized title and preserve custom titles. Extensions register data and adapters; they do not execute extension code. Use Create example in Extensions to generate a manifest and matching catalog.
+
+The companion starts explicitly on localhost or a selected private network address. Its random pairing address grants read-only title and play-history access while it is running. Closing it stops the server. It does not serve game files, save contents, local paths or credentials.
+
+Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (`v1.26.0` for this version). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
 
 ## Repository layout
 

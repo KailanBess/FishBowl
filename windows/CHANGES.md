@@ -1,3 +1,11 @@
+# Windows 1.25.12
+
+- Expanded themes from 18 to 40, with distinct dark, light, warm, cool and neutral surfaces. Existing saved theme names remain supported.
+- Expanded accents from 7 to 28. Appearance, Settings and app icon colors share the same catalog; Match accent follows all new colors.
+- Removed the sand, pebbles and plants from the footer. Its water background follows live theme changes.
+- Kept the existing UI layouts, controls and wording. Custom palette overrides and Windows high contrast preferences remain supported.
+- Added coverage for all 1,120 theme/accent combinations, readable text, saved choices, settings selectors, app icon colors and footer painting. Linux needs matching theme/accent choices and footer styling; saved fields are unchanged.
+
 # Windows 1.25.11
 
 - Normalized organization source paths before grouping playlists, cues and tracks. Repeated references are deduplicated; circular playlists are rejected. Tests cover Windows short temp paths, relative paths and enumeration order (#10).

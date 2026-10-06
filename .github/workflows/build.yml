@@ -22,14 +22,15 @@ jobs:
       - name: Compile retained shared source with C# 5
         shell: pwsh
         run: |
-          & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /target:library /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /out:SharedCompatibility.dll FishBowl.Model.cs FishBowl.Core.cs FishBowl.Platform.cs FishBowl.Library.cs
+          & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /target:library /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /out:SharedCompatibility.dll FishBowl.Model.cs FishBowl.Core.cs FishBowl.Platform.cs FishBowl.Library.cs FishBowl.GameTools.cs FishBowl.Integrations.cs FishBowl.SaveTools.cs
           if ($LASTEXITCODE -ne 0) { throw 'Shared C# 5 compilation failed' }
+      - name: Package complete Windows app and source
+        shell: pwsh
+        run: ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion 1.26.0
       - uses: actions/upload-artifact@v7
         with:
           name: FishBowl-windows
-          path: |
-            windows/FishBowl.exe
-            windows/FishBowl Setup.exe
+          path: artifacts/windows/
 
   linux:
     name: Linux (Avalonia + core tests)

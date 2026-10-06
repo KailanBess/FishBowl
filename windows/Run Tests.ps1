@@ -21,7 +21,7 @@ function Invoke-FixtureTest([string]$Executable, [string[]]$TestArguments) {
 }
 Push-Location $fixture
 try {
- foreach ($testName in @('LibraryRecoveryTests','LibraryEditTests','RemovalTests','IntegrationTests','NextRegressionTests','RecognitionTests','AzaharStorageTests','VisualRegressionTests','VisualMatrixTests','EmulatorEditorTests','SmoothUiTests','PopupCloseTests','PopupPositionTests','PopupAnimationTests')) {
+ foreach ($testName in @('GameToolsTests','UiPolishTests','IntegrationExpansionTests','ExpansionVisualTests','ThemeTests','LibraryRecoveryTests','LibraryEditTests','RemovalTests','IntegrationTests','NextRegressionTests','RecognitionTests','AzaharStorageTests','VisualRegressionTests','VisualMatrixTests','EmulatorEditorTests','SmoothUiTests','PopupCloseTests','PopupPositionTests','PopupAnimationTests')) {
   Write-Output "Running $testName"
   Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('Tests\' + $testName + '.cs')) -Destination $fixture
   & $compiler /nologo /r:FishBowl.exe /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/out:$testName.exe" "$testName.cs"
