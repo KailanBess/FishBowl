@@ -67,6 +67,8 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 
 ## Log
 
+- **2026-10-06 (Windows toolbar assertion):** updated the compact-menu regression to verify every toolbar action fits its container; a fixed single-row height is not a valid requirement when enlarged text must wrap on a small desktop. CI found one remaining narrow-pane summary action. Summary buttons now stay within their pane using the existing ellipsis/tooltip behavior, and the compact main-window fixture overrides its minimum size to reproduce the runner's actual width.
+
 - **2026-10-06 (Windows compact layouts):** reproduced the CI desktop at 1024x720. Existing button rows wrap, card captions expand, and organizer/settings labels retain spacing with enlarged text. Compact audit has zero findings at all three text sizes. Added bounded test processes and per-test diagnostics for unattended Windows checks.
 
 - **2026-10-06 (Windows CI fixtures):** normalized all fixture base paths so long and short Windows temp names produce equivalent launch, save and artwork expectations. Added audit findings and display/font details to CI logs so remaining runner-specific layouts can be reviewed directly.

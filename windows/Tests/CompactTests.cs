@@ -28,7 +28,7 @@ class CompactTests {
                 ui.Scale(new SizeF(scale,scale)); Application.DoEvents();
                 var bar=NextUi.Descendants(ui).OfType<FlowLayoutPanel>().Single(p=>p.Controls.OfType<Button>().Any(b=>b.Text=="Game actions ▾"));
                 Check(bar.Controls.OfType<Button>().Where(b=>b.Visible).Count()<=6,"compact toolbar at "+scale);
-                Check(bar.Height<=68*scale,"single roomier toolbar row at "+scale);
+                Check(bar.Controls.OfType<Button>().Where(b=>b.Visible).All(b=>b.Left>=0 && b.Top>=0 && b.Right<=bar.ClientSize.Width && b.Bottom<=bar.ClientSize.Height),"toolbar rows keep every action visible at "+scale);
                 foreach(string title in new [] {"Game actions ▾","Library tools ▾"}) {
                     var button=bar.Controls.OfType<Button>().Single(b=>b.Text==title);
                     typeof(Button).GetMethod("OnClick",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(button,new object[]{EventArgs.Empty}); Application.DoEvents();

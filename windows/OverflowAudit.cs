@@ -63,6 +63,7 @@ class OverflowAudit {
   MainForm main = null;
   try {
    main = new MainForm(true); main.ShowInTaskbar = false; main.StartPosition = FormStartPosition.Manual; main.Location = new Point(-4000, -4000); main.Size = compact ? new Size(1024, 720) : new Size(1280, 800);
+   if (compact) { main.MinimumSize = new Size(Math.Min(main.MinimumSize.Width, 1024), Math.Min(main.MinimumSize.Height, 720)); main.MaximumSize = new Size(1024, 720); main.Size = new Size(1024, 720); }
    main.Show(); Pump(600);
    var tabs = typeof(MainForm).GetField("workspaceNavigation", flags);
    var navigation = tabs == null ? null : tabs.GetValue(main) as TabControl;

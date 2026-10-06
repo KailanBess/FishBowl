@@ -23673,8 +23673,11 @@ namespace EmulatorHub
 			foreach (Button item in summary.Controls.OfType<Button>())
 			{
 				item.AutoSize = false;
-				item.MinimumSize = new Size(140, 42);
-				item.Width = Math.Max(140, TextRenderer.MeasureText(item.Text, item.Font).Width + 60);
+				int available = Math.Max(1, ClientSize.Width - summary.Padding.Horizontal - item.Margin.Horizontal);
+				item.MinimumSize = new Size(Math.Min(140, available), 42);
+				item.MaximumSize = new Size(available, 0);
+				item.AutoEllipsis = true;
+				item.Width = Math.Min(available, Math.Max(140, TextRenderer.MeasureText(item.Text, item.Font).Width + 60));
 				item.Height = Math.Max(42, item.Font.Height + 16);
 			}
 			int num2 = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
