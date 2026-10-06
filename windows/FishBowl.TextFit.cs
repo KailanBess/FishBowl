@@ -62,7 +62,9 @@ namespace EmulatorHub
 			// Auto-sized buttons stay in their row (at their own width) so the row shifts together.
 			foreach (var row in container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None).GroupBy(b => b.Top / 8))
 			{
-				if (!row.Any(b => buttons.Contains(b))) continue;
+				var ordered = row.OrderBy(b => b.Left).ToList();
+				bool overlapping = ordered.Zip(ordered.Skip(1), (x, y) => x.Right > y.Left + 1).Any(o => o);
+				if (!overlapping && !row.Any(b => buttons.Contains(b))) continue;
 				var others = container.Controls.Cast<Control>().Where(c => c.Visible && !(c is ButtonBase) && c.Top < row.Max(b => b.Bottom) && c.Bottom > row.Min(b => b.Top)).ToList();
 				var right = row.Where(b => (b.Anchor & AnchorStyles.Right) != 0 && (b.Anchor & AnchorStyles.Left) == 0).OrderByDescending(b => b.Right).ToList();
 				var left = row.Except(right).OrderBy(b => b.Left).ToList();

@@ -8883,7 +8883,7 @@ namespace EmulatorHub
 				queued.Clear();
 				RefreshQueue();
 			}));
-			base.Controls.Add(Button("Open root", 278, 478, OpenRoot));
+			base.Controls.Add(Button("Open root", 300, 478, OpenRoot));
 			FishBowlActionButton fishBowlActionButton2 = Button("Store queued files", 588, 478, StoreFiles);
 			fishBowlActionButton2.BackColor = Color.FromArgb(255, 164, 82);
 			fishBowlActionButton2.ForeColor = Color.FromArgb(40, 25, 14);
