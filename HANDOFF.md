@@ -50,7 +50,7 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 
 ## Next steps (Linux parity)
 
-1. **Move Windows non-UI logic into shared files:** game recognition, library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
+1. **Move Windows non-UI logic into shared files:** game recognition (done: `FishBowl.GameRecognition.cs`), then library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
 2. **Build Linux screens on that shared logic:** Home, Library, game details, profiles and living-room mode.
 3. **Finish and submit the Linux-only features above.**
 
@@ -59,6 +59,7 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 ## Log
 
 - **2026-10-06:**
+  - Shared game identification: `windows/GameRecognition.cs` moved to the root as `FishBowl.GameRecognition.cs` and is compiled by both builds. Its WinForms helpers (`SmoothPainting`, `ConsistentInputs`) moved to `windows/FishBowl.InputPainting.cs`. Linux uses `FishBowl.LinuxShims.cs` for the `System.Drawing` types (built-in PNG encoder). Fixed Linux storing its library in the current directory when `~/.local/share` doesn't exist yet.
   - Rewrote the README and tidied the repository: removed superseded source and test files, the old root `FishBowl.cs`, and obsolete review notes.
   - Moved the Windows binaries to the v1.25.8 release, and added `AGENTS.md`, `CLAUDE.md` and this file.
   - Opened #11 (text overflow) and #9 (Tux easter egg). Filed #10.

@@ -106,6 +106,7 @@ Every push and pull request is checked by GitHub Actions:
 | --- | --- |
 | `windows/` | Windows release source, build and test scripts, and change notes |
 | `FishBowl.Model.cs` | The library data model (`library.json`), shared by both versions |
+| `FishBowl.GameRecognition.cs` | Game identification from local metadata, shared by both versions |
 | `FishBowl.Core.cs`, `FishBowl.Platform.cs` | Shared emulator logic, and the differences between Windows and Linux |
 | `FishBowl.Avalonia/` | The Linux user interface |
 | `linux/` | Linux install scripts and desktop entry |

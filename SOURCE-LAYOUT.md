@@ -6,19 +6,20 @@ FishBowl has two front ends that share their data model and emulator logic.
 
 The Windows application, currently version **1.25.8**, is built from:
 
-- `windows/FishBowl.cs`: the WinForms application
-- `windows/GameRecognition.cs`: game identification
-- `FishBowl.Model.cs` (repository root): the shared data model
+- `windows/FishBowl.cs`, `windows/FishBowl.InputPainting.cs` and `windows/FishBowl.TextFit.cs`: the WinForms application
+- `FishBowl.Model.cs` and `FishBowl.GameRecognition.cs` (repository root): the shared data model and game identification
 
 `windows/FishBowl.Setup.cs` builds the installer. Run `windows/Build.ps1` to build both executables beside the source, and `windows/Run Tests.ps1` to run the regression tests in `windows/Tests/`. Executables are distributed through GitHub Releases, not committed.
 
 ## Linux (`FishBowl.Avalonia/`)
 
-The Avalonia application links three root files:
+The Avalonia application links these root files:
 
 | File | Contents |
 | --- | --- |
 | `FishBowl.Model.cs` | Every class saved in `library.json`. Also compiled by the Windows build. |
+| `FishBowl.GameRecognition.cs` | Game identification (titles, title IDs, icons) and installed-game lookup. Also compiled by the Windows build. |
+| `FishBowl.LinuxShims.cs` | Linux stand-ins for the few Windows-only types the shared files use (`System.Drawing` images; `UserTools.Guest`). Linux only. |
 | `FishBowl.Core.cs` | Presets, folder routing, discovery, imports, release checks, backups and setup checks. |
 | `FishBowl.Platform.cs` | Windows/Linux differences: launching, process detection, versions, Flatpak and `.desktop` handling. |
 
