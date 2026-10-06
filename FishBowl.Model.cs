@@ -412,6 +412,8 @@ namespace EmulatorHub
 	}
 	public class GameEntry
 	{
+        public bool TitleIsCustom { get; set; }
+
 #if NETCOREAPP
 		// Keep fields from newer versions when this one saves (Linux build; JavaScriptSerializer on Windows ignores this).
 		[System.Text.Json.Serialization.JsonExtensionData]
@@ -666,6 +668,8 @@ namespace EmulatorHub
 		public List<EmulatorProfile> Emulators { get; set; }
 
 		public List<GameEntry> Games { get; set; }
+
+        public List<string> RemovedGamePaths { get; set; }
 
 		public List<WebsiteLink> Links { get; set; }
 

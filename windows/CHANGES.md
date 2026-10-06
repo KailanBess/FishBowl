@@ -1,3 +1,18 @@
+# Windows 1.25.10
+
+### Fixed
+
+- Edited library titles save immediately in the row and selected-game preview. They remain separate from filenames and are preserved by automatic recognition.
+- Assigned game covers display in the default list as well as artwork view. Cover replacements refresh cached images and selected-game previews.
+- Selected covers are retained in FishBowl artwork storage, preserving original image files and avoiding broken references if those files move.
+
+### Added
+
+- Visible Remove game and Remove emulator actions, including confirmation and removal of multiple selected games.
+- Persistent scan exclusions for removed game paths and additional discs; explicit addition restores a path.
+- Shared optional title preference and scan-exclusion fields, plus non-UI library helpers compiled into both builds.
+- Regression checks for title edits, cover retention and refresh, cancellation, removal, scan behavior and file preservation. Appearance tests use an independent portable fixture to avoid inheriting settings from earlier tests.
+
 # Windows changelog
 
 ## 1.25.8

@@ -2,7 +2,7 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-06, by the Linux side._
+_Last updated: 2026-10-06, by the Windows side._
 
 ## Current state
 
@@ -20,10 +20,20 @@ _Last updated: 2026-10-06, by the Linux side._
 | #9 | Linux easter egg (Tux in the banner) | Linux only. |
 | #12 | README rewrite and repository tidy-up | Removes unused files, moves binaries to Releases, adds these handoff files. |
 
+## Windows change awaiting review
+
+Branch `fix-library-title-artwork` proposes source version **1.25.10**. It includes the earlier 1.25.9 removal actions, preserves explicit library titles without renaming game files, retains custom covers, and refreshes covers in list and artwork views. It preserves the shared-model and text-fitting changes already on main.
+
+Shared changes: optional `GameEntry.TitleIsCustom` and `LibraryData.RemovedGamePaths` fields, plus `FishBowl.Library.cs` for removal and cover-copy logic. Both front ends and shared test projects compile this helper. Linux schema tests cover preservation of the new fields; matching Linux UI actions need a port. Shared-model review from the Linux maintainer is needed before merging.
+
+Validation commands: `windows\Build.ps1`, `windows\Run Tests.ps1`, `windows\Run Overflow Audit.ps1`, and the Framework C# 5 shared compilation. Linux/Avalonia build and schema tests run in CI. Local Linux runtime/GUI checks have not been run.
+
+Validation results: 2,651 Windows regression checks passed, 62 previews rendered without failures, and shared sources compiled with Framework C# 5. The overflow audit reported 69 findings; the remaining dense-dialog layout work is separate from library editing.
+
 ## Known issues
 
 - **#10, Windows CI test failure.** "multi-disc support files grouped once" in `windows/Tests/IntegrationTests.cs` passes locally but fails on GitHub's Windows runner. Every Windows CI run fails until it is fixed. This is Windows-side work.
-- **Remaining text overflow (88 findings).** Mostly at 200% text in dense dialogs (Library Maintenance, Settings), which need a layout redesign. The report is in the `overflow-audit` artifact of each audit run.
+- **Remaining text overflow (69 findings in the 1.25.10 audit).** Mostly at larger text sizes in dense dialogs (Library Maintenance, Settings), which need a layout redesign. The report is in the `overflow-audit` artifact of each audit run.
 
 ## In progress on the Linux side
 
@@ -58,6 +68,7 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 
 ## Log
 
+- **2026-10-06 (Windows):** prepared 1.25.10 library title/cover fixes and 1.25.9 removal actions on `fix-library-title-artwork`. Added shared optional fields/helpers and editing/removal regression checks. Linux needs matching UI actions; the released version remains 1.25.8 until review and release.
 - **2026-10-06:**
   - Rewrote the README and tidied the repository: removed superseded source and test files, the old root `FishBowl.cs`, and obsolete review notes.
   - Moved the Windows binaries to the v1.25.8 release, and added `AGENTS.md`, `CLAUDE.md` and this file.

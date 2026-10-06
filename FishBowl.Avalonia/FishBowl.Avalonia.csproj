@@ -18,6 +18,7 @@
     <Compile Include="../FishBowl.Model.cs" Link="Shared/FishBowl.Model.cs" />
     <EmbeddedResource Include="../FishBowl.png" LogicalName="FishBowl.png" />
     <EmbeddedResource Include="../FishBowl.ico" LogicalName="FishBowl.ico" />
+    <Compile Include="../FishBowl.Library.cs" Link="Shared/FishBowl.Library.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.22" />

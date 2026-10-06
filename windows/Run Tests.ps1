@@ -1,4 +1,4 @@
-﻿param([switch]$FullVisual)
+param([switch]$FullVisual)
 $ErrorActionPreference = 'Stop'
 $fixture = Join-Path $env:TEMP ('FB-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
@@ -8,7 +8,7 @@ $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
 Push-Location $fixture
 try {
- foreach ($testName in @('IntegrationTests','NextRegressionTests','RecognitionTests','AzaharStorageTests','VisualRegressionTests','VisualMatrixTests','EmulatorEditorTests','SmoothUiTests','PopupCloseTests','PopupPositionTests','PopupAnimationTests')) {
+ foreach ($testName in @('LibraryEditTests','RemovalTests','IntegrationTests','NextRegressionTests','RecognitionTests','AzaharStorageTests','VisualRegressionTests','VisualMatrixTests','EmulatorEditorTests','SmoothUiTests','PopupCloseTests','PopupPositionTests','PopupAnimationTests')) {
   Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('Tests\' + $testName + '.cs')) -Destination $fixture
   & $compiler /nologo /r:FishBowl.exe /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/out:$testName.exe" "$testName.cs"
   if ($LASTEXITCODE -ne 0) { throw "$testName compilation failed." }
@@ -18,14 +18,25 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "$testName failed." }
  }
  foreach ($legacyTest in @('AdditionTests','CompactTests','CosmeticTests','UserToolsTests','PolishTests','AuditTests','HubTests','ImmersionTests','FluidTests','TextFieldTests','RowPaintTests','PauseAnimationTests')) {
-  Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('Tests\' + $legacyTest + '.cs')) -Destination $fixture
+  $legacyFixture = $fixture
+  if ($legacyTest -eq 'CosmeticTests') {
+   # Appearance fixtures must not inherit settings changed by earlier test executables.
+   $legacyFixture = Join-Path $fixture 'cosmetic-isolated'
+   New-Item -ItemType Directory -Path $legacyFixture -Force | Out-Null
+   Copy-Item -LiteralPath (Join-Path $fixture 'FishBowl.exe') -Destination $legacyFixture
+   Set-Content -LiteralPath (Join-Path $legacyFixture 'portable.flag') -Value ''
+  }
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('Tests\' + $legacyTest + '.cs')) -Destination $legacyFixture
+  Push-Location $legacyFixture
+  try {
   & $compiler /nologo /r:FishBowl.exe /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/out:$legacyTest.exe" "$legacyTest.cs"
   if ($LASTEXITCODE -ne 0) { throw "$legacyTest compilation failed." }
   $legacyArgs = @()
   if ($legacyTest -eq 'CompactTests') { $legacyArgs += 'current-menus.txt' }
   if ($legacyTest -eq 'PauseAnimationTests') { $legacyArgs += '--pause-ui-animation' }
-  & (Join-Path $fixture ($legacyTest + '.exe')) @legacyArgs
+  & (Join-Path $legacyFixture ($legacyTest + '.exe')) @legacyArgs
   if ($LASTEXITCODE -ne 0) { throw "$legacyTest failed." }
+  } finally { Pop-Location }
  }
  Write-Output "Test fixtures and previews: $fixture"
 } finally { Pop-Location }

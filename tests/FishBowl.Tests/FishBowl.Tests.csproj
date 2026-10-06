@@ -12,5 +12,6 @@
     <Compile Include="../../FishBowl.Platform.cs" Link="Shared/FishBowl.Platform.cs" />
     <Compile Include="../../FishBowl.Model.cs" Link="Shared/FishBowl.Model.cs" />
     <Compile Include="CoreTests.cs" />
+    <Compile Include="../../FishBowl.Library.cs" Link="Shared/FishBowl.Library.cs" />
   </ItemGroup>
 </Project>
