@@ -181,7 +181,7 @@ namespace EmulatorHub
                 foreach (var file in Directory.EnumerateFiles(dir)) {
                     Guid id; string name = Path.GetFileNameWithoutExtension(file);
                     bool generated = Guid.TryParseExact(name, "N", out id) || (name.Length == 53 && name[20] == '-' && name.Substring(0, 20).All(c => Uri.IsHexDigit(c)) && Guid.TryParseExact(name.Substring(21), "N", out id));
-                    if (generated && !referenced.Contains(Path.GetFullPath(file)) && (File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) files.Add(file);
+                    if (generated && !referenced.Contains(Path.GetFullPath(file)) && (File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) files.Add(Path.GetFullPath(file));
                 }
             }
             return files;
