@@ -12,6 +12,9 @@ namespace EmulatorHub
 	public static class TextFit
 	{
 		private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Form, object> scaled = new System.Runtime.CompilerServices.ConditionalWeakTable<Form, object>();
+        // Lets the offscreen audit exercise a smaller desktop without changing the user's display.
+        public static Rectangle? WorkingAreaOverride;
+        private static Rectangle WorkingArea(Form form) { return WorkingAreaOverride ?? Screen.FromControl(form).WorkingArea; }
 
 		public static void FitLabels(Form form)
 		{
@@ -23,7 +26,7 @@ namespace EmulatorHub
             FitContainers(form);
             if (!form.TopLevel) { form.MinimumSize = Size.Empty; return; }
 			if (grown <= 0) return;
-			Rectangle area = Screen.FromControl(form).WorkingArea;
+			Rectangle area = WorkingArea(form);
 			int height = Math.Min(form.ClientSize.Height + grown, area.Height - (form.Height - form.ClientSize.Height));
 			if (height < form.ClientSize.Height + grown) form.AutoScroll = true;
 			if (form.MinimumSize.Height > 0 && form.MinimumSize.Height < form.Height + grown) form.MinimumSize = new Size(form.MinimumSize.Width, Math.Min(form.MinimumSize.Height + grown, area.Height));
@@ -40,7 +43,7 @@ namespace EmulatorHub
 			scaled.Add(form, true);
 			int positioned = form.Controls.Cast<Control>().Count(c => c.Dock == DockStyle.None && !(c is TableLayoutPanel) && !(c is FlowLayoutPanel));
 			if (positioned < 3 || form.Controls.Cast<Control>().Any(c => c.Dock == DockStyle.Fill && (c is TableLayoutPanel || c is FlowLayoutPanel))) return;
-			Rectangle area = Screen.FromControl(form).WorkingArea;
+			Rectangle area = WorkingArea(form);
 			float factor = NextUi.TextPercent / 100f;
 			factor = Math.Min(factor, Math.Min(area.Width * 0.95f / Math.Max(1, form.Width), area.Height * 0.95f / Math.Max(1, form.Height)));
 			if (factor <= 1.01f) return;
@@ -63,14 +66,18 @@ namespace EmulatorHub
             var flow = root as FlowLayoutPanel;
             if (flow != null) {
                 foreach (ButtonBase button in flow.Controls.OfType<ButtonBase>()) button.Width = Math.Max(button.Width, Need(button));
+                if (!flow.WrapContents && flow.ClientSize.Width > 0 && flow.Controls.Cast<Control>().Any(c => (c.Visible || !flow.Visible) && c.Right + c.Margin.Right > flow.ClientSize.Width - flow.Padding.Right)) {
+                    flow.WrapContents = true;
+                    flow.PerformLayout();
+                }
                 if (flow.Dock == DockStyle.Top || flow.Dock == DockStyle.Bottom || flow.Dock == DockStyle.None) {
-                    int bottom = flow.Controls.Cast<Control>().Where(c => c.Visible).Select(c => c.Bottom + c.Margin.Bottom + flow.Padding.Bottom).DefaultIfEmpty(flow.Height).Max();
+                    int bottom = flow.Controls.Cast<Control>().Where(c => c.Visible || !flow.Visible).Select(c => c.Bottom + c.Margin.Bottom + flow.Padding.Bottom).DefaultIfEmpty(flow.Height).Max();
                     if (bottom > flow.ClientSize.Height) flow.Height += bottom - flow.ClientSize.Height;
                 }
                 var parentTable = flow.Parent as TableLayoutPanel;
                 if (parentTable != null && flow.Dock == DockStyle.Fill) {
                     int row = parentTable.GetRow(flow);
-                    int need = flow.Controls.Cast<Control>().Where(c => c.Visible).Select(c => c.Height + c.Margin.Vertical).DefaultIfEmpty(0).Max() + flow.Padding.Vertical + flow.Margin.Vertical;
+                    int need = flow.Controls.Cast<Control>().Where(c => c.Visible || !flow.Visible).Select(c => c.Bottom + c.Margin.Bottom).DefaultIfEmpty(0).Max() + flow.Padding.Bottom + flow.Margin.Vertical;
                     if (row >= 0 && row < parentTable.RowStyles.Count && parentTable.GetRowHeights()[row] < need) {
                         int delta = need - parentTable.GetRowHeights()[row];
                         parentTable.RowStyles[row] = new RowStyle(SizeType.Absolute, need);
@@ -83,8 +90,9 @@ namespace EmulatorHub
                 var checks = root.Controls.OfType<CheckBox>().ToList();
                 var motion = checks.FirstOrDefault(c => c.Text == "Enable hover and selection motion");
                 var info = checks.FirstOrDefault(c => c.Text == "Show emulator information pane");
-                if (motion != null && info != null && motion.Bounds.IntersectsWith(info.Bounds)) {
-                    int oldBottom = motion.Bottom, delta = info.Bottom + 8 - motion.Top;
+                var icons = checks.FirstOrDefault(c => c.Text == "Show emulator icons");
+                if (motion != null && info != null && (motion.Bounds.IntersectsWith(info.Bounds) || icons != null && motion.Bounds.IntersectsWith(icons.Bounds))) {
+                    int oldBottom = motion.Bottom, delta = Math.Max(info.Bottom, icons == null ? 0 : icons.Bottom) + 8 - motion.Top;
                     motion.Top += delta;
                     foreach (Control other in root.Controls) if (other != motion && other.Top >= oldBottom) other.Top += delta;
                 }
@@ -121,6 +129,10 @@ namespace EmulatorHub
             }
             // Header panels contain a title followed by an instruction. Keep their spacing at larger fonts.
             if (root is Panel && !(root is TableLayoutPanel) && !(root is FlowLayoutPanel)) {
+                if (root.Dock == DockStyle.Top) foreach (Label caption in root.Controls.OfType<Label>().Where(l => l.Dock == DockStyle.Fill)) {
+                    int needed = TextRenderer.MeasureText(caption.Text, caption.Font, new Size(Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal - caption.Margin.Horizontal), int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl).Height;
+                    root.Height = Math.Max(root.Height, needed + caption.Padding.Vertical + root.Padding.Vertical + caption.Margin.Vertical);
+                }
                 var labels = root.Controls.OfType<Label>().Where(l => l.Visible && l.Dock == DockStyle.None).OrderBy(l => l.Top).ToArray();
                 for (int i = 1; i < labels.Length; i++) if (labels[i].Top < labels[i - 1].Bottom + 4 && labels[i].Left < labels[i - 1].Right) {
                     int oldBottom = labels[i].Bottom, delta = labels[i - 1].Bottom + 4 - labels[i].Top;
@@ -141,6 +153,24 @@ namespace EmulatorHub
 				if (child.HasChildren && !(child is FlowLayoutPanel)) FitRows(child);
 			if (container is FlowLayoutPanel || container is TableLayoutPanel) return;
 			int edge = container.ClientSize.Width - 8;
+            foreach (Label label in container.Controls.OfType<Label>().Where(l => l.Visible && l.Dock == DockStyle.None && !l.AutoSize && !l.Text.Contains(" ") && !l.Text.Contains("\n")))
+                label.Width = Math.Max(label.Width, TextRenderer.MeasureText(label.Text, label.Font).Width + label.Padding.Horizontal + 4);
+            if (container is Form) {
+                var labels = container.Controls.OfType<Label>().Where(l => l.Visible && l.Dock == DockStyle.None).OrderBy(l => l.Top).ToList();
+                for (int i = 1; i < labels.Count; i++) {
+                    var previous = labels[i - 1]; var current = labels[i];
+                    if (current.Top <= previous.Top + 8 || current.Top >= previous.Bottom + 4 || current.Left >= previous.Right || current.Right <= previous.Left) continue;
+                    int oldBottom = current.Bottom, delta = previous.Bottom + 6 - current.Top;
+                    foreach (Control sibling in container.Controls) if (sibling != current && sibling.Dock == DockStyle.None && sibling.Top >= oldBottom) sibling.Top += delta;
+                    current.Top += delta;
+                }
+                foreach (ButtonBase button in container.Controls.OfType<ButtonBase>().Where(b => b.Visible && b.Dock == DockStyle.None && Need(b) > b.Width)) {
+                    var field = container.Controls.OfType<TextBox>().FirstOrDefault(t => t.Dock == DockStyle.None && t.Left < button.Left && t.Top < button.Bottom && t.Bottom > button.Top);
+                    if (field == null) continue;
+                    button.Width = Need(button); button.Left = Math.Min(button.Left, edge - button.Width - 8);
+                    field.Width = Math.Max(80, button.Left - field.Left - 8);
+                }
+            }
 			foreach (Label label in container.Controls.OfType<Label>())
 				if (label.Visible && label.AutoSize && label.Dock == DockStyle.None && label.Right > edge && label.Left < edge - 40)
 					label.MaximumSize = new Size(edge - label.Left, 0);
@@ -177,7 +207,19 @@ namespace EmulatorHub
 			var gaps = new List<int>();
 			for (int i = 1; i < group.Count; i++) gaps.Add(Math.Max(6, fromRight ? group[i - 1].Left - group[i].Right : group[i].Left - group[i - 1].Right));
 			int total = widths.Sum() + gaps.Sum();
-			if (fromRight ? group[0].Right - total < limit : group[0].Left + total > limit) return;
+            if (fromRight ? group[0].Right - total < limit : group[0].Left + total > limit) {
+                if (fromRight) return;
+                int start = group[0].Left, top = group.Min(b => b.Top), oldBottom = group.Max(b => b.Bottom), rowHeight = group.Max(b => b.Height) + 8, wrapX = start;
+                if (limit - start < widths.Max()) return;
+                for (int i = 0; i < group.Count; i++) {
+                    if (wrapX + widths[i] > limit && wrapX > start) { wrapX = start; top += rowHeight; }
+                    group[i].SetBounds(wrapX, top, widths[i], group[i].Height); wrapX += widths[i] + 8;
+                }
+                int delta = group.Max(b => b.Bottom) - oldBottom;
+                var parent = group[0].Parent;
+                foreach (Control other in parent.Controls) if (!group.Contains(other as ButtonBase) && other.Dock == DockStyle.None && other.Top >= oldBottom && (other.Anchor & AnchorStyles.Bottom) == 0) other.Top += delta;
+                return;
+            }
 			int x = fromRight ? group[0].Right : group[0].Left;
 			for (int i = 0; i < group.Count; i++)
 			{

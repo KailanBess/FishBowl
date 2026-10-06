@@ -18,6 +18,7 @@ This produces `FishBowl.exe` and `FishBowl Setup.exe` in this folder. Releases a
 & ".\Run Tests.ps1"               # regression tests in Tests\, run against a temporary portable library
 & ".\Run Tests.ps1" -FullVisual   # also renders the full set of interface previews
 & ".\Run Overflow Audit.ps1"      # reports text that doesn't fit, at 100%, 150% and 200% text size
+& ".\Run Overflow Audit.ps1" -Compact # repeats the audit with a 1024x720 desktop
 ```
 
 Run `Build.ps1` first. The tests never open or modify your real library, games or saves.

@@ -19,15 +19,18 @@ class OverflowAudit {
  static readonly List<string> skipped = new List<string>();
  static readonly BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
  static LibraryData data;
+ static bool compact;
 
  static void Pump(int ms) { var w = Stopwatch.StartNew(); while (w.ElapsedMilliseconds < ms) { Application.DoEvents(); System.Threading.Thread.Sleep(5); } }
 
  [STAThread]
  static int Main(string[] args) {
   string output = Path.GetFullPath(args.Length > 0 ? args[0] : "overflow-audit"); Directory.CreateDirectory(output);
+  compact = args.Contains("--compact");
+  if (compact) TextFit.WorkingAreaOverride = new Rectangle(0, 0, 1024, 720);
   Application.EnableVisualStyles(); Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
   Application.ThreadException += (s, e) => skipped.Add("UI exception: " + e.Exception.Message);
-  Console.WriteLine("Audit working area: " + Screen.PrimaryScreen.WorkingArea);
+   Console.WriteLine("Audit working area: " + (TextFit.WorkingAreaOverride ?? Screen.PrimaryScreen.WorkingArea));
   using (var font = new Font("Bahnschrift", 8f)) Console.WriteLine("Audit font: " + font.Name);
   data = Fixture();
   var dialogs = typeof(MainForm).Assembly.GetTypes().Where(t => typeof(Form).IsAssignableFrom(t) && !t.IsAbstract && t != typeof(MainForm) && t.IsPublic).OrderBy(t => t.Name).ToList();
@@ -59,7 +62,7 @@ class OverflowAudit {
  static void AuditMain(int percent, string output) {
   MainForm main = null;
   try {
-   main = new MainForm(true); main.ShowInTaskbar = false; main.StartPosition = FormStartPosition.Manual; main.Location = new Point(-4000, -4000); main.Size = new Size(1280, 800);
+   main = new MainForm(true); main.ShowInTaskbar = false; main.StartPosition = FormStartPosition.Manual; main.Location = new Point(-4000, -4000); main.Size = compact ? new Size(1024, 720) : new Size(1280, 800);
    main.Show(); Pump(600);
    var tabs = typeof(MainForm).GetField("workspaceNavigation", flags);
    var navigation = tabs == null ? null : tabs.GetValue(main) as TabControl;
@@ -78,6 +81,7 @@ class OverflowAudit {
   try {
    form = Create(type);
    if (form == null) { if (percent == 100) skipped.Add(type.Name + ": no constructor the audit can satisfy"); return; }
+   if (compact) { form.MinimumSize = new Size(Math.Min(form.MinimumSize.Width, 1024), Math.Min(form.MinimumSize.Height, 720)); form.MaximumSize = new Size(1024, 720); }
    form.ShowInTaskbar = false; form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-4000, -4000);
    form.Show(); Pump(400);
    Audit(form, type.Name, percent, output);
@@ -141,7 +145,7 @@ class OverflowAudit {
     using (var g = Graphics.FromImage(bitmap)) using (var pen = new Pen(Color.Red, 3)) foreach (var c in found) {
      var p = form.PointToClient(c.PointToScreen(Point.Empty)); g.DrawRectangle(pen, p.X + offset.X, p.Y + offset.Y, c.Width - 1, c.Height - 1);
     }
-    if (found.Count > 0 || percent == 100) bitmap.Save(Path.Combine(output, Safe(window) + "-" + percent + ".png"));
+    bitmap.Save(Path.Combine(output, Safe(window) + "-" + percent + ".png"));
    }
   } catch (Exception error) { skipped.Add(window + " screenshot at " + percent + "%: " + error.Message); }
  }

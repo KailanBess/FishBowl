@@ -23689,7 +23689,9 @@ namespace EmulatorHub
 				}
 				foreach (Label item2 in control3.Controls.OfType<Label>())
 				{
-					item2.Height = Math.Max((int)(40f * num), item2.Font.Height + 14);
+					int captionWidth = Math.Max(1, control3.Width - control3.Padding.Horizontal - item2.Padding.Horizontal);
+					int captionHeight = TextRenderer.MeasureText(item2.Text, item2.Font, new Size(captionWidth, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl).Height;
+					item2.Height = Math.Max((int)(40f * num), captionHeight + 14);
 				}
 				int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - 2);
 				foreach (Control control4 in flowLayoutPanel.Controls)
