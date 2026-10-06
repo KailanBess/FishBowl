@@ -1,15 +1,20 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
+#if NETCOREAPP
+using EmulatorHub.Imaging; // Linux stand-ins for the System.Drawing types used here (FishBowl.LinuxShims.cs)
+#else
+using System.Drawing;
+using System.Drawing.Imaging;
+#endif
 
+// Game identification from local metadata (titles, title IDs, platforms and icons), shared by the Windows and
+// Linux builds. Keep it C# 5 compatible. Windows uses System.Drawing; Linux uses the stand-ins in FishBowl.LinuxShims.cs.
 namespace EmulatorHub
 {
     public sealed class RecognizedGame : IDisposable
@@ -79,7 +84,9 @@ namespace EmulatorHub
                         if (!string.IsNullOrWhiteSpace(v.ProductName)) { r.Title = v.ProductName; r.Source = "Program metadata"; }
                         r.Developer = v.CompanyName;
                     }
+#if !NETCOREAPP
                     using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(path)) if (icon != null) r.Icon = icon.ToBitmap();
+#endif
                 }
                 else if (ext == ".nds" || ext == ".smdh" || ext == ".cia" || ext == ".3ds" || ext == ".cci" || ext == ".cxi" || ext == ".app" || ext == ".ncch" || ext == ".pkg" || ext == ".gba" || ext == ".gb" || ext == ".gbc" || ext == ".z64" || ext == ".n64" || ext == ".v64" || ext == ".iso" || ext == ".gcm")
                 {
@@ -368,8 +375,7 @@ namespace EmulatorHub
             if (Is3ds(e))
             {
                 // Save backup overrides must not replace the emulator's active SD storage.
-                var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
-                var active = serializer.Deserialize<EmulatorProfile>(serializer.Serialize(e));
+                var active = Json.Deserialize<EmulatorProfile>(Json.Serialize(e, 16 * 1024 * 1024), 16 * 1024 * 1024);
                 active.InGameSaveFolder = "";
                 if (Regex.IsMatch(e.Executable ?? "", @"(?i)azahar[\s_-]*plus")) active.Preset = "Azahar Plus";
                 try { roots.AddRange(detector.Detect(active).Where(f => f.Property == "InGameSaveFolder").Select(f => f.Path)); } catch (IOException) { }
@@ -512,58 +518,6 @@ namespace EmulatorHub
                 throw new IOException("Remove install flags from the launch arguments. FishBowl launches the installed 3DS content directly.");
             string template = (arguments ?? "").Replace("\"{game}\"", "{game}");
             return template.Contains("{game}") ? template.Replace("{game}", "\"" + installed + "\"") : template + " \"" + installed + "\"";
-        }
-    }
-
-    public static class SmoothPainting
-    {
-        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> enabled = new System.Runtime.CompilerServices.ConditionalWeakTable<Control, object>();
-        static readonly System.Reflection.PropertyInfo buffered = typeof(Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        public static void Enable(Control control)
-        {
-            if (!(control is Panel || control is UserControl || control is ListView)) return;
-            object marker;
-            if (enabled.TryGetValue(control, out marker)) return;
-            buffered.SetValue(control, true, null);
-            enabled.Add(control, new object());
-        }
-    }
-
-    public static class ConsistentInputs
-    {
-        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> watched = new System.Runtime.CompilerServices.ConditionalWeakTable<Control, object>();
-        public static void Watch(Control c, Action<Control> style)
-        {
-            object marker;
-            if (watched.TryGetValue(c, out marker)) return;
-            watched.Add(c, new object());
-            c.ControlAdded += delegate(object sender, ControlEventArgs e) { style(e.Control); };
-        }
-        public static void Style(Control c)
-        {
-            var text = c as TextBoxBase;
-            if (text != null)
-            {
-                text.BorderStyle = BorderStyle.FixedSingle;
-                text.BackColor = FishBowlPalette.DeepSeaSurface;
-                text.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, text.BackColor);
-                // Preserve native caret, selection, scrollbars and DPI sizing; no clipping regions.
-                if (text.Region != null) { var old = text.Region; text.Region = null; old.Dispose(); }
-            }
-            var tabs = c as FishBowlTabs;
-            if (tabs != null)
-            {
-                tabs.LegacyHeaders = true;
-                tabs.SurfaceColor = FishBowlPalette.ThemeTop;
-                tabs.HeaderTextColor = FishBowlPalette.ThemeInk;
-                tabs.AccentColor = FishBowlPalette.IconAccent;
-            }
-            if (c is TabPage)
-            {
-                c.BackColor = FishBowlPalette.DeepSeaSurface;
-                c.ForeColor = FishBowlPalette.ThemeInk;
-                ((TabPage)c).UseVisualStyleBackColor = false;
-            }
         }
     }
 }

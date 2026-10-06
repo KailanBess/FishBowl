@@ -16,7 +16,6 @@ _Last updated: 2026-10-06, by the Windows side._
 
 | PR | What | Notes |
 | --- | --- | --- |
-| #9 | Linux easter egg (Tux in the banner) | Linux only. |
 | #15 | Windows 1.25.11 library recovery and layout fixes | Includes 1.25.9 removal and 1.25.10 title/cover fixes; needs Linux UI port and review. |
 
 ## Windows change awaiting review
@@ -27,7 +26,7 @@ Shared changes: `GameEntry.RequiresEmulatorAssignment`, `LibraryData.RemovalHist
 
 Undo retains the last 20 removal batches across restarts. It skips conflicts with re-added entries and retains partially recovered batches, protects newer emulator assignments, and leaves game/save/executable files untouched. Cleanup is manual, reviewed, and limited to generated files in managed artwork folders. References in the active library, inactive profiles, undo history and readable local backup/restore libraries are protected; an unreadable backup blocks cleanup. Root repair matches exact relative paths rather than guessing titles.
 
-Validation: Windows app/installer build, full regression runner (2,738 checks including 43 recovery checks), 62 general dialog previews plus reassignment prompts at 100/150/200% text size, and Framework C# 5 shared compilation. The expanded overflow audit covers six previously skipped dialogs; only the generic background-worker form remains outside the constructor fixture. Normal and compact desktop checks reported zero clipping or overlap findings at 100%, 150% and 200% text size. Use `Run Overflow Audit.ps1 -Compact` to reproduce the 1024x720 desktop check. Audit screenshots now include every text size. Windows fixture roots are normalized so long and short temporary path names produce equivalent expectations. The runner prints each test name, captures its output and limits each executable to three minutes (ten with FullVisual) so an unattended modal cannot stall CI indefinitely. Linux/Avalonia build, core tests and schema preservation passed on CI; final Windows CI confirmation remains pending.
+Validation: Windows app/installer build, full regression runner (2,738 checks including 43 recovery checks), 62 general dialog previews plus reassignment prompts at 100/150/200% text size, and Framework C# 5 shared compilation. The expanded overflow audit covers six previously skipped dialogs; only the generic background-worker form remains outside the constructor fixture. Normal and compact desktop checks reported zero clipping or overlap findings at 100%, 150% and 200% text size. Use `Run Overflow Audit.ps1 -Compact` to reproduce the 1024x720 desktop check. Audit screenshots now include every text size. Windows fixture roots are normalized so long and short temporary path names produce equivalent expectations. The runner prints each test name, captures its output and limits each executable to three minutes (ten with FullVisual) so an unattended modal cannot stall CI indefinitely. Linux/Avalonia build, core tests and schema preservation passed on CI; Windows CI also passed all 2,738 checks before integrating the newly merged shared game recognizer. The combined-source checks are pending.
 
 ## Known issues
 
@@ -59,13 +58,15 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 
 ## Next steps (Linux parity)
 
-1. **Move Windows non-UI logic into shared files:** game recognition, library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
+1. **Move Windows non-UI logic into shared files:** game recognition (done: `FishBowl.GameRecognition.cs`), then library tools, play sessions and save snapshots. Do it one piece at a time, with both builds compiling each shared file.
 2. **Build Linux screens on that shared logic:** Home, Library, game details, profiles and living-room mode.
 3. **Finish and submit the Linux-only features above.**
 
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-06 (shared recognizer integration):** merged main after #14 landed, retaining the shared game identification and Linux PNG helpers alongside Windows recovery/layout changes. Build/test projects include both recognition and recovery helpers. Explicit library titles remain protected in the shared recognizer. Released Windows version remains 1.25.8 pending review.
 
 - **2026-10-06 (Windows restore loop):** reproduced the stall locally at 1024x720. Emulator column resizing re-entered while native scrollbars changed; the update is now guarded, applies only changed widths and uses the existing proportions without a conflicting native autosize call. Normal/compact native text checks cover repeated maximize, restore and full-screen transitions. The runner executes both desktop variants, for 2,738 total checks.
 
@@ -88,6 +89,8 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 
 - **2026-10-06 (Windows):** prepared 1.25.10 library title/cover fixes and 1.25.9 removal actions on `fix-library-title-artwork`. Added shared optional fields/helpers and editing/removal regression checks. Linux needs matching UI actions; the released version remains 1.25.8 until review and release.
 - **2026-10-06:**
+  - Shared game identification: `windows/GameRecognition.cs` moved to the root as `FishBowl.GameRecognition.cs` and is compiled by both builds. Its WinForms helpers (`SmoothPainting`, `ConsistentInputs`) moved to `windows/FishBowl.InputPainting.cs`. Linux uses `FishBowl.LinuxShims.cs` for the `System.Drawing` types (built-in PNG encoder). Fixed Linux storing its library in the current directory when `~/.local/share` doesn't exist yet.
+  - Merged #8 (shared data model), #9 (Tux easter egg), #11 (text overflow fixes; Windows build now compiles `windows/FishBowl.TextFit.cs`) and #12 (README, tidy-up, handoff). Published release v1.25.8.
   - Rewrote the README and tidied the repository: removed superseded source and test files, the old root `FishBowl.cs`, and obsolete review notes.
   - Moved the Windows binaries to the v1.25.8 release, and added `AGENTS.md`, `CLAUDE.md` and this file.
   - Opened #11 (text overflow) and #9 (Tux easter egg). Filed #10.

@@ -22,9 +22,11 @@ namespace EmulatorHub
     {
         private static readonly string PortableMarker = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "portable.flag");
         public static bool PortableMode { get { return File.Exists(PortableMarker); } }
-        public static string DataDirectory { get { return PortableMode ? System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FishBowlData") : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FishBowl"); } }
+        // DoNotVerify: otherwise .NET returns "" when the folder does not exist yet (possible on a fresh Linux account),
+        // which would put library.json in the current directory.
+        public static string DataDirectory { get { return PortableMode ? System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FishBowlData") : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify), "FishBowl"); } }
         public static string FileName { get { return System.IO.Path.Combine(DataDirectory, "library.json"); } }
-        private static readonly string LegacyFileName = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EmulatorHub", "library.json");
+        private static readonly string LegacyFileName = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify), "EmulatorHub", "library.json");
         // Shows a warning to the user; each front end supplies its own message box.
         public static Action<string> ShowWarning = delegate { };
 
@@ -304,7 +306,7 @@ namespace EmulatorHub
         private string program;
         public string Notice { get; private set; }
         public EmulatorFolderDetector() : this(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify),
             Platform.Documents, Platform.IsWindows) { }
         public EmulatorFolderDetector(string roamingPath, string localPath, string documentsPath, bool registry)
             : this(roamingPath, localPath, documentsPath, registry, Platform.Home, Platform.ConfigHome, Platform.DataHome, Platform.CacheHome) { }

@@ -11,7 +11,10 @@
     <Compile Include="../../FishBowl.Core.cs" Link="Shared/FishBowl.Core.cs" />
     <Compile Include="../../FishBowl.Platform.cs" Link="Shared/FishBowl.Platform.cs" />
     <Compile Include="../../FishBowl.Model.cs" Link="Shared/FishBowl.Model.cs" />
+    <Compile Include="../../FishBowl.GameRecognition.cs" Link="Shared/FishBowl.GameRecognition.cs" />
+    <Compile Include="../../FishBowl.LinuxShims.cs" Link="Shared/FishBowl.LinuxShims.cs" />
     <Compile Include="CoreTests.cs" />
     <Compile Include="../../FishBowl.Library.cs" Link="Shared/FishBowl.Library.cs" />
+    <Compile Include="RecognitionTests.cs" />
   </ItemGroup>
 </Project>
