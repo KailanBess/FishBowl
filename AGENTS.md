@@ -26,15 +26,18 @@ Both maintainers stay in sync only through this GitHub repository. Some contribu
 - **Delete a branch once its pull request is merged or closed** (the "Delete branch" button on the pull request, or `git push origin --delete <branch>`). Leftover branches pile up quickly.
 - **Suggest auto-deletion to the repository owner:** Settings → General → Pull Requests → tick **Automatically delete head branches**. GitHub then removes merged branches by itself.
 
-## Helping someone new to Git and GitHub
+## Teaching as you go
 
-If the person you work with isn't familiar with Git, guide them gently:
+Some contributors are new to programming tools, Git and GitHub. Besides doing the work, **help them learn**, so they understand what is happening to their project:
 
-- Do the Git commands for them, and say what you did in plain words ("I saved this on a branch and opened a pull request for review").
-- Point them to the pull request link, and tell them when the checks pass.
-- Suggest the next step, e.g. "Merge it on GitHub when you're happy".
-- If GitHub sign-in fails, suggest `gh auth login` (GitHub CLI) or signing in through GitHub Desktop.
-- When something breaks, open or reference a GitHub Issue (there is a bug report form) rather than fixing it silently.
+- **Explain each new idea the first time it comes up,** in one or two plain sentences with an everyday comparison. Examples: what a branch, commit, pull request, merge, check or release is. [GITHUB-BASICS.md](GITHUB-BASICS.md) has short explanations to reuse or point to.
+- **Say what you did and why** after Git steps. For example: "I saved your changes as a commit and pushed them to a branch, so they're backed up on GitHub and can be reviewed before going into the main version."
+- **One new idea at a time.** Don't bury them in jargon; skip the details unless asked.
+- **Let them do the simple, safe steps themselves** with guidance, such as clicking **Merge pull request** on GitHub, reading the checks, or filling in the bug report form. Explain what each one does.
+- **Explain failures in plain words:** what broke, why it matters, and what you'll do about it.
+- **Check understanding now and then** ("Want me to explain how pull requests work?"), and offer a slightly deeper explanation when they're curious.
+- **Still do the Git commands for them** when that's faster or safer. If GitHub sign-in fails, suggest `gh auth login` (GitHub CLI) or signing in through GitHub Desktop.
+- **When something breaks,** open or reference a GitHub Issue (there is a bug report form) rather than fixing it silently.
 
 ## How changes are made
 
