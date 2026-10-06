@@ -195,6 +195,8 @@ namespace EmulatorHub
 
 		private static int Need(ButtonBase button)
 		{
+			var action = button as FishBowlActionButton;
+			if (action != null && action.IconOnly) return button.Width;
 			var own = button.GetType().GetMethod("TextWidthNeeded");
 			return own != null ? (int)own.Invoke(button, null) : TextRenderer.MeasureText(button.Text, button.Font).Width + 16;
 		}

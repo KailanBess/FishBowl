@@ -49,6 +49,10 @@ try {
   if ($legacyTest -eq 'CompactTests') { $legacyArgs += 'current-menus.txt' }
   if ($legacyTest -eq 'PauseAnimationTests') { $legacyArgs += '--pause-ui-animation' }
   Invoke-FixtureTest (Join-Path $legacyFixture ($legacyTest + '.exe')) $legacyArgs
+  if ($legacyTest -eq 'TextFieldTests') {
+   Write-Output 'Running TextFieldTests (1024x720 desktop)'
+   Invoke-FixtureTest (Join-Path $legacyFixture ($legacyTest + '.exe')) @('--compact')
+  }
   } finally { Pop-Location }
  }
  Write-Output "Test fixtures and previews: $fixture"

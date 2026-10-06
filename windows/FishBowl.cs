@@ -347,6 +347,9 @@ namespace EmulatorHub
 			}
 			RefreshHub();
 			ApplyVisualScale();
+			Rectangle desktop = TextFit.WorkingAreaOverride ?? Screen.FromControl(this).WorkingArea;
+			MinimumSize = new Size(Math.Min(MinimumSize.Width, desktop.Width), Math.Min(MinimumSize.Height, desktop.Height));
+			Size = new Size(Math.Min(Width, desktop.Width), Math.Min(Height, desktop.Height));
 			InitializeEnhancements(isolatedPreview);
 			InitializeHub(isolatedPreview);
 			FishBowlPalette.StyleWindow(this);
@@ -2897,19 +2900,18 @@ namespace EmulatorHub
 
 		private void ResizeEmulatorColumns()
 		{
-			if (emulatorList.Columns.Count == 4)
+			if (emulatorList.Columns.Count == 4 && !resizingEmulatorColumns)
 			{
+				resizingEmulatorColumns = true;
+				try {
 				int num = Math.Max(1, emulatorList.ClientSize.Width - 4);
-				emulatorList.Columns[0].Width = (int)((double)num * 0.36);
-				emulatorList.Columns[1].Width = (int)((double)num * 0.18);
-				emulatorList.Columns[2].Width = (int)((double)num * 0.29);
-				emulatorList.Columns[3].Width = num - emulatorList.Columns[0].Width - emulatorList.Columns[1].Width - emulatorList.Columns[2].Width;
-				if (emulatorList.IsHandleCreated)
-				{
-					emulatorList.AutoResizeColumn(3, ColumnHeaderAutoResizeStyle.HeaderSize);
-				}
+				int first = (int)(num * 0.36), second = (int)(num * 0.18), third = (int)(num * 0.29);
+				int[] widths = { first, second, third, num - first - second - third };
+				for (int i = 0; i < widths.Length; i++) if (emulatorList.Columns[i].Width != widths[i]) emulatorList.Columns[i].Width = widths[i];
+				} finally { resizingEmulatorColumns = false; }
 			}
 		}
+		private bool resizingEmulatorColumns;
 
 		private ProcessStartInfo EmulatorStartInfo(EmulatorProfile profile)
 		{
@@ -3889,7 +3891,7 @@ namespace EmulatorHub
 					savedNormalBounds = ((base.WindowState == FormWindowState.Normal) ? base.Bounds : base.RestoreBounds);
 					base.FormBorderStyle = FormBorderStyle.None;
 					base.WindowState = FormWindowState.Normal;
-					base.Bounds = Screen.FromControl(this).Bounds;
+					base.Bounds = TextFit.WorkingAreaOverride ?? Screen.FromControl(this).Bounds;
 					fullScreen = true;
 					SetStatus("Full-screen mode. Press F11 to return.");
 				}
@@ -16961,9 +16963,10 @@ namespace EmulatorHub
 				return;
 			}
 			int need = TextWidthNeeded();
-			if (base.Width < need && base.Parent is FlowLayoutPanel && base.Dock == DockStyle.None && !base.AutoSize)
+			int fittedWidth = base.MaximumSize.Width > 0 ? Math.Min(need, base.MaximumSize.Width) : need;
+			if (base.Width < fittedWidth && base.Parent is FlowLayoutPanel && base.Dock == DockStyle.None && !base.AutoSize)
 			{
-				base.Width = need;
+				base.Width = fittedWidth;
 			}
 			clippedTip.SetToolTip(this, base.Width < need ? Text : null);
 		}
