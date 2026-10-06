@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -10,193 +10,13 @@ using System.Net;
 // OS-specific behaviour belongs in FishBowl.Platform.cs.
 namespace EmulatorHub
 {
-    public class EmulatorProfile
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Preset { get; set; }
-        public string Executable { get; set; }
-        public string IconPath { get; set; }
-        public List<string> Extensions { get; set; }
-        public string Arguments { get; set; }
-        public string ScanFolder { get; set; }
-        public string SaveFolder { get; set; } // Preserved legacy shortcut.
-        public string InGameSaveFolder { get; set; }
-        public string SaveStateFolder { get; set; }
-        public string BannerPath { get; set; }
-        public string AccentColor { get; set; }
-        public string LastGameFolder { get; set; }
-        public List<LaunchProfile> LaunchProfiles { get; set; }
-        public string ControllerProfileNotes { get; set; }
-        public bool Favorite { get; set; }
-        public string Platform { get; set; }
-        public string Notes { get; set; }
-        public string ManualVersion { get; set; }
-        public string Description { get; set; }
-        public string Strengths { get; set; }
-        public string Limitations { get; set; }
-        public string Requirements { get; set; }
-        public string ControllerInfo { get; set; }
-        public string WebsiteUrl { get; set; }
-        public string DocumentationUrl { get; set; }
-        public string CompatibilityUrl { get; set; }
-        public string ReleasesUrl { get; set; }
-        public string ChangelogUrl { get; set; }
-        public string ControllerGuideUrl { get; set; }
-        public string TroubleshootingUrl { get; set; }
-        public string ConfigFolder { get; set; }
-        public string ScreenshotFolder { get; set; }
-        public string LogFolder { get; set; }
-        public List<EmulatorBuild> Builds { get; set; }
-        public string GitHubRepository { get; set; }
-        public bool IncludePreviewReleases { get; set; }
-        public string LatestReleaseTag { get; set; }
-        public string LatestReleaseUrl { get; set; }
-        public string LatestReleaseNotes { get; set; }
-        public string LastUpdateCheck { get; set; }
-        public string FirmwareFolder { get; set; }
 
-    }
 
-    public class LaunchProfile
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Name { get; set; }
-        public string Arguments { get; set; }
-    }
 
-    public class GameEntry
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Id { get; set; }
-        public string EmulatorId { get; set; }
-        public string Title { get; set; }
-        public string Path { get; set; }
-        public string ArtworkPath { get; set; }
-        public string Arguments { get; set; }
-        public string Notes { get; set; }
-        public string PreferredEmulatorId { get; set; }
-        public bool Favorite { get; set; }
-        public string AddedAt { get; set; }
-        public string LastLaunched { get; set; }
-        public int LaunchCount { get; set; }
-        public List<string> Tags { get; set; }
-        public string Genre { get; set; }
-        public string Developer { get; set; }
-        public string Description { get; set; }
-        public string ReleaseYear { get; set; }
-        public long TotalPlaySeconds { get; set; }
-    }
 
-    public class WebsiteLink
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Url { get; set; }
-    }
 
-    public class GameConverter
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string EmulatorId { get; set; }
-        public string InputExtensions { get; set; }
-        public string OutputExtension { get; set; }
-        public string Mode { get; set; }
-        public string Program { get; set; }
-        public string Arguments { get; set; }
-    }
 
-    public class GameCollection
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public List<string> GameIds { get; set; }
-        public bool IsSmart { get; set; }
-        public string SmartRule { get; set; }
-        public int SortOrder { get; set; }
-    }
 
-    public class ThemeSettings
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Name { get; set; }
-        public int AutoBackupDays { get; set; }
-        public string LastBackupAt { get; set; }
-        public bool DiscordRichPresenceEnabled { get; set; }
-        public bool WelcomeComplete { get; set; }
-        public bool ShowStartupAssistant { get; set; }
-        public bool StartupAssistantPreferenceSet { get; set; }
-        public bool StartMaximized { get; set; }
-        public bool AutoSyncGameFolders { get; set; }
-        public bool ConfirmBeforeGameLaunch { get; set; }
-        public int CustomizationVersion { get; set; }
-        public string AccentColor { get; set; }
-        public string FontFamily { get; set; }
-        public int UiScalePercent { get; set; }
-        public string ListDensity { get; set; }
-        public bool ShowBanner { get; set; }
-        public bool ShowStatusBar { get; set; }
-        public bool ShowInformationPanel { get; set; }
-        public bool ShowEmulatorIcons { get; set; }
-        public bool EnableMotion { get; set; }
-        public bool AlternateRowShading { get; set; }
-        public string SelectionContrast { get; set; }
-        public string IconTileShape { get; set; }
-        public bool ShowGameStorageAssistant { get; set; }
-        public bool GameStorageAssistantPreferenceSet { get; set; }
-    }
-
-    public class LibraryData
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public int Version { get; set; }
-        public List<EmulatorProfile> Emulators { get; set; }
-        public List<GameEntry> Games { get; set; }
-        public List<WebsiteLink> Links { get; set; }
-        public List<GameConverter> Converters { get; set; }
-        public List<GameCollection> Collections { get; set; }
-        public ThemeSettings Theme { get; set; }
-        public string BackupFolder { get; set; }
-        public string EmulatorRootDirectory { get; set; }
-        public string GameLibraryRoot { get; set; }
-    }
 
     public static class Store
     {
@@ -890,19 +710,6 @@ namespace EmulatorHub
     }
 
 
-    public class EmulatorBuild
-    {
-#if NETCOREAPP
-        // Preserve optional fields written by newer Windows builds when Linux edits this record.
-        [System.Text.Json.Serialization.JsonExtensionData]
-        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
-#endif
-        public string Id { get; set; }
-        public string Label { get; set; }
-        public string Executable { get; set; }
-        public string ManualVersion { get; set; }
-        public string AddedAt { get; set; }
-    }
     public static class HubPaths
     {
         public static string EmulatorRoot(LibraryData library)
