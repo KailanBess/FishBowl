@@ -27,11 +27,11 @@ Shared changes: `GameEntry.RequiresEmulatorAssignment`, `LibraryData.RemovalHist
 
 Undo retains the last 20 removal batches across restarts. It skips conflicts with re-added entries and retains partially recovered batches, protects newer emulator assignments, and leaves game/save/executable files untouched. Cleanup is manual, reviewed, and limited to generated files in managed artwork folders. References in the active library, inactive profiles, undo history and readable local backup/restore libraries are protected; an unreadable backup blocks cleanup. Root repair matches exact relative paths rather than guessing titles.
 
-Validation: Windows app/installer build, full regression runner (2,694 checks including 43 recovery checks), 62 general dialog previews plus reassignment prompts at 100/150/200% text size, and Framework C# 5 shared compilation. The expanded overflow audit covers six previously skipped dialogs; only the generic background-worker form remains outside the constructor fixture. The expanded text audit reported zero clipping or overlap findings at 100%, 150% and 200% text size. The first 1.25.11 CI run passed Linux/Avalonia build, core tests and schema preservation. Its Windows fixture exposed a short/long path spelling difference in an artwork assertion; candidates and comparisons now use canonical paths. Runner confirmation is pending for the follow-up commit. Linux/Avalonia runtime checks are delegated to CI because no local .NET SDK is available.
+Validation: Windows app/installer build, full regression runner (2,694 checks including 43 recovery checks), 62 general dialog previews plus reassignment prompts at 100/150/200% text size, and Framework C# 5 shared compilation. The expanded overflow audit covers six previously skipped dialogs; only the generic background-worker form remains outside the constructor fixture. The expanded text audit reported zero clipping or overlap findings at 100%, 150% and 200% text size. The first 1.25.11 CI run passed Linux/Avalonia build, core tests and schema preservation. Its Windows fixture exposed a short/long path spelling difference in an artwork assertion; candidates and comparisons now use canonical paths. The follow-up run passed all 43 recovery checks and the multi-disc grouping check, then exposed the same short/long path spelling assumption in the existing automatic-save assertion. That assertion now compares normalized paths too; full runner confirmation is pending. Linux/Avalonia runtime checks are delegated to CI because no local .NET SDK is available.
 
 ## Known issues
 
-- **#10:** source normalization addresses the Windows runner multi-disc grouping failure. Regression coverage now includes short Windows paths, relative paths, source order and repeated/circular playlist references. GitHub runner confirmation is pending for the new commit.
+- **#10:** source normalization addresses the Windows runner multi-disc grouping failure. Regression coverage now includes short Windows paths, relative paths, source order and repeated/circular playlist references. The clean Windows runner now passes this grouping check. The existing integration save assertion also needed normalized path comparison.
 - Linux library recovery and reassignment screens need a matching UI port before platform parity.
 
 ## In progress on the Linux side
@@ -66,6 +66,9 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-06 (Windows CI):** confirmed the multi-disc grouping fix on the clean runner. Normalized artwork candidate returns and replaced literal path spelling comparisons in recovery/save assertions; Linux build, core tests and schema checks passed.
+
 
 - **2026-10-06 (Windows):** prepared 1.25.11 recovery and layout improvements on PR #15 using the existing UI. Added optional shared recovery/root fields, protected artwork cleanup, emulator reassignment and regression/schema coverage. Supersedes the 69-finding overflow baseline from 1.25.10; release stays 1.25.8 pending review and CI.
 
