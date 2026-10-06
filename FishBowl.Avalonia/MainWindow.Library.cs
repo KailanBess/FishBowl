@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -22,7 +22,6 @@ namespace EmulatorHub
         private readonly StackPanel homeCards = new StackPanel { Spacing = 14 };
         private readonly WrapPanel couchCards = new WrapPanel();
         private readonly Dictionary<string, Process> gameProcesses = new Dictionary<string, Process>();
-        private readonly Dictionary<string, Tuple<GameEntry, DateTime, string, string, string>> runningGameSessions = new Dictionary<string, Tuple<GameEntry, DateTime, string, string, string>>();
         private bool rebuildingGames;
         private TabControl libraryPages;
 
@@ -32,7 +31,7 @@ namespace EmulatorHub
             var panel = new DockPanel { Margin = new Thickness(14) };
             var toolbar = Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Import Steam game", ImportSteamLibraryGame), Ui.Action("Edit game", EditLibraryGame),
                 Ui.Action("Play", LaunchLibraryGame), Ui.Action("Remove", RemoveLibraryGame), Ui.Action("Undo removal", UndoLibraryRemoval),
-                Ui.Action("Collections", ManageLibraryCollections), Ui.Action("Profiles", ManageLibraryProfiles),
+                Ui.Action("Collections", ManageLibraryCollections), Ui.Action("Profiles", ManageLibraryProfiles), Ui.Action("Remote couch play", ShowRemoteCouchPlay),
                 Ui.Action("Library repair", RepairLibraryPaths), Ui.Action("Artwork cleanup", CleanupLibraryArtwork), Ui.Action("Library tools", ShowLibraryIntegrations), Ui.Action("Game setup", ShowLibraryGameTools), Ui.Action("Save timeline", ShowLibrarySaveTimeline));
             DockPanel.SetDock(toolbar, Dock.Top); panel.Children.Add(toolbar);
             gameSearch.Watermark = "Search title, platform, tags or notes";
@@ -114,7 +113,7 @@ namespace EmulatorHub
             homeCards.Children.Clear(); couchCards.Children.Clear();
             homeCards.Children.Add(Ui.Text("Home", 24, true));
             homeCards.Children.Add(Ui.Text(library.Games.Count + " games Â· " + library.Emulators.Count + " emulators Â· " + TimeSpan.FromSeconds(library.Games.Sum(g => g.TotalPlaySeconds)).TotalHours.ToString("0.0") + " hours played", 14, false, p.SubtleBrush));
-            homeCards.Children.Add(Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Open library", () => libraryPages.SelectedIndex = 1), Ui.Action("Profiles", ManageLibraryProfiles), Ui.Action("Settings", ShowSettings), Ui.Action("Customize home", CustomizeLibraryHome)));
+            homeCards.Children.Add(Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Open library", () => libraryPages.SelectedIndex = 1), Ui.Action("Profiles", ManageLibraryProfiles), Ui.Action("Appearance", ShowAppearanceHub), Ui.Action("Customize home", CustomizeLibraryHome)));
             foreach (var section in (library.Theme.HomeCardOrder ?? new List<string> { "Recently played", "Favorites" }).Concat(new[] { "Recently played", "Favorites" }).Distinct().Where(s => (s == "Recently played" || s == "Favorites") && !(library.Theme.HiddenHomeCards ?? new List<string>()).Contains(s)))
             {
                 homeCards.Children.Add(Ui.Text(section, 18, true));
@@ -192,7 +191,7 @@ namespace EmulatorHub
         private async Task LaunchGame(GameEntry game)
         {
             if (!File.Exists(game.Path)) { await Ui.Message(this, "The game file is missing. Edit its location or use Library repair."); return; }
-            if (gameProcesses.TryGetValue(game.Id, out var existing) && !existing.HasExited) { await Ui.Message(this, "This game is already running."); return; }
+            if (sessionTrackers.Values.Any(t => t.GameId == game.Id && !t.Finished)) { await Ui.Message(this, "This game is already running."); return; }
             var emulator = library.Emulators.FirstOrDefault(e => e.Id == (game.PreferredEmulatorId ?? game.EmulatorId));
             if (game.RequiresEmulatorAssignment || (emulator == null && !Platform.IsLaunchFile(game.Path)))
             {
@@ -213,36 +212,17 @@ namespace EmulatorHub
             args = args.Select(a => a.Replace("{game}", game.Path)).ToList(); if (emulator != null && installed == null && !hasRom) args.Add(game.Path);
             if (args.Any(a => a.Contains("{") || a.Contains("}"))) throw new IOException("Unsupported argument template. Use {game} for the game path.");
             var info = Platform.StartInfo(program, ""); if (Directory.Exists(game.Extras?.WorkingDirectory)) info.WorkingDirectory = game.Extras.WorkingDirectory; foreach (var argument in args) info.ArgumentList.Add(argument);
+            var beforeLaunch = SessionLedger.ProcessSnapshot();
             var started = DateTime.UtcNow; var process = Process.Start(info); if (process == null) throw new IOException("The game could not be started.");
-            gameProcesses[game.Id] = process; runningGameSessions[game.Id] = Tuple.Create(game, started, program, game.Path, library.UserTools?.ActiveId); LibraryProfiles.ActiveLaunches++; game.LastLaunched = started.ToString("o"); game.LaunchCount++; Store.Save(library); RefreshGameLibrary();
-            process.EnableRaisingEvents = true;
-            process.Exited += delegate { Ui.Post(() => FinishLibraryGameSession(game.Id, false, true)); };
-            process.EnableRaisingEvents = true;
-            if (process.HasExited) Ui.Post(() => FinishLibraryGameSession(game.Id, false, true));
+            StartLibrarySession(game, process, beforeLaunch, started, program);
+            game.LastLaunched = started.ToString("o"); game.LaunchCount++; Store.Save(library); RefreshGameLibrary();
             SetStatus("Started " + game.Title + ".");
-        }
-
-        private void FinishLibraryGameSession(string id, bool closing, bool save)
-        {
-            if (!runningGameSessions.TryGetValue(id, out var session)) return;
-            runningGameSessions.Remove(id); // An already-queued Exited callback cannot finalize this session twice.
-            var ended = DateTime.UtcNow; var seconds = Math.Max(0, (long)(ended - session.Item2).TotalSeconds);
-            session.Item1.TotalPlaySeconds += seconds;
-            if (library.PlaySessions == null) library.PlaySessions = new List<PlaySession>();
-            library.PlaySessions.Add(new PlaySession { Id = Guid.NewGuid().ToString("N"), GameId = id, StartedAt = session.Item2.ToString("o"), EndedAt = ended.ToString("o"), Seconds = seconds, EmulatorPath = session.Item3, DiscPath = session.Item4, Profile = session.Item5, Uncertain = closing, Note = closing ? "FishBowl closed while the launched game was running. Time recorded until FishBowl closed; the game was left running." : "Time recorded for the launched process. Launchers that hand off to another process may end early." });
-            if (gameProcesses.TryGetValue(id, out var process)) { gameProcesses.Remove(id); process.Dispose(); }
-            LibraryProfiles.ActiveLaunches = Math.Max(0, LibraryProfiles.ActiveLaunches - 1);
-            if (save) { Store.Save(library); RefreshGameLibrary(); }
-        }
-        private void FinishLibraryGameSessionsAtClose()
-        {
-            foreach (var id in runningGameSessions.Keys.ToArray()) FinishLibraryGameSession(id, true, false);
-            LibraryProfiles.SaveActive(library); Store.Save(library);
         }
 
         private async Task RemoveLibraryGame()
         {
             var game = SelectedLibraryGame(); if (game == null) return;
+            if (sessionTrackers.Values.Any(t => t.GameId == game.Id && !t.Finished)) { await Ui.Message(this, "Close this game before removing it from the library."); return; }
             if (!await Ui.Confirm(this, "Remove " + game.Title + " from FishBowl? Its file and saves stay where they are. Use Undo removal to restore it.")) return;
             GameLibraryRemoval.RemoveGames(library, new[] { game.Id }); Store.Save(library); RefreshGameLibrary();
         }

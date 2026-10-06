@@ -4,10 +4,12 @@ FishBowl has two front ends that share their data model and emulator logic.
 
 ## Windows (`windows/`)
 
-The Windows application, source version **1.26.2**, is built from:
+The Windows application, source version **1.27.0**, is built from:
 
 - `windows/FishBowl.cs`, `windows/FishBowl.InputPainting.cs` and `windows/FishBowl.TextFit.cs`: the WinForms application
 - `FishBowl.Model.cs` and `FishBowl.GameRecognition.cs` (repository root): the shared data model and game identification
+- `windows/FishBowl.Navigation.cs`, `windows/FishBowl.Sessions.cs` and `windows/FishBowl.RemotePlay.cs`: unified appearance/controller navigation, session UI tracking and the local browser/input bridge
+- `remote-play/client/`: embedded browser media client and the pinned LiveKit SDK, including its license
 
 `windows/FishBowl.Setup.cs` builds the installer. Run `windows/Build.ps1` to build both executables beside the source, and `windows/Run Tests.ps1` to run the regression tests in `windows/Tests/`. Executables are distributed through GitHub Releases, not committed.
 
@@ -34,3 +36,5 @@ It must not compile `windows/FishBowl.cs`. Windows behaviour reaches Linux by mo
 - **Artwork:** `FishBowl.png` and `FishBowl.ico` at the root are used by the Linux app and installer. Windows keeps its own copies in `windows/`.
 
 Shared expansion helpers: `FishBowl.GameTools.cs` (imports, mods, media and history), `FishBowl.Integrations.cs` (catalogs, achievements and companion) and `FishBowl.SaveTools.cs` (verified file save snapshots). Both platforms compile these helpers.
+
+`FishBowl.Sessions.cs` supplies verified process-tree identities and durable, profile-owned journals on both platforms. `FishBowl.Avalonia/LinuxJoystick.cs` decodes existing Linux joystick devices; platform session/controller screens stay in Avalonia. `remote-play/server.mjs` is a separate, private reference token service, not an automatically deployed part of the desktop application. See [remote-play setup](remote-play/README.md).

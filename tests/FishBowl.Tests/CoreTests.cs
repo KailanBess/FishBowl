@@ -1,4 +1,4 @@
-﻿using System; using System.IO; using System.Linq; using System.Collections.Generic; using EmulatorHub;
+using System; using System.IO; using System.Linq; using System.Collections.Generic; using EmulatorHub;
 // Fixture-based checks: every test works in a temporary folder and never touches real emulator data.
 static class T {
   static int fails;
@@ -80,8 +80,10 @@ static class T {
       Check("version from package manager", (Platform.ProgramVersion("/usr/bin/sleep") ?? "").Contains("coreutils"));
     Check("system scan runs", EmulatorDiscovery.ScanSystem(tok) != null);
     SaveToolsTests.Run(root, Check);
+    SessionTests.Run(root, Check);
     Directory.Delete(root, true);
     RecognitionTests.Run(Check);
+    ControllerInputTests.Run(Check);
     Console.WriteLine(fails == 0 ? "ALL PASSED" : fails + " FAILED");
     return fails == 0 ? 0 : 1;
   }

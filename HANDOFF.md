@@ -8,13 +8,21 @@ _Last updated: 2026-10-06, expansion integration._
 
 | | State |
 | --- | --- |
-| Windows | Source **1.26.2** on `fishbowl-expansion`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.27.0** on `fishbowl-session-remote-play`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
-Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dialog focus). PR #20 includes and supersedes #18; it can be reviewed directly against main. Both platform implementations are included.
+PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.27.0 work is on `fishbowl-session-remote-play` and targets main. Both platform implementations are included.
+
+## Session, navigation and remote play 1.27.0
+
+Shared session journals store observed seconds, exact PID/start identities and profile ownership. Recovery applies only missing deltas, preserves other profiles and excludes app downtime. Windows background polling follows verified launcher children; Linux uses procfs identities. Unverifiable instant Linux launchers remain uncertain rather than attaching unrelated processes. Journals commit only after library saves; games are not terminated on shutdown.
+
+Windows Appearance and accessibility unifies existing panels; General preferences keep startup/backup settings. Controller navigation handles menu/submenu/overflow actions, choices, lists, checks, numeric fields and tabs, with active-process, reconnect and repeat guards. Linux reads existing joystick devices and reuses the current settings style. Physical controllers and Linux display sessions need native smoke testing.
+
+Remote media client and reference Node token service are under `remote-play/`. Windows explicitly chooses a single game window, approves one guest and sends only supported keyboard keys to that exact foreground game. Linux provides browser joining; native hosting is unsupported. SDKs are pinned; no service is deployed and no credentials are bundled. Actual two-device video/audio/input, account/provider calls and physical emulator input remain live-test requirements. See remote-play/README.md. Normal/compact 100/150/200% audits check all main sections and 64 dialog types and report zero text overflow. Validation details accompany the PR.
 
 ## Compact controls and color harmony 1.26.2
 
@@ -40,7 +48,7 @@ Library recovery and layout fixes: normalized multi-disc grouping, large-text la
 
 ## Known issues
 
-- **Flaky Windows test:** "actual emulator-process session time recorded" in `IntegrationTests` failed once on `main` and passed on re-run with no changes. It depends on timing; make it wait for the session instead of a fixed delay.
+- Session completion checks in Integration/Immersion/Hub use bounded condition waits, including the two-second verified launcher grace period.
 - **Remaining text overflow:** the 1.25.11 audit reports zero findings at 100/150/200% on normal and compact desktops.
 
 ## In progress on the Linux side
@@ -117,3 +125,7 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
   - Opened #11 (text overflow) and #9 (Tux easter egg). Filed #10.
 - **2026-10-05:** shared the data model (#8, re-landing #7), published the 1.25.8 source (#6), and added the text overflow audit (#5), the bug report form (#4) and the Windows source, assets and CI (#3).
 - **2026-09-30:** first Linux version merged (#1).
+
+### 2026-10-06 — sessions, navigation and remote play
+
+Added profile-owned crash journals, exact launcher tree tracking, Windows controller/appearance integration, Linux joystick/session parity and the browser media client/private token service. Main through merged PR #20 is the base. Updated bounded completion fixtures, C#5/build/package references and service CI. Service/device smoke testing remains explicitly required.

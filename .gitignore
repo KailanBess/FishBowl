@@ -27,3 +27,9 @@ windows/overflow-audit-compact/
 # Packaged workflow/local deliverables
 /artifacts/
 /SharedCompatibility.dll
+
+# Remote-play dependencies and private deployment settings
+node_modules/
+.env
+.env.*
+!.env.example

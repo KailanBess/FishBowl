@@ -326,23 +326,24 @@ namespace EmulatorHub
             catch (Exception error) { await Ui.Message(this, "FishBowl could not create the shortcut.\n\n" + error.Message); }
         }
 
-        private async Task ShowSettings()
+        private Task ShowSettings() { return ShowSettings(this); }
+        private async Task ShowSettings(Window owner)
         {
             var dialog = new SettingsDialog(library.Theme, library.BackupFolder);
-            await dialog.Present(this);
+            await dialog.Present(owner);
             if (!dialog.Confirmed) return;
             var t = library.Theme; var n = dialog.ChosenTheme;
             bool restartRequired = !String.Equals(t.Name, n.Name, StringComparison.OrdinalIgnoreCase) || t.StartMaximized != n.StartMaximized || !String.Equals(t.AccentColor, n.AccentColor, StringComparison.OrdinalIgnoreCase) || !String.Equals(t.FontFamily, n.FontFamily, StringComparison.OrdinalIgnoreCase) || t.UiScalePercent != n.UiScalePercent || !String.Equals(t.ListDensity, n.ListDensity, StringComparison.OrdinalIgnoreCase) || t.ShowBanner != n.ShowBanner || t.ShowStatusBar != n.ShowStatusBar || t.ShowInformationPanel != n.ShowInformationPanel || t.ShowEmulatorIcons != n.ShowEmulatorIcons || t.EnableMotion != n.EnableMotion || t.AlternateRowShading != n.AlternateRowShading || t.SelectionContrast != n.SelectionContrast || t.IconTileShape != n.IconTileShape;
             library.Theme = n; library.BackupFolder = dialog.BackupFolder;
             Store.Save(library); ConfigureGameFolderWatchers();
-            if (restartRequired && await Ui.Confirm(this, "These settings need FishBowl to restart before they can take effect.\n\nRestart FishBowl now?", "Restart FishBowl"))
+            if (restartRequired && await Ui.Confirm(owner, "These settings need FishBowl to restart before they can take effect.\n\nRestart FishBowl now?", "Restart FishBowl"))
             {
                 Store.Log("Restarting to apply settings.");
                 SaveProfileNotes(); SaveWindowLayout();
                 string argument; using (Process.Start(SelfStart(out argument))) { }
                 Close();
             }
-            else if (restartRequired) await Ui.Message(this, "Settings saved. Restart FishBowl whenever you are ready to apply them.");
+            else if (restartRequired) await Ui.Message(owner, "Settings saved. Restart FishBowl whenever you are ready to apply them.");
             else SetStatus("Settings saved and applied.");
         }
 

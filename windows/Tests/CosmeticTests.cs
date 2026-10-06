@@ -18,7 +18,7 @@ class CosmeticTests {
     static void Dialog(MainForm main,Action<NextDialog> action) {
         using(var timer=new Timer {Interval=250}) {
             timer.Tick+=(s,e)=> {var dialog=Application.OpenForms.Cast<Form>().OfType<NextDialog>().SingleOrDefault(d=>d.Text=="Cosmetic styles");if(dialog==null) return;timer.Stop();action(dialog);};
-            timer.Start();typeof(MainForm).GetMethod("ShowCosmetics",flags).Invoke(main,null);
+            timer.Start();typeof(MainForm).GetMethod("ShowCosmeticsCore",flags).Invoke(main,null);
         }
     }
     [STAThread] static int Main() { try { return Run(); } catch(Exception error) { Console.Error.WriteLine(error); return 1; } }

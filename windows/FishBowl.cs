@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.26.2.0")]
+[assembly: AssemblyFileVersion("1.27.0.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.26.2.0")]
+[assembly: AssemblyVersion("1.27.0.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.26.2";
+		private const string FishBowlVersion = "1.27.0";
 
-		private const string FishBowlTitleVersion = "1.26.2";
+		private const string FishBowlTitleVersion = "1.27.0";
 
 		private Icon ownedAppIcon;
 
@@ -315,7 +315,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.26.2";
+			Text = "FishBowl 1.27.0";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -401,11 +401,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.26.2" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.27.0" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.26.2";
+						library.Theme.LastSeenBuild = "1.27.0";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -426,6 +426,7 @@ namespace EmulatorHub
                         // Startup preferences change the Home cache key; settle it before later selection updates.
                         if (homeSurface != null) homeSurface.Reload(false);
                         if (emulatorHome != null) emulatorHome.Reload(false);
+                        if (!isolatedPreview) WindowsSessions.Recover(this, library);
 					}
 				});
 			};
@@ -1883,7 +1884,7 @@ namespace EmulatorHub
 			toolStripMenuItem13.DropDownItems.Add(linksMenu);
 			CompactMenus.Arrange(toolStripMenuItem2, toolStripMenuItem3, toolStripMenuItem8, toolStripMenuItem10);
 			toolStripMenuItem3.DropDownItems.Add(MenuAction("User tools...", "settings", ShowUserTools));
-            toolStripMenuItem3.DropDownItems.Add(MenuAction("Home and appearance...", "settings", delegate { UiPolishTools.Open(this, library, delegate { ApplyAppearanceNow(); homeSurface.Reload(); }); }));
+            toolStripMenuItem3.DropDownItems.Add(MenuAction("Home and appearance...", "settings", ShowAppearanceHub));
             toolStripMenuItem3.DropDownItems.Add(MenuAction("Game tools...", "play", delegate { WindowsGameTools.OpenLibrary(this, library, delegate { homeSurface.Reload(); embeddedLibrary.ReloadLibrary(); }); }));
             toolStripMenuItem3.DropDownItems.Add(MenuAction("Integrations...", "info", delegate { IntegrationTools.Open(this, library, delegate { homeSurface.Reload(); embeddedLibrary.ReloadLibrary(); RefreshHub(); }); }));
 
@@ -1926,14 +1927,7 @@ namespace EmulatorHub
 				EmulatorProfile selectedProfile = multiplayerDialog.SelectedProfile;
 				if (multiplayerDialog.Mode == "Remote couch play")
 				{
-					if (string.IsNullOrWhiteSpace(library.Multiplayer.RelayGatewayUrl))
-					{
-						MessageBox.Show(this, "Remote couch play needs a LiveKit Cloud token endpoint before it can start. FishBowl keeps this unconfigured by default so no LiveKit API secret or private session information is stored in the app. Use Privacy and connection settings to enter your endpoint after its server is set up.", "Remote couch play");
-					}
-					else
-					{
-						MessageBox.Show(this, "FishBowl saved the private session preference and confirmed a LiveKit Cloud token endpoint is configured. The LiveKit media client is not included in this desktop build yet, so FishBowl will not expose a game window or controller data until that service is connected.", "Remote couch play");
-					}
+                    RemotePlayTools.Open(this, library, selectedProfile);
 					return;
 				}
 				if (multiplayerDialog.Mode == "Native online")
@@ -3390,7 +3384,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.26.2"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.27.0"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3398,7 +3392,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.26.2"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.27.0"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3406,7 +3400,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.26.2"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.27.0"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -4007,43 +4001,7 @@ namespace EmulatorHub
 
 		private void ShowSettings()
 		{
-			using (SettingsDialog settingsDialog = new SettingsDialog(library.Theme, library.BackupFolder))
-			{
-				if (settingsDialog.ShowDialog(this) == DialogResult.OK)
-				{
-					bool flag = !string.Equals(library.Theme.Name, settingsDialog.Theme.Name, StringComparison.OrdinalIgnoreCase) || library.Theme.StartMaximized != settingsDialog.Theme.StartMaximized || !string.Equals(library.Theme.AccentColor, settingsDialog.Theme.AccentColor, StringComparison.OrdinalIgnoreCase) || !string.Equals(library.Theme.AppIconColor, settingsDialog.Theme.AppIconColor, StringComparison.OrdinalIgnoreCase) || !string.Equals(library.Theme.FontFamily, settingsDialog.Theme.FontFamily, StringComparison.OrdinalIgnoreCase) || library.Theme.UiScalePercent != settingsDialog.Theme.UiScalePercent || !string.Equals(library.Theme.ListDensity, settingsDialog.Theme.ListDensity, StringComparison.OrdinalIgnoreCase) || library.Theme.ShowBanner != settingsDialog.Theme.ShowBanner || library.Theme.ShowStatusBar != settingsDialog.Theme.ShowStatusBar || library.Theme.ShowInformationPanel != settingsDialog.Theme.ShowInformationPanel || library.Theme.ShowEmulatorIcons != settingsDialog.Theme.ShowEmulatorIcons || library.Theme.EnableMotion != settingsDialog.Theme.EnableMotion;
-					library.Theme = settingsDialog.Theme;
-					library.BackupFolder = settingsDialog.BackupFolder;
-					ApplyThemeColors();
-					try
-					{
-						Platform.UpdateAppShortcutIcons(FishBowlBranding.WriteShortcutIcon());
-					}
-					catch
-					{
-					}
-					Store.Save(library);
-					ConfigureGameFolderWatchers();
-					ConfigureScheduledLibraryScan();
-					if (flag && MessageBox.Show(this, "These settings need FishBowl to restart before they can take effect.\n\nRestart FishBowl now?", "Restart FishBowl", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-					{
-						Store.Log("Restarting to apply settings.");
-						ProcessStartInfo processStartInfo = new ProcessStartInfo(Application.ExecutablePath);
-						processStartInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
-						processStartInfo.UseShellExecute = true;
-						Process.Start(processStartInfo);
-						Close();
-					}
-					else if (flag)
-					{
-						MessageBox.Show("Settings saved. Restart FishBowl whenever you are ready to apply them.", "FishBowl");
-					}
-					else
-					{
-						SetStatus("Settings saved and applied.");
-					}
-				}
-			}
+			WindowsAppearance.General(this, library, delegate { ConfigureGameFolderWatchers(); ConfigureScheduledLibraryScan(); ApplyAppearanceNow(); });
 		}
 
 		private void EnablePortableMode()
@@ -4940,7 +4898,12 @@ namespace EmulatorHub
 			});
 		}
 
-		private void ShowLiveAppearance()
+        private void ShowAppearanceHub() {
+            WindowsAppearance.Open(this, library, delegate { ApplyAppearanceNow(); homeSurface.Reload(); }, ShowLiveAppearanceCore, ShowCosmeticsCore);
+        }
+        private void ShowLiveAppearance() { ShowAppearanceHub(); }
+        private void ShowCosmetics() { ShowAppearanceHub(); }
+		private void ShowLiveAppearanceCore()
 		{
 			NextData.Ensure(library);
 			ThemeSettings original = NextData.Copy(library.Theme);
@@ -5757,7 +5720,7 @@ namespace EmulatorHub
 			}
 		}
 
-		private void ShowCosmetics()
+		private void ShowCosmeticsCore()
 		{
 			if (library.Cosmetics == null)
 			{
@@ -6487,6 +6450,7 @@ namespace EmulatorHub
 		{
 			FishBowlPalette.StyleWindow(this);
 			NextUi.ApplyAccessibility(this);
+            NavigationController.Attach(this);
 			Polish.Accessibility(this);
 			foreach (FlowLayoutPanel bar in NextUi.Descendants(this).OfType<FlowLayoutPanel>().ToArray())
 			{
@@ -17305,7 +17269,7 @@ namespace EmulatorHub
 			MultiplayerCapability multiplayerCapability = new MultiplayerCapability();
 			multiplayerCapability.NativeOnline = "Check the emulator's own multiplayer or netplay settings.";
 			multiplayerCapability.LocalPlay = "Configure additional controllers inside the emulator.";
-			multiplayerCapability.RemoteCouchPlay = "Available after a FishBowl LiveKit Cloud token service is configured.";
+			multiplayerCapability.RemoteCouchPlay = "Browser window streaming and approved keyboard/gamepad-to-keyboard controls use the configured LiveKit token service. Start the game first; configure matching keys in the emulator.";
 			multiplayerCapability.Notes = "FishBowl never changes the emulator's multiplayer settings.";
 			MultiplayerCapability multiplayerCapability2 = multiplayerCapability;
 			switch (name)
@@ -23558,6 +23522,7 @@ namespace EmulatorHub
 				if (more == null)
 				{
 					ContextMenuStrip menu = new ContextMenuStrip();
+            NavigationController.Register(menu);
 					more = ExperienceUi.Button("More", delegate { });
 					Button anchor = more;
 					more.Click += delegate { menu.Show(anchor, new Point(0, anchor.Height)); };
@@ -23653,6 +23618,7 @@ namespace EmulatorHub
 				action("Game", game, null);
 			});
 			ContextMenuStrip context = new ContextMenuStrip();
+            NavigationController.Register(context);
 			context.Items.Add("Game details", null, delegate
 			{
 				action("Game details", game, null);
@@ -24497,6 +24463,7 @@ namespace EmulatorHub
 			UserSaveRoutes.Arguments(library, emulatorProfile, true);
 			ProcessStartInfo processStartInfo = Platform.StartInfo(emulatorProfile.Executable, text);
 			processStartInfo.WorkingDirectory = ((Hub.Native(game) && !string.IsNullOrWhiteSpace(game.Extras.WorkingDirectory)) ? game.Extras.WorkingDirectory : Path.GetDirectoryName(emulatorProfile.Executable));
+            var sessionBeforeLaunch = SessionLedger.ProcessSnapshot();
 			Process process;
 			try
 			{
@@ -24510,7 +24477,7 @@ namespace EmulatorHub
 			Immersion.Sound(library, true);
 			game.LastLaunched = DateTime.Now.ToString("g");
 			game.LaunchCount++;
-			bool flag = Platform.IsDirectProgram(emulatorProfile.Executable) && process != null;
+			bool flag = process != null;
 			PlaySession session = NextData.BeginSession(library, game, emulatorProfile.Executable, flag);
 			game.SessionTrackingNote = (flag ? "Tracking the launched emulator process; game changes inside that process cannot be distinguished." : "Time not tracked: launcher or wrapper process is uncertain.");
 			Hub.Record(library, "Launched " + game.Title);
@@ -24527,73 +24494,7 @@ namespace EmulatorHub
 					Store.Log("Jump List update: " + ex.Message);
 				}
 			}
-			if (flag)
-			{
-				UserTools.ActiveLaunches++;
-				UserTools.ActiveSessions.TryAdd(session.Id, 0);
-				bool completionQueued = false;
-				Stopwatch clock = Stopwatch.StartNew();
-				Task.Factory.StartNew(delegate
-				{
-					try
-					{
-						process.WaitForExit();
-						clock.Stop();
-						Control control = owner as Control;
-						Action method = delegate
-						{
-							try
-							{
-								NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSeconds);
-								game.SessionTrackingNote = "Recorded emulator session: " + clock.Elapsed.ToString();
-								Store.Save(library);
-							}
-							finally
-							{
-								Interlocked.Decrement(ref UserTools.ActiveLaunches);
-								byte value2;
-								UserTools.ActiveSessions.TryRemove(session.Id, out value2);
-							}
-							Immersion.AfterSession(owner, library, game, session);
-						};
-						if (control != null && !control.IsDisposed && control.IsHandleCreated)
-						{
-							control.BeginInvoke(method);
-							completionQueued = true;
-						}
-						else
-						{
-							LibraryData libraryData = Store.Load();
-							NextData.Ensure(libraryData);
-							PlaySession playSession = libraryData.PlaySessions.FirstOrDefault((PlaySession p) => p.Id == session.Id);
-							GameEntry gameEntry = libraryData.Games.FirstOrDefault((GameEntry g) => g.Id == game.Id);
-							if (playSession != null && gameEntry != null)
-							{
-								NextData.CompleteSession(libraryData, gameEntry, playSession, (long)clock.Elapsed.TotalSeconds);
-								Store.Save(libraryData);
-							}
-						}
-					}
-					catch (Exception ex2)
-					{
-						Store.Log("Session tracking ended: " + ex2.Message);
-					}
-					finally
-					{
-						if (!completionQueued)
-						{
-							Interlocked.Decrement(ref UserTools.ActiveLaunches);
-							byte value;
-							UserTools.ActiveSessions.TryRemove(session.Id, out value);
-						}
-						process.Dispose();
-					}
-				});
-			}
-			else if (process != null)
-			{
-				process.Dispose();
-			}
+            if (flag) WindowsSessions.Track(owner, library, game, session, process, sessionBeforeLaunch);
 		}
 
         public static void UndoRemoval(IWin32Window owner, LibraryData library)
@@ -27538,6 +27439,7 @@ namespace EmulatorHub
 			{
 			});
 			ContextMenuStrip menu = new ContextMenuStrip();
+            NavigationController.Register(menu);
 			more.Click += delegate
 			{
 				menu.Show(more, new Point(0, more.Height));
@@ -29217,6 +29119,7 @@ namespace EmulatorHub
 		public static ContextMenuStrip Menu()
 		{
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
+            NavigationController.Register(contextMenuStrip);
 			contextMenuStrip.Renderer = new FishBowlMenuRenderer();
 			contextMenuStrip.BackColor = FishBowlPalette.ThemeSurface;
 			contextMenuStrip.ForeColor = FishBowlPalette.ThemeInk;
@@ -30117,6 +30020,7 @@ namespace EmulatorHub
 				Add(flowLayoutPanel2, "Switch", delegate
 				{
 					Switch(d, s.Users.First((BowlUser x) => x.Name == users.Text).Id);
+                    WindowsSessions.Recover(owner, d);
 					Store.Save(d);
 					refresh();
 					f.Close();
@@ -30688,7 +30592,7 @@ namespace EmulatorHub
 
 		private readonly NotifyIcon notification = new NotifyIcon();
 
-		private ushort previous;
+
 
 		private DateTime hideNotice;
 
@@ -30718,6 +30622,7 @@ namespace EmulatorHub
 			{
 				Navigate();
 			}
+            else NavigationController.Reset();
 			if (UserTools.Guest || userToolSettings.BreakMinutes <= 0 || DateTime.UtcNow < nextReminder)
 			{
 				return;
@@ -30790,121 +30695,12 @@ namespace EmulatorHub
 
 		private void Navigate()
 		{
-			Form activeForm = Form.ActiveForm;
-			State state;
-			if (activeForm == null || !Read(out state))
-			{
-				previous = 0;
-				return;
-			}
-			ushort pressed = (ushort)(state.Pad.Buttons & ~previous);
-			previous = state.Pad.Buttons;
-			ApplyButtons(activeForm, owner, pressed);
+			NavigationController.Poll(owner);
 		}
 
 		public static void ApplyButtons(Form f, Form owner, ushort pressed)
 		{
-			Control activeControl = f.ActiveControl;
-			while (activeControl is ContainerControl && ((ContainerControl)activeControl).ActiveControl != null)
-			{
-				activeControl = ((ContainerControl)activeControl).ActiveControl;
-			}
-			if ((pressed & 0x1000u) != 0)
-			{
-				MainForm mainForm = f as MainForm;
-				if (mainForm != null && mainForm.ActivateControllerSelection(activeControl))
-				{
-					return;
-				}
-				Button button = activeControl as Button;
-				if (button != null)
-				{
-					button.PerformClick();
-				}
-				else if (activeControl is CheckBox)
-				{
-					((CheckBox)activeControl).Checked = !((CheckBox)activeControl).Checked;
-				}
-				else if (activeControl is ComboBox)
-				{
-					((ComboBox)activeControl).DroppedDown = !((ComboBox)activeControl).DroppedDown;
-				}
-				else if (activeControl is ListView || activeControl is ListBox)
-				{
-					typeof(Control).GetMethod("OnDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(activeControl, new object[1] { EventArgs.Empty });
-				}
-			}
-			if ((pressed & 0x2000u) != 0 && f != owner)
-			{
-				f.Close();
-			}
-			int num = ((((uint)pressed & (true ? 1u : 0u)) != 0) ? (-1) : (((pressed & 2u) != 0) ? 1 : 0));
-			if (num != 0)
-			{
-				ListBox listBox = activeControl as ListBox;
-				ListView listView = activeControl as ListView;
-				ComboBox comboBox = activeControl as ComboBox;
-				if (listBox != null && listBox.Items.Count > 0)
-				{
-					listBox.SelectedIndex = Math.Max(0, Math.Min(listBox.Items.Count - 1, listBox.SelectedIndex + num));
-				}
-				else if (comboBox != null && comboBox.Items.Count > 0)
-				{
-					comboBox.SelectedIndex = Math.Max(0, Math.Min(comboBox.Items.Count - 1, comboBox.SelectedIndex + num));
-				}
-				else if (listView != null && listView.Items.Count > 0)
-				{
-					int num2 = ((listView.SelectedIndices.Count > 0) ? listView.SelectedIndices[0] : 0);
-					ListViewItem listViewItem = listView.Items[Math.Max(0, Math.Min(listView.Items.Count - 1, num2 + num))];
-					listView.SelectedItems.Clear();
-					listViewItem.Selected = true;
-					listViewItem.Focused = true;
-					listViewItem.EnsureVisible();
-				}
-				else
-				{
-					f.SelectNextControl(activeControl, num > 0, true, true, true);
-				}
-			}
-			if ((pressed & 0xCu) != 0)
-			{
-				NumericUpDown numericUpDown = activeControl as NumericUpDown;
-				Control control = ((activeControl == null) ? null : activeControl.Parent);
-				while (numericUpDown == null && control != null)
-				{
-					numericUpDown = control as NumericUpDown;
-					control = control.Parent;
-				}
-				if (numericUpDown != null)
-				{
-					numericUpDown.Value = Math.Max(numericUpDown.Minimum, Math.Min(numericUpDown.Maximum, numericUpDown.Value + (((pressed & 8u) != 0) ? numericUpDown.Increment : (-numericUpDown.Increment))));
-				}
-				else
-				{
-					f.SelectNextControl(activeControl, (pressed & 8) != 0, true, true, true);
-				}
-			}
-			if ((pressed & 0x300) == 0)
-			{
-				return;
-			}
-			TabControl tabControl = null;
-			for (Control control = ((activeControl == null) ? null : activeControl.Parent); control != null; control = control.Parent)
-			{
-				if (control is TabControl)
-				{
-					tabControl = (TabControl)control;
-					break;
-				}
-			}
-			if (tabControl == null)
-			{
-				tabControl = Descendants(f).OfType<TabControl>().FirstOrDefault((TabControl t) => t.Visible);
-			}
-			if (tabControl != null && tabControl.TabCount > 0)
-			{
-				tabControl.SelectedIndex = (tabControl.SelectedIndex + (((pressed & 0x200u) != 0) ? 1 : (tabControl.TabCount - 1))) % tabControl.TabCount;
-			}
+			NavigationController.ApplyButtons(f, owner, pressed);
 		}
 
 		private static IEnumerable<Control> Descendants(Control c)

@@ -67,6 +67,8 @@ namespace EmulatorHub
             if (library.Theme.StartMaximized) WindowState = WindowState.Maximized;
             Background = p.BottomBrush; Foreground = p.InkBrush;
             BuildLayout();
+            ConfigureControllerNavigation();
+            ConfigureSessionTracking();
             RefreshHub();
             ConfigureGameFolderWatchers();
             SetStatus("Select a game in Library to play, or open an emulator.");
@@ -87,10 +89,10 @@ namespace EmulatorHub
             };
             Closing += (sender, e) =>
             {
-                try { FinishLibraryGameSessionsAtClose(); SaveProfileNotes(); SaveWindowLayout(); }
+                try { SaveProfileNotes(); SaveWindowLayout(); FinishLibraryGameSessionsAtClose(); }
                 catch (Exception error) { e.Cancel = true; Ui.Post(async () => await Ui.Message(this, "Your library could not be saved.\n\n" + error.Message)); }
             };
-            Closed += delegate { companionServer?.Dispose(); runtimeTimer.Stop(); foreach (var watcher in gameFolderWatchers) watcher.Dispose(); };
+            Closed += delegate { controllerTimer.Stop(); controllerDevice.Dispose(); companionServer?.Dispose(); runtimeTimer.Stop(); foreach (var watcher in gameFolderWatchers) watcher.Dispose(); };
         }
 
         // ----- Layout ------------------------------------------------------------------------------------------------
@@ -235,6 +237,7 @@ namespace EmulatorHub
                 MenuAction("Diagnostics report...", "info", ShowDiagnostics) } };
             var view = new MenuItem { Header = "_View", ItemsSource = new object[] {
                 MenuAction("Refresh emulators", "refresh", () => { reloadProgramMetadata = true; RefreshHub(); }),
+                MenuAction("Appearance...", "settings", ShowAppearanceHub),
                 MenuAction("Full screen (F11)", "desktop", ToggleFullScreen) } };
             convertersMenu.SubmenuOpened += delegate { RefreshConvertersMenu(); }; RefreshConvertersMenu();
             linksMenu.SubmenuOpened += delegate { RefreshWebsiteLinksMenu(); }; RefreshWebsiteLinksMenu();

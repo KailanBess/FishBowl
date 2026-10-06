@@ -12,6 +12,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  remote-play:
+    name: Remote-play service and browser controls
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - name: Install pinned server dependencies
+        run: pnpm install --dir remote-play --frozen-lockfile --ignore-scripts
+      - name: Verify token service and controls
+        run: pnpm --dir remote-play test
+      - name: Check browser source syntax
+        run: node --check remote-play/client/client.js
+
   windows:
     name: Windows (csc.exe, C# 5)
     runs-on: windows-latest
@@ -26,11 +44,11 @@ jobs:
       - name: Compile retained shared source with C# 5
         shell: pwsh
         run: |
-          & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /target:library /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /out:SharedCompatibility.dll FishBowl.Model.cs FishBowl.Core.cs FishBowl.Platform.cs FishBowl.Library.cs FishBowl.GameTools.cs FishBowl.Integrations.cs FishBowl.SaveTools.cs
+          & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /target:library /r:System.Web.Extensions.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /out:SharedCompatibility.dll FishBowl.Model.cs FishBowl.Core.cs FishBowl.Platform.cs FishBowl.Library.cs FishBowl.GameTools.cs FishBowl.Integrations.cs FishBowl.SaveTools.cs FishBowl.Sessions.cs
           if ($LASTEXITCODE -ne 0) { throw 'Shared C# 5 compilation failed' }
       - name: Package complete Windows app and source
         shell: pwsh
-        run: ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion 1.26.2
+        run: ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion 1.27.0
       - uses: actions/upload-artifact@v7
         with:
           name: FishBowl-windows

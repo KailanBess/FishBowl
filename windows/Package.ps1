@@ -33,6 +33,10 @@ Home and appearance settings offer Compact/Standard/Roomy control spacing, Harmo
 Game titles and artwork are stored in the library without renaming game files. Removing games/emulators supports Undo. Review mod changes and save restore destinations before applying them. Game files and emulator programs are supplied separately.
 
 Source and platform build instructions are in the accompanying Source archive and the repository README.
+
+Session checkpoints recover observed playtime after restart and follow verified launcher descendants without stopping games on app close. Appearance and accessibility settings share one hub, with separate General preferences. Controller navigation covers current menus, overflow actions, dialogs and controls.
+
+Remote couch play includes a browser media client and host-approved keyboard controls. It requires a LiveKit deployment and the private token service described in remote-play/README.md in the Source archive. This package does not deploy the service or include credentials. Live streaming and emulator key mappings require a two-device test; Linux can join as a browser guest.
 "@ | Set-Content -LiteralPath (Join-Path $bundle 'README.md') -Encoding UTF8
 $zip = Join-Path $output ('FishBowl-' + $version + '.zip')
 Compress-Archive -LiteralPath $bundle -DestinationPath $zip -Force

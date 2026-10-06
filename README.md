@@ -7,7 +7,7 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 | Windows | 1.25.8 | Current release |
 | Linux | Preview | Library and expansion screens; Linux desktop testing remains required |
 
-Source version **1.26.2** expands both Windows and Linux. It adds Home customization, theme previews, accessibility presets, native imports, game setup tools, reviewed metadata catalogs, mods, media, save recovery, play insights, achievement progress and a paired browser companion. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source.
+Source version **1.27.0** adds crash-safe session checkpoints, verified launcher handoffs, a unified Appearance hub, controller navigation and a browser remote-play client with reference token service. It retains Home customization, theme previews, accessibility presets, native imports, game setup tools, reviewed metadata catalogs, mods, media, save recovery, play insights, achievement progress and the paired browser companion. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source.
 
 ## Features
 
@@ -50,7 +50,9 @@ The Linux version shares the emulator presets, folder routing, backups and libra
 - **Running emulators** are detected, including Flatpak and AppImage processes. Opening one that is already running brings its window forward on Hyprland, Sway and X11.
 - **Importing:** AppImages and ZIP packages can be imported into a dedicated emulator folder.
 
-The preview now includes Home, Library, profiles, collections, keyboard living-room browsing, title/cover editing, removal with Undo, game setup, Steam import, integrations, mods, media, play history and verified file save recovery. Folder save archives use the emulator backup manager. Controller polling and some advanced Windows tools remain platform-specific. The library file is shared; Linux preserves unfamiliar fields when it saves.
+The preview includes Home, Library, profiles, collections, keyboard/joystick living-room browsing, title/cover editing, removal with Undo, game setup, Steam import, integrations, mods, media, play history and verified file save recovery. Folder save archives use the emulator backup manager. Linux controller navigation reads available `/dev/input/js*` devices; mappings and device permissions depend on the system. The library file is shared; Linux preserves unfamiliar fields when it saves.
+
+Session journals recover saved active time and resume verified running processes after restart. Time while FishBowl is closed is excluded; launchers without a verifiable process identity or ancestry remain uncertain. Games stay running when FishBowl closes. Windows includes browser window sharing and host-approved keyboard/gamepad-to-keyboard controls. Linux can join in the browser; native Linux hosting is not implemented. Remote play needs a configured LiveKit deployment and token service; see [setup and live-test checklist](remote-play/README.md).
 
 ## Installation
 
@@ -119,7 +121,7 @@ Extensions are declarative JSON manifests of kind `Metadata`, `Importer` or `Emu
 
 The companion starts explicitly on localhost or a selected private network address. Its random pairing address grants read-only title and play-history access while it is running. Closing it stops the server. It does not serve game files, save contents, local paths or credentials.
 
-Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (`v1.26.2` for this version). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
+Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (`v1.27.0` for this version). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
 
 ## Repository layout
 
