@@ -1,15 +1,33 @@
-# Source layout and Linux compatibility
+# Source layout
 
-`windows/` contains the complete source for the released Windows app version **1.25.8**, internally build **1.25.8.0**. Build it with `windows/Build.ps1` and run `windows/Run Tests.ps1`. This source includes all application C# files, tests, scripts and artwork. Builds create the executables beside that source. Ship executable files through GitHub Releases or CI artifacts.
+FishBowl has two front ends that share their data model and emulator logic.
 
-The repository root `FishBowl.cs`, `FishBowl.Core.cs` and `FishBowl.Platform.cs` remain the older split source used by the Linux port. `FishBowl.Avalonia/` continues linking the root core/platform files; it must not compile the Windows monolith. **The newer Windows non-UI logic has not yet been extracted into the shared core.** The Windows source is committed as-is to make that port possible without overwriting Linux work or claiming feature parity.
+## Windows (`windows/`)
 
-**Shared data model:** `FishBowl.Model.cs` at the root holds every class saved in `library.json` (38 classes, moved verbatim from `windows/FishBowl.cs`). The Windows build (`windows/Build.ps1`) and the Linux build both compile it, so a field added there exists in both apps. Keep it C# 5, add fields as optional, and never rename or remove one. The Linux build adds `[JsonExtensionData]` to each class so fields from newer versions still survive a save.
+The Windows application, currently version **1.25.8**, is built from:
 
-Root `FishBowl.png` and `FishBowl.ico` are restored for the current Linux project and installer. Windows also has its own source-folder copies, so changing Windows artwork does not remove Linux inputs.
+- `windows/FishBowl.cs`: the WinForms application
+- `windows/GameRecognition.cs`: game identification
+- `FishBowl.Model.cs` (repository root): the shared data model
 
-Linux model classes retain unknown JSON properties under NETCOREAPP. This lets Linux update known fields while retaining newer optional Windows fields, including nested fields on games, emulators, themes and collections. This is data preservation, not an implementation of the newer features. Existing JSON field names remain unchanged. The Framework/C# 5 code path is preserved.
+`windows/FishBowl.Setup.cs` builds the installer. Run `windows/Build.ps1` to build both executables beside the source, and `windows/Run Tests.ps1` to run the regression tests in `windows/Tests/`. Executables are distributed through GitHub Releases, not committed.
 
-The build workflow and existing Linux core tests were taken from PR #2 and adapted to compile the released Windows source. The PR itself has not been merged. Its optional auto-updater and UI hook were deliberately left out of this repair; review them as a separate change.
+## Linux (`FishBowl.Avalonia/`)
 
-The current Windows build compiles `FishBowl.cs` and `GameRecognition.cs` as the application and `FishBowl.Setup.cs` as the installer. The older supplemental Windows source files remain for historical reference and are not compiler inputs to this build. New regression fixtures are in `windows/Tests/`; the runner also retains the existing Windows regression tests.
+The Avalonia application links three root files:
+
+| File | Contents |
+| --- | --- |
+| `FishBowl.Model.cs` | Every class saved in `library.json`. Also compiled by the Windows build. |
+| `FishBowl.Core.cs` | Presets, folder routing, discovery, imports, release checks, backups and setup checks. |
+| `FishBowl.Platform.cs` | Windows/Linux differences: launching, process detection, versions, Flatpak and `.desktop` handling. |
+
+It must not compile `windows/FishBowl.cs`. Windows behaviour reaches Linux by moving non-UI logic into shared files that both builds compile.
+
+## Shared-file rules
+
+- **C# 5 only:** shared files must compile with the .NET Framework C# 5 compiler. Linux-only APIs go behind `#if NETCOREAPP`.
+- **Library compatibility:**
+  - New `library.json` fields must be optional. Never rename or remove an existing field.
+  - The Linux build adds `[JsonExtensionData]` to each model class, so fields from newer versions survive a Linux save.
+- **Artwork:** `FishBowl.png` and `FishBowl.ico` at the root are used by the Linux app and installer. Windows keeps its own copies in `windows/`.
