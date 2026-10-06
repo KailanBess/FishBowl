@@ -8,13 +8,17 @@ _Last updated: 2026-10-06, expansion integration._
 
 | | State |
 | --- | --- |
-| Windows | Source **1.26.1** on `fishbowl-expansion`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.26.2** on `fishbowl-expansion`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
 Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dialog focus). PR #20 includes and supersedes #18; it can be reviewed directly against main. Both platform implementations are included.
+
+## Compact controls and color harmony 1.26.2
+
+Windows compact density reduces control/card spacing without reducing user-selected fonts. Optional `ThemeSettings.ControlDensity` and `ColorHarmony` preserve the choice across both platforms; default values use Compact and Harmonized. Standard/Roomy density, Original color behavior, custom palettes and accessibility settings remain available. Controller presets use Roomy. Theme switching updates previous themed backgrounds, avoiding mixed palettes. Windows build, 34 density checks, 17,129 color/selection checks and 199 schema preservation checks pass. Full regressions and fresh normal/compact text audits are required in PR #20. Linux UI density/color styling is unchanged; the new optional choices survive Linux settings and profile saves.
 
 ## Home layout 1.26.1
 
@@ -71,6 +75,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-06 (compact UI 1.26.2):** introduced optional control density and color harmony preferences, smaller Windows controls/cards and consistent theme-relative colors; retained text scaling and all Home options.
 
 - **2026-10-06 (Home spacing 1.26.1):** simplified Windows Home card previews with wider layouts, grouped actions and reversible expansion, keeping all existing options.
 

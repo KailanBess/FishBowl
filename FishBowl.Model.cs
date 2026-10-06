@@ -1021,6 +1021,8 @@ namespace EmulatorHub
         public List<string> HiddenHomeCards { get; set; }
         public bool RestrainedAccents { get; set; }
         public string CoverAspect { get; set; }
+        public string ControlDensity { get; set; }
+        public string ColorHarmony { get; set; }
 
 #if NETCOREAPP
 		// Keep fields from newer versions when this one saves (Linux build; JavaScriptSerializer on Windows ignores this).

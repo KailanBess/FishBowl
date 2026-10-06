@@ -4,7 +4,7 @@ FishBowl has two front ends that share their data model and emulator logic.
 
 ## Windows (`windows/`)
 
-The Windows application, source version **1.26.1**, is built from:
+The Windows application, source version **1.26.2**, is built from:
 
 - `windows/FishBowl.cs`, `windows/FishBowl.InputPainting.cs` and `windows/FishBowl.TextFit.cs`: the WinForms application
 - `FishBowl.Model.cs` and `FishBowl.GameRecognition.cs` (repository root): the shared data model and game identification

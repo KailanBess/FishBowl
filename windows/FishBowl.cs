@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.26.1.0")]
+[assembly: AssemblyFileVersion("1.26.2.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.26.1.0")]
+[assembly: AssemblyVersion("1.26.2.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.26.1";
+		private const string FishBowlVersion = "1.26.2";
 
-		private const string FishBowlTitleVersion = "1.26.1";
+		private const string FishBowlTitleVersion = "1.26.2";
 
 		private Icon ownedAppIcon;
 
@@ -315,7 +315,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.26.1";
+			Text = "FishBowl 1.26.2";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -401,11 +401,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.26.1" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.26.2" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.26.1";
+						library.Theme.LastSeenBuild = "1.26.2";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -549,8 +549,7 @@ namespace EmulatorHub
 					e.Graphics.FillRectangle(brush, e.Bounds);
 				}
 				e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-				int alpha = ((library.Theme.SelectionContrast == "Soft") ? 58 : ((library.Theme.SelectionContrast == "Strong") ? 132 : 88));
-				Color color = (selected ? CosmeticRuntime.Optional(CosmeticRuntime.Current.SelectionColor, Color.FromArgb(alpha, blue.R, blue.G, blue.B)) : ((library.Theme.AlternateRowShading && e.Item.Index % 2 != 0) ? Color.FromArgb(20, surface) : bottom));
+				Color color = ColorHarmony.EmulatorRowBackground(selected, library.Theme.AlternateRowShading && e.Item.Index % 2 != 0, library.Theme.SelectionContrast, bottom, surface, blue);
 				using (SolidBrush brush2 = new SolidBrush(color))
 				{
 					e.Graphics.FillRectangle(brush2, e.Bounds);
@@ -607,7 +606,7 @@ namespace EmulatorHub
 						return;
 					}
 					Color fallback = ((e.SubItem.Text == "Ready" || e.SubItem.Text == "Running") ? ((bottom.GetBrightness() < 0.65f) ? Color.FromArgb(118, 211, 161) : Color.FromArgb(35, 126, 82)) : ((e.SubItem.Text == "Missing program") ? Color.FromArgb(246, 183, 105) : subtle));
-					fallback = FishBowlPalette.EnsureReadable(CosmeticRuntime.Status(e.SubItem.Text, fallback), bottom);
+					fallback = FishBowlPalette.EnsureReadable(CosmeticRuntime.Status(e.SubItem.Text, fallback), color);
 					using (SolidBrush brush2 = new SolidBrush(fallback))
 					{
 						e.Graphics.FillEllipse(brush2, bounds.Left + 1, e.Bounds.Top + (e.Bounds.Height - 6) / 2, 6, 6);
@@ -615,7 +614,7 @@ namespace EmulatorHub
 					bounds = new Rectangle(bounds.Left + 14, bounds.Top, Math.Max(0, bounds.Width - 14), bounds.Height);
 					foreground = (selected ? Color.White : fallback);
 				}
-				FishBowlText.DrawText(e.Graphics, e.SubItem.Text, emulatorList.Font, bounds, FishBowlPalette.EnsureReadable(foreground, selected ? CosmeticRuntime.Selection : bottom), TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
+				FishBowlText.DrawText(e.Graphics, e.SubItem.Text, emulatorList.Font, bounds, FishBowlPalette.EnsureReadable(foreground, color), TextFormatFlags.EndEllipsis | TextFormatFlags.VerticalCenter);
 			};
 			emulatorList.MouseMove += delegate(object sender, MouseEventArgs e)
 			{
@@ -3388,7 +3387,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.26.1"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.26.2"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3396,7 +3395,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.26.1"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.26.2"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3404,7 +3403,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.26.1"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.26.2"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3671,6 +3670,7 @@ namespace EmulatorHub
 
 		private void ApplyThemeColors()
 		{
+            ControlDensityTools.Configure(library);
 			ThemeColors colors = ThemeCatalog.Get(library.Theme == null ? null : library.Theme.Name);
 			ink = colors.Ink; top = colors.Top; bottom = colors.Bottom; surface = colors.Surface; subtle = colors.Subtle;
 			AccentCatalog.TryGet(library.Theme == null ? null : library.Theme.AccentColor, out blue, out pink);
@@ -3689,6 +3689,7 @@ namespace EmulatorHub
 				pink,
 				Color.FromArgb((blue.R + pink.R) / 2, (blue.G + pink.G) / 2, (blue.B + pink.B) / 2)
 			};
+			ColorHarmony.Configure(library.Theme.ColorHarmony, CosmeticRuntime.Current.CustomPalette, library.Theme.Name, pink);
 			FishBowlPalette.Configure(ink, top, bottom, surface, subtle, blue, pink);
 			FishBowlBranding.Configure(library.Theme.AppIconColor, blue, pink);
 		}
@@ -5716,6 +5717,7 @@ namespace EmulatorHub
 			NextUi.FontFamily = (string.IsNullOrWhiteSpace(library.Theme.FontFamily) ? "Bahnschrift" : library.Theme.FontFamily);
 			FishBowlHighlights.ReducedMotion = library.Enhancements.ReducedMotion;
 			FluidStyle.Configure(library);
+            ControlDensityTools.Apply(this);
 			UpdateFluidHeader();
 			if (homeSurface != null)
 			{
@@ -6387,10 +6389,11 @@ namespace EmulatorHub
 				PictureBox pictureBox = control.Controls.OfType<PictureBox>().FirstOrDefault();
 				if (title != null && label != null)
 				{
-					int num = ((pictureBox == null) ? 84 : (pictureBox.Right + 12));
+					if (pictureBox != null) pictureBox.Size = new Size(ControlDensityTools.Choose(44, 60, 68), ControlDensityTools.Choose(44, 60, 68));
+                    int num = ((pictureBox == null) ? 64 : (pictureBox.Right + ControlDensityTools.Choose(8, 12, 16)));
 					title.Location = new Point(num, 8);
-					label.Location = new Point(num, Math.Max(43, title.Bottom + 3));
-					workspaceShell.RowStyles[1].Height = (library.Theme.ShowBanner ? Math.Max(Math.Max(76, label.Bottom + 10), (pictureBox != null) ? (pictureBox.Bottom + 8) : 0) : 0);
+					label.Location = new Point(num, Math.Max(ControlDensityTools.Choose(31, 43, 48), title.Bottom + 3));
+					workspaceShell.RowStyles[1].Height = (library.Theme.ShowBanner ? Math.Max(Math.Max(ControlDensityTools.Choose(56, 76, 84), label.Bottom + ControlDensityTools.Choose(6, 10, 12)), (pictureBox != null) ? (pictureBox.Bottom + 8) : 0) : 0);
 				}
 			}
 		}
@@ -6486,6 +6489,7 @@ namespace EmulatorHub
 				NextUi.Responsive(bar);
 			}
 			CosmeticRuntime.Apply(this);
+            ControlDensityTools.Apply(this);
 			SectionMotion.Attach(this);
 			StartupPromptLayout.Apply(this);
 			// After styling sets the final fonts: larger text sizes can wrap labels onto lines a fixed layout hides.
@@ -12791,6 +12795,8 @@ namespace EmulatorHub
                 HiddenHomeCards = originalTheme.HiddenHomeCards,
                 RestrainedAccents = originalTheme.RestrainedAccents,
                 CoverAspect = originalTheme.CoverAspect,
+                ControlDensity = originalTheme.ControlDensity,
+                ColorHarmony = originalTheme.ColorHarmony,
 				CustomizationVersion = 9
 			};
 			BackupFolder = backupFolder.Text.Trim();
@@ -16135,6 +16141,7 @@ namespace EmulatorHub
 		private static readonly HashSet<Form> styledForms = new HashSet<Form>();
 		private static readonly Dictionary<Form, int> styledRevisions = new Dictionary<Form, int>();
 		private static int paletteRevision;
+		private static int harmonyRevision = -1;
 
 		private static Color ink = Color.FromArgb(231, 241, 255);
 
@@ -16210,7 +16217,7 @@ namespace EmulatorHub
 		{
 			get
 			{
-				return Blend(surface, accent, 14);
+				return ColorHarmony.Selection;
 			}
 		}
 
@@ -16218,7 +16225,7 @@ namespace EmulatorHub
 		{
 			get
 			{
-				return Blend(bottom, surface, 26);
+				return ColorHarmony.Input;
 			}
 		}
 
@@ -16248,7 +16255,8 @@ namespace EmulatorHub
 
 		public static void Configure(Color newInk, Color newTop, Color newBottom, Color newSurface, Color newSubtle, Color newAccent, Color newSecondaryAccent)
 		{
-			if (ink != newInk || top != newTop || bottom != newBottom || surface != newSurface || subtle != EnsureReadable(newSubtle, newSurface) || accent != newAccent || secondaryAccent != newSecondaryAccent) paletteRevision++;
+			if (ink != newInk || top != newTop || bottom != newBottom || surface != newSurface || subtle != EnsureReadable(newSubtle, newSurface) || accent != newAccent || secondaryAccent != newSecondaryAccent || harmonyRevision != ColorHarmony.Revision) paletteRevision++;
+			harmonyRevision = ColorHarmony.Revision;
 			ink = newInk;
 			top = newTop;
 			bottom = newBottom;
@@ -16357,11 +16365,11 @@ namespace EmulatorHub
 		{
 			ConsistentInputs.Watch(control, StyleControl);
 			SmoothPainting.Enable(control);
-			control.BackColor = ReplaceBackground(control.BackColor);
+			control.BackColor = ColorHarmony.NormalizeControlBackground(control, ReplaceBackground(control.BackColor));
 			control.ForeColor = ReplaceForeground(control.ForeColor);
 			if (control is Button)
 			{
-				control.BackColor = MenuSelection;
+				control.BackColor = ColorHarmony.Button;
 				control.ForeColor = ink;
 			}
 			else if (control is TextBoxBase || control is ComboBox || control is NumericUpDown || control is ListBox || control is ListView)
@@ -16422,7 +16430,7 @@ namespace EmulatorHub
 				}
 				background = ((parent == null) ? bottom : parent.BackColor);
 			}
-			control.ForeColor = EnsureReadable(control.ForeColor, background);
+			control.ForeColor = ColorHarmony.ReadableText(control, control.ForeColor, background);
 			foreach (Control control2 in control.Controls)
 			{
 				StyleControl(control2);
@@ -16724,10 +16732,10 @@ namespace EmulatorHub
 		{
 			if (IconOnly)
 			{
-				return new Size(40, 34);
+				return new Size(ControlDensityTools.Choose(32, 40, 44), ControlDensityTools.Choose(28, 34, 42));
 			}
 			Size preferredSize = base.GetPreferredSize(proposedSize);
-			return new Size(preferredSize.Width + 4, Math.Max(34, preferredSize.Height));
+			return new Size(preferredSize.Width + 4, Math.Max(ControlDensityTools.Choose(28, 34, 42), preferredSize.Height));
 		}
 
 		protected override void OnMouseEnter(EventArgs e)
@@ -23069,9 +23077,9 @@ namespace EmulatorHub
 			{
 				Text = text,
 				AutoSize = false,
-				Size = new Size(Math.Max(116, TextRenderer.MeasureText(text, SystemFonts.DefaultFont).Width + 58), 34),
-				MinimumSize = new Size(116, 34),
-				Margin = new Padding(5),
+				Size = new Size(Math.Max(ControlDensityTools.Choose(90, 116, 132), TextRenderer.MeasureText(text, SystemFonts.DefaultFont).Width + ControlDensityTools.Choose(36, 58, 66)), ControlDensityTools.Choose(28, 34, 42)),
+				MinimumSize = new Size(ControlDensityTools.Choose(90, 116, 132), ControlDensityTools.Choose(28, 34, 42)),
+				Margin = new Padding(ControlDensityTools.Choose(3, 5, 7)),
 				BackColor = FishBowlPalette.MenuSelection,
 				ForeColor = FishBowlPalette.ThemeInk,
 				AccessibleName = text
@@ -23282,7 +23290,7 @@ namespace EmulatorHub
 			AutoSizeMode = AutoSizeMode.GrowAndShrink,
 			Height = 92,
 			WrapContents = true,
-			Padding = new Padding(10, 4, 10, 4)
+			Padding = new Padding(6, 2, 6, 2)
 		};
 
 		private int homeStamp;
@@ -23321,6 +23329,7 @@ namespace EmulatorHub
 		public HomeSurface(LibraryData library, Action<string, GameEntry, EmulatorProfile> action)
 		{
 			this.library = library;
+            ControlDensityTools.Configure(library);
 			this.action = action;
 			Dock = DockStyle.Fill;
 			BackColor = FishBowlPalette.DeepSeaSurface;
@@ -23328,7 +23337,7 @@ namespace EmulatorHub
 			cards.Dock = DockStyle.Fill;
 			cards.AutoScroll = true;
 			cards.WrapContents = true;
-			cards.Padding = new Padding(16);
+			cards.Padding = new Padding(ControlDensityTools.Choose(10, 16, 20));
 			summary.AccessibleName = "Library summary actions";
 			base.Controls.Add(cards);
 			base.Controls.Add(summary);
@@ -23387,7 +23396,8 @@ namespace EmulatorHub
 			}
 			try
 			{
-				LayoutCardsCore();
+				ControlDensityTools.Configure(library);
+                LayoutCardsCore();
 			}
 			finally
 			{
@@ -23407,16 +23417,18 @@ namespace EmulatorHub
 			{
 				item.AutoSize = false;
 				int available = Math.Max(1, ClientSize.Width - summary.Padding.Horizontal - item.Margin.Horizontal);
-				item.MinimumSize = new Size(Math.Min(140, available), 42);
+				item.MinimumSize = new Size(Math.Min(ControlDensityTools.Choose(108, 140, 152), available), ControlDensityTools.Choose(30, 42, 48));
 				item.MaximumSize = new Size(available, 0);
 				item.AutoEllipsis = true;
-				item.Width = Math.Min(available, Math.Max(140, TextRenderer.MeasureText(item.Text, item.Font).Width + 60));
-				item.Height = Math.Max(42, item.Font.Height + 16);
+				item.Width = Math.Min(available, Math.Max(ControlDensityTools.Choose(108, 140, 152), TextRenderer.MeasureText(item.Text, item.Font).Width + ControlDensityTools.Choose(36, 60, 68)));
+				item.Height = Math.Max(ControlDensityTools.Choose(30, 42, 48), item.Font.Height + ControlDensityTools.Choose(10, 16, 20));
 			}
 			int num2 = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
-			int num3 = Math.Max(1, Math.Min(2, num2 / (int)(430f * num)));
+			int num3 = Math.Max(1, Math.Min(ControlDensityTools.Choose(3, 2, 2), num2 / (int)(ControlDensityTools.Choose(330, 430, 460) * num)));
 			foreach (Control control3 in cards.Controls)
 			{
+				control3.Padding = new Padding(ControlDensityTools.Choose(12, 22, 28));
+                control3.Margin = new Padding(ControlDensityTools.Choose(7, 12, 16));
 				control3.Width = Math.Max(1, num2 / num3 - control3.Margin.Horizontal - 2);
 				FlowLayoutPanel flowLayoutPanel = control3.Tag as FlowLayoutPanel;
 				if (flowLayoutPanel == null)
@@ -23427,7 +23439,7 @@ namespace EmulatorHub
 				{
 					int captionWidth = Math.Max(1, control3.Width - control3.Padding.Horizontal - item2.Padding.Horizontal);
 					int captionHeight = TextRenderer.MeasureText(item2.Text, item2.Font, new Size(captionWidth, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl).Height;
-					item2.Height = Math.Max((int)(40f * num), captionHeight + 14);
+					item2.Height = Math.Max((int)(ControlDensityTools.Choose(30, 40, 46) * num), captionHeight + 14);
 				}
 				int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal - 2);
 				foreach (Control control4 in flowLayoutPanel.Controls)
@@ -23435,8 +23447,8 @@ namespace EmulatorHub
 					int num5 = Math.Max(1, num4 - control4.Margin.Horizontal);
 					if (control4 is Button)
 					{
-						control4.MaximumSize = new Size(num5, Math.Max(1, (int)(42f * num)));
-						control4.Size = new Size(Math.Min(Math.Max(116, (int)((float)TextRenderer.MeasureText(control4.Text, control4.Font).Width + 58f * num)), num5), Math.Max(1, (int)(42f * num)));
+						control4.MaximumSize = new Size(num5, Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
+						control4.Size = new Size(Math.Min(Math.Max(ControlDensityTools.Choose(90, 116, 132), (int)((float)TextRenderer.MeasureText(control4.Text, control4.Font).Width + ControlDensityTools.Choose(36, 58, 66) * num)), num5), Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
 						continue;
 					}
 					control4.MaximumSize = new Size(num5, 0);
@@ -23452,7 +23464,7 @@ namespace EmulatorHub
                             foreach (Button item in flowLayoutPanel2.Controls.OfType<Button>())
                             {
                                 item.MaximumSize = new Size(Math.Max(1, num5 - item.Margin.Horizontal), 0);
-                                item.Size = new Size(Math.Min(Math.Max(116, TextRenderer.MeasureText(item.Text, item.Font).Width + (int)(40f * num)), Math.Max(1, num5 - item.Margin.Horizontal)), Math.Max(item.Font.Height + 16, (int)(42f * num)));
+                                item.Size = new Size(Math.Min(Math.Max(ControlDensityTools.Choose(90, 116, 132), TextRenderer.MeasureText(item.Text, item.Font).Width + (int)(ControlDensityTools.Choose(30, 40, 46) * num)), Math.Max(1, num5 - item.Margin.Horizontal)), Math.Max(item.Font.Height + ControlDensityTools.Choose(10, 16, 20), (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
                             }
                             flowLayoutPanel2.Height = flowLayoutPanel2.GetPreferredSize(new Size(num5, 0)).Height;
                         }
@@ -23460,16 +23472,16 @@ namespace EmulatorHub
 						{
 							button.AutoEllipsis = true;
 							int num6 = Math.Max(1, num5 - pictureBox.Width - pictureBox.Margin.Horizontal - button.Margin.Horizontal);
-							button.MinimumSize = new Size(Math.Min(116, num6), Math.Max(1, (int)(42f * num)));
-							button.MaximumSize = new Size(num6, Math.Max(1, (int)(42f * num)));
-							button.Width = Math.Min(num6, TextRenderer.MeasureText(button.Text, button.Font).Width + (int)(58f * num));
+							button.MinimumSize = new Size(Math.Min(ControlDensityTools.Choose(90, 116, 132), num6), Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
+							button.MaximumSize = new Size(num6, Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
+							button.Width = Math.Min(num6, TextRenderer.MeasureText(button.Text, button.Font).Width + (int)(ControlDensityTools.Choose(36, 58, 66) * num));
 							flowLayoutPanel2.Height = Math.Max(pictureBox.Height + pictureBox.Margin.Vertical, button.Height + button.Margin.Vertical);
 						}
 					}
 				}
 				int headingHeight = control3.Controls.OfType<Label>().Sum(l => l.Height);
-				int val = flowLayoutPanel.Controls.Cast<Control>().Where(item => !collapsedRows.Contains(item)).Sum(item => ((item is Label) ? item.GetPreferredSize(new Size(Math.Max(1, num4 - item.Margin.Horizontal), 0)).Height : item.Height) + item.Margin.Vertical) + headingHeight + control3.Padding.Vertical + (int)(20f * num);
-				control3.Height = Math.Max((int)((Immersion.Ensure(library).Roomier ? 180f : 120f) * num), val);
+				int val = flowLayoutPanel.Controls.Cast<Control>().Where(item => !collapsedRows.Contains(item)).Sum(item => ((item is Label) ? item.GetPreferredSize(new Size(Math.Max(1, num4 - item.Margin.Horizontal), 0)).Height : item.Height) + item.Margin.Vertical) + headingHeight + control3.Padding.Vertical + (int)(ControlDensityTools.Choose(10, 20, 26) * num);
+				control3.Height = Math.Max((int)(ControlDensityTools.Choose(100, Immersion.Ensure(library).Roomier ? 180 : 120, 210) * num), val);
 			}
 		}
 
@@ -23479,8 +23491,8 @@ namespace EmulatorHub
 			panel.Height = (Immersion.Ensure(library).Roomier ? 300 : (library.Experience.CompactHome ? 210 : 260));
 			panel.Width = 370;
 			panel.BackColor = FishBowlPalette.ThemeSurface;
-			panel.Margin = new Padding(12);
-			panel.Padding = new Padding(22);
+			panel.Margin = new Padding(ControlDensityTools.Choose(7, 12, 16));
+			panel.Padding = new Padding(ControlDensityTools.Choose(12, 22, 28));
 			panel.AccessibleName = title;
 			Panel panel2 = panel;
 			Label label = ExperienceUi.Label(title, 40);
@@ -23536,7 +23548,7 @@ namespace EmulatorHub
             var actions = body.Controls.OfType<Button>().Where(button => !(button.Tag is GameEntry) && !(button.Tag is EmulatorProfile)).ToArray();
             if (actions.Length > 0)
             {
-                var row = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, WrapContents = true, AutoSize = false, Margin = new Padding(0, 10, 0, 2), AccessibleName = "Home card actions" };
+                var row = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, WrapContents = true, AutoSize = false, Margin = new Padding(0, ControlDensityTools.Choose(4, 10, 14), 0, 2), AccessibleName = "Home card actions" };
                 foreach (var button in actions) { body.Controls.Remove(button); row.Controls.Add(button); }
                 body.Controls.Add(row);
             }
@@ -35167,7 +35179,7 @@ namespace EmulatorHub
 			{
 				CheckBox checkBox = new CheckBox
 				{
-					Checked = (bool)typeof(ImmersionSettings).GetProperty(array2[0]).GetValue(immersionSettings, null)
+					Checked = array2[0] == "Roomier" ? d.Theme.ControlDensity == "Roomy" || d.Theme.ControlDensity == "Standard" && immersionSettings.Roomier : (bool)typeof(ImmersionSettings).GetProperty(array2[0]).GetValue(immersionSettings, null)
 				};
 				checks[array2[0]] = checkBox;
 				NextDialog.Field(table, array2[1], checkBox, Math.Max(48, Font.Height * 3));
@@ -35209,6 +35221,7 @@ namespace EmulatorHub
 				typeof(ImmersionSettings).GetProperty(check.Key).SetValue(immersionSettings2, check.Value.Checked, null);
 			}
 			Immersion.ApplyPreset(data, preset.Text);
+            data.Theme.ControlDensity = checks["Roomier"].Checked ? "Roomy" : "Compact";
 			Hub.Ensure(data).Immersion = immersionSettings2;
 			FluidStyle.Configure(data);
 			Store.Save(data);
@@ -35716,10 +35729,12 @@ namespace EmulatorHub
 		public static void Configure(LibraryData d)
 		{
 			ImmersionSettings immersionSettings = Immersion.Ensure(d);
-			bool flag = Motion != d.Theme.EnableMotion || Transitions != immersionSettings.Transitions || Roomier != immersionSettings.Roomier || Bubbles != immersionSettings.Bubbles;
+            ControlDensityTools.Configure(d);
+			bool flag = Motion != d.Theme.EnableMotion || Transitions != immersionSettings.Transitions || Roomier != (ControlDensityTools.Current == "Roomy" || ControlDensityTools.Current == "Standard" && immersionSettings.Roomier) || Bubbles != immersionSettings.Bubbles;
 			Motion = d.Theme.EnableMotion;
 			Transitions = immersionSettings.Transitions;
-			Roomier = immersionSettings.Roomier;
+			ControlDensityTools.Configure(d);
+            Roomier = ControlDensityTools.Current == "Roomy" || ControlDensityTools.Current == "Standard" && immersionSettings.Roomier;
 			Bubbles = immersionSettings.Bubbles;
 			if (flag)
 			{

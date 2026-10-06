@@ -49,7 +49,8 @@ class VisualRegressionTests
         using (var history = new SaveHistoryDialog(library, library.Games.FirstOrDefault()))
         {
             Show(history); Check(history.Icon != null, "Save history is branded");
-            Check(history.BackColor == FishBowlPalette.DeepSeaSurface, "New dialogs follow the palette");
+            Check(history.BackColor == FishBowlPalette.ThemeBottom, "New dialogs use the current window background role");
+            Check(FishBowlPalette.Contrast(history.ForeColor, history.BackColor) >= 4.5, "Window text remains readable against the dialog background");
         }
         using (var form = new Form { ClientSize = new Size(1000, 640) })
         {

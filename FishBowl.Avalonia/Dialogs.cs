@@ -330,6 +330,8 @@ namespace EmulatorHub
                 ChosenTheme.HiddenHomeCards = original.HiddenHomeCards;
                 ChosenTheme.RestrainedAccents = restrained.IsChecked == true;
                 ChosenTheme.CoverAspect = coverAspect.SelectedItem as string;
+                ChosenTheme.ControlDensity = original.ControlDensity;
+                ChosenTheme.ColorHarmony = original.ColorHarmony;
                 BackupFolder = (backup.Text ?? "").Trim();
                 return Task.FromResult(true);
             });
