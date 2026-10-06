@@ -72,6 +72,8 @@ namespace EmulatorHub
             SetStatus("Double-click an emulator to open it. Manage games inside the emulator.");
             // Bubble, so open menus and drop-downs handle Escape/Enter before the hub shortcuts.
             AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Bubble);
+            // Watches every key on the way in (lists consume arrows) without handling it: the Konami code wakes Tux.
+            AddHandler(KeyDownEvent, (sender, e) => { if (TuxEasterEgg.KeyPressed(e.Key)) PlayTux(); }, RoutingStrategies.Tunnel);
             runtimeTimer.Tick += delegate { RefreshRuntimeStatus(); }; runtimeTimer.Start();
             notesTimer.Tick += async delegate { await Ui.Run(this, () => { SaveProfileNotes(); return Task.CompletedTask; }); };
             gameFolderTimer.Tick += async delegate { gameFolderTimer.Stop(); await Ui.Run(this, () => { SyncWatchedGameFolders(); return Task.CompletedTask; }); };
@@ -98,11 +100,14 @@ namespace EmulatorHub
             var shell = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto"), Background = p.BottomBrush };
             shell.Children.Add(BuildMenu());
             var banner = new Grid { Background = p.TopBrush, Height = 76, ColumnDefinitions = new ColumnDefinitions("Auto,*"), IsVisible = library.Theme.ShowBanner };
-            banner.Children.Add(new Image { Source = Ui.Logo(), Width = 60, Height = 60, Margin = new Thickness(12, 8), Stretch = Stretch.Uniform });
+            var logo = new Image { Source = Ui.Logo(), Width = 60, Height = 60, Margin = new Thickness(12, 8), Stretch = Stretch.Uniform };
+            logo.PointerPressed += delegate { if (TuxEasterEgg.LogoClicked()) PlayTux(); };
+            banner.Children.Add(logo);
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0) };
             titles.Children.Add(Ui.Text("FishBowl", 24, true));
             titles.Children.Add(Ui.Text("Your emulators, together. Add and play games inside each emulator.", 12, false, p.SubtleBrush));
             Grid.SetColumn(titles, 1); banner.Children.Add(titles);
+            Grid.SetColumnSpan(tux, 2); banner.Children.Add(tux);
             Grid.SetRow(banner, 1); shell.Children.Add(banner);
             var actions = BuildPrimaryActions(); Grid.SetRow(actions, 2); shell.Children.Add(actions);
 
@@ -565,6 +570,15 @@ namespace EmulatorHub
         }
 
         // ----- Keyboard ----------------------------------------------------------------------------------------------
+
+        private readonly TuxSwim tux = new TuxSwim();
+        private void PlayTux()
+        {
+            if (tux.Playing) return;
+            tux.Play(library.Theme.EnableMotion);
+            SetStatus("A wild Tux appeared! 🐧");
+            Store.Log("Tux visited the fishbowl.");
+        }
 
         private async void OnKeyDown(object sender, KeyEventArgs e)
         {
