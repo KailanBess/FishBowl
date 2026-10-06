@@ -16,7 +16,7 @@ _Last updated: 2026-10-06, by the Linux side._
 
 | PR | What | Notes |
 | --- | --- | --- |
-| (this one) | Linux: dialogs no longer trap the mouse | Linux only. |
+| #19 | Linux: dialogs no longer trap the mouse | Linux only. |
 
 ## Recently merged: Windows 1.25.11 (#15)
 
