@@ -16872,6 +16872,54 @@ namespace EmulatorHub
 			}
 		}
 
+		private static readonly ToolTip clippedTip = new ToolTip();
+
+		// Space the label needs with no icon: text plus the 7px side margins drawn in OnPaint.
+		public int TextWidthNeeded()
+		{
+			return TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width + 14;
+		}
+
+		// Buttons in flowing rows widen to fit their text (the row re-flows); fixed-position buttons keep their size
+		// and show the full text as a tooltip when it has to be shortened.
+		private void FitText()
+		{
+			if (IconOnly || String.IsNullOrEmpty(Text))
+			{
+				return;
+			}
+			int need = TextWidthNeeded();
+			if (base.Width < need && base.Parent is FlowLayoutPanel && base.Dock == DockStyle.None && !base.AutoSize)
+			{
+				base.Width = need;
+			}
+			clippedTip.SetToolTip(this, base.Width < need ? Text : null);
+		}
+
+		protected override void OnTextChanged(EventArgs e)
+		{
+			base.OnTextChanged(e);
+			FitText();
+		}
+
+		protected override void OnFontChanged(EventArgs e)
+		{
+			base.OnFontChanged(e);
+			FitText();
+		}
+
+		protected override void OnParentChanged(EventArgs e)
+		{
+			base.OnParentChanged(e);
+			FitText();
+		}
+
+		protected override void OnSizeChanged(EventArgs e)
+		{
+			base.OnSizeChanged(e);
+			FitText();
+		}
+
 		public override Size GetPreferredSize(Size proposedSize)
 		{
 			if (IconOnly)
@@ -16988,7 +17036,8 @@ namespace EmulatorHub
 			}
 			Color foreColor = FishBowlPalette.EnsureReadable(base.Enabled ? ForeColor : FishBowlPalette.DisabledText, color2);
 			Size size = TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
-			bool flag2 = base.Image != null && base.Width >= 56;
+			// The icon gives way to the label when both don't fit, so text isn't cut to "Sa..." for decoration.
+			bool flag2 = base.Image != null && base.Width >= 56 && base.Width >= 20 + 7 + size.Width + 14;
 			int num = (flag2 ? 20 : 0);
 			int num2 = (flag2 ? 7 : 0);
 			int num3 = num + num2 + size.Width;
