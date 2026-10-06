@@ -1,6 +1,6 @@
 # FishBowl for Windows
 
-This folder contains the source of the Windows version of FishBowl (current source version **1.25.10**). See [CHANGES.md](CHANGES.md) for what's new, and the [main README](../README.md) for features and installation.
+This folder contains the source of the Windows version of FishBowl (current source version **1.25.11**). See [CHANGES.md](CHANGES.md) for what's new, and the [main README](../README.md) for features and installation.
 
 ## Build
 

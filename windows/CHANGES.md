@@ -1,3 +1,13 @@
+# Windows 1.25.11
+
+- Normalized organization source paths before grouping playlists, cues and tracks. Repeated references are deduplicated; circular playlists are rejected. Tests cover Windows short temp paths, relative paths and enumeration order (#10).
+- Fixed large-text layout scaling so fonts are enlarged once. Existing labels, buttons, headers and form rows fit their text without changing themes or wording.
+- Added Library tools → Undo removal. The last 20 game or emulator removal batches are retained across restarts. Restores game metadata, collection membership, queue order and emulator assignments, preserving entries edited or re-added afterward. Conflicting entries stay available for recovery.
+- Portable libraries record their previous roots. Moving the portable folder repairs missing paths when matching files exist in the new folder. Repair game paths → Review moved reviews matching paths under a selected old/new folder pair before applying them. File contents and names remain unchanged.
+- Launching a game whose emulator was removed prompts for a preferred emulator. FishBowl no longer silently uses the sole remaining emulator for those games.
+- Added Library tools → Cleanup artwork. It reviews unused generated covers and icons before removal, protecting active entries, Undo removal history, inactive profiles and readable library backups. Unreadable backups stop cleanup.
+- Shared optional recovery and portable metadata are preserved by the Linux schema tests. The shared helpers compile into both platforms; Linux still needs corresponding UI actions.
+
 # Windows 1.25.10
 
 ### Fixed

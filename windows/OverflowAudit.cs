@@ -101,6 +101,12 @@ class OverflowAudit {
   else if (t == typeof(EmulatorProfile)) value = data.Emulators[0];
   else if (t == typeof(GameEntry)) value = data.Games[1];
   else if (t == typeof(ThemeSettings)) value = data.Theme;
+  else if (t == typeof(WorkspaceItem)) value = new WorkspaceItem { Title = "Fixture workspace item", Target = Path.GetFullPath("fixture.rom") };
+  else if (t == typeof(PlaySession)) value = new PlaySession { Seconds = 120 };
+  else if (t == typeof(IEnumerable<DiscoveredEmulator>)) value = new List<DiscoveredEmulator>();
+  else if (t == typeof(IEnumerable<SearchResult>)) value = new List<SearchResult> { new SearchResult { Caption = "Fixture game", Open = delegate {} } };
+  else if (t == typeof(IEnumerable<WebsiteLink>)) value = new List<WebsiteLink> { new WebsiteLink { Name = "Fixture website", Url = "https://example.com" } };
+  else if (t == typeof(List<OrganizationPlan>)) value = new List<OrganizationPlan>();
   else if (t == typeof(string)) value = parameter.Name.IndexOf("path", StringComparison.OrdinalIgnoreCase) >= 0 ? Path.GetFullPath("fixture.rom") : parameter.Name.IndexOf("version", StringComparison.OrdinalIgnoreCase) >= 0 ? "1.24" : "Fixture text that is long enough to show how this dialog handles a realistic sentence";
   else if (t == typeof(int)) value = 0; else if (t == typeof(long)) value = 0L; else if (t == typeof(bool)) value = false; else if (t == typeof(double)) value = 0d;
   else if (t.IsEnum) value = Enum.GetValues(t).GetValue(0);

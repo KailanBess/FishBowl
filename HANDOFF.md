@@ -16,24 +16,23 @@ _Last updated: 2026-10-06, by the Windows side._
 
 | PR | What | Notes |
 | --- | --- | --- |
-| #11 | Fix cut-off and overlapping text in the Windows app | Audit findings 309 → 88 (2 at 100% text size). Adds `windows/FishBowl.TextFit.cs`. |
 | #9 | Linux easter egg (Tux in the banner) | Linux only. |
-| #12 | README rewrite and repository tidy-up | Removes unused files, moves binaries to Releases, adds these handoff files. |
+| #15 | Windows 1.25.11 library recovery and layout fixes | Includes 1.25.9 removal and 1.25.10 title/cover fixes; needs Linux UI port and review. |
 
 ## Windows change awaiting review
 
-Branch `fix-library-title-artwork` proposes source version **1.25.10**. It includes the earlier 1.25.9 removal actions, preserves explicit library titles without renaming game files, retains custom covers, and refreshes covers in list and artwork views. It preserves the shared-model and text-fitting changes already on main.
+Branch `fix-library-title-artwork` ([PR #15](../../pull/15)) proposes source version **1.25.11**. It includes the earlier removal and title/cover fixes, plus all six follow-up improvements: normalized multi-disc grouping, large-text layouts, persisted Undo removal, portable/moved-folder path recovery, explicit emulator reassignment after removal, and reviewed artwork cleanup. Existing UI themes, control styles and wording are retained.
 
-Shared changes: optional `GameEntry.TitleIsCustom` and `LibraryData.RemovedGamePaths` fields, plus `FishBowl.Library.cs` for removal and cover-copy logic. Both front ends and shared test projects compile this helper. Linux schema tests cover preservation of the new fields; matching Linux UI actions need a port. Shared-model review from the Linux maintainer is needed before merging.
+Shared changes: `GameEntry.RequiresEmulatorAssignment`, `LibraryData.RemovalHistory`, `SavedDataRoot` and `SavedPortableRoot`, and the recovery record types are optional in `FishBowl.Model.cs`. `FishBowl.Library.cs` contains the recovery, path-repair and artwork-reference helpers. Both Store implementations record roots on save and repair missing paths on load when matching relocated files exist. Linux schema tests cover the new optional fields and nested recovery records; matching Linux UI actions still need a port. No Avalonia UI or Linux integration files changed.
 
-Validation commands: `windows\Build.ps1`, `windows\Run Tests.ps1`, `windows\Run Overflow Audit.ps1`, and the Framework C# 5 shared compilation. Linux/Avalonia build and schema tests run in CI. Local Linux runtime/GUI checks have not been run.
+Undo retains the last 20 removal batches across restarts. It skips conflicts with re-added entries and retains partially recovered batches, protects newer emulator assignments, and leaves game/save/executable files untouched. Cleanup is manual, reviewed, and limited to generated files in managed artwork folders. References in the active library, inactive profiles, undo history and readable local backup/restore libraries are protected; an unreadable backup blocks cleanup. Root repair matches exact relative paths rather than guessing titles.
 
-Validation results: 2,651 Windows regression checks passed, 62 previews rendered without failures, and shared sources compiled with Framework C# 5. The overflow audit reported 69 findings; the remaining dense-dialog layout work is separate from library editing.
+Validation: Windows app/installer build, full regression runner (2,694 checks including 43 recovery checks), 62 general dialog previews plus reassignment prompts at 100/150/200% text size, and Framework C# 5 shared compilation. The expanded overflow audit covers six previously skipped dialogs; only the generic background-worker form remains outside the constructor fixture. The expanded text audit reported zero clipping or overlap findings at 100%, 150% and 200% text size. GitHub CI status is recorded after verification. Linux/Avalonia runtime checks are delegated to CI because no local .NET SDK is available.
 
 ## Known issues
 
-- **#10, Windows CI test failure.** "multi-disc support files grouped once" in `windows/Tests/IntegrationTests.cs` passes locally but fails on GitHub's Windows runner. Every Windows CI run fails until it is fixed. This is Windows-side work.
-- **Remaining text overflow (69 findings in the 1.25.10 audit).** Mostly at larger text sizes in dense dialogs (Library Maintenance, Settings), which need a layout redesign. The report is in the `overflow-audit` artifact of each audit run.
+- **#10:** source normalization addresses the Windows runner multi-disc grouping failure. Regression coverage now includes short Windows paths, relative paths, source order and repeated/circular playlist references. GitHub runner confirmation is pending for the new commit.
+- Linux library recovery and reassignment screens need a matching UI port before platform parity.
 
 ## In progress on the Linux side
 
@@ -67,6 +66,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-06 (Windows):** prepared 1.25.11 recovery and layout improvements on PR #15 using the existing UI. Added optional shared recovery/root fields, protected artwork cleanup, emulator reassignment and regression/schema coverage. Supersedes the 69-finding overflow baseline from 1.25.10; release stays 1.25.8 pending review and CI.
 
 - **2026-10-06 (Windows):** prepared 1.25.10 library title/cover fixes and 1.25.9 removal actions on `fix-library-title-artwork`. Added shared optional fields/helpers and editing/removal regression checks. Linux needs matching UI actions; the released version remains 1.25.8 until review and release.
 - **2026-10-06:**
