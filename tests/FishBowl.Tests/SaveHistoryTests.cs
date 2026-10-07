@@ -56,6 +56,11 @@ public static class SaveHistoryTests
         var imported = SaveHistory.Import(library, game, bundle, CancellationToken.None);
         check("exported bundle imports with the same hash", imported.Hash == first.Hash && imported.Source == null && Directory.Exists(imported.Path));
 
+        string cloud = Path.Combine(folder, "cloud"); Directory.CreateDirectory(cloud);
+        int exported = SaveHistory.ExportAll(library, cloud, CancellationToken.None, null);
+        check("cloud export writes one bundle per snapshot", exported == library.SaveSnapshots.Count && Directory.GetFiles(cloud, "*.fishbowl-save.zip", SearchOption.AllDirectories).Length == exported);
+        check("cloud export skips bundles already exported", SaveHistory.ExportAll(library, cloud, CancellationToken.None, null) == 0 && library.Experience.LastCloudBackup != null);
+
         string evil = Path.Combine(folder, "evil.zip");
         using (var archive = ZipFile.Open(evil, ZipArchiveMode.Create))
         {

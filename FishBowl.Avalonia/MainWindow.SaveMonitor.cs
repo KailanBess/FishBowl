@@ -245,7 +245,7 @@ namespace EmulatorHub
             SaveHistory.EnsureData(library); var settings = library.Experience;
             var dialog = new FishDialog("Optional Cloud Backup Folder", 620);
             var provider = Ui.Combo(new[] { "Nextcloud", "Syncthing", "Dropbox", "Google Drive", "OneDrive", "Custom synced folder" }, settings.CloudProvider ?? "Custom synced folder");
-            var folder = Ui.Field(settings.CloudFolder, true);
+            var folder = Ui.Field(settings.CloudFolder);
             var last = Ui.Hint("Last successful export: " + (settings.LastCloudBackup ?? "Not yet exported"));
             var body = new StackPanel { Spacing = 4 };
             body.Children.Add(Ui.Caption("Installed sync provider")); body.Children.Add(provider);
@@ -259,12 +259,12 @@ namespace EmulatorHub
                 {
                     if (!Directory.Exists(folder.Text)) throw new IOException("Choose an existing sync folder.");
                     await new ResultsDialog("Cloud export preview", library.SaveSnapshots.Count == 0 ? new[] { "No snapshots yet. Create snapshots in File > Game saves first." } : library.SaveSnapshots.Select(s => { var g = library.Games.FirstOrDefault(x => x.Id == s.GameId); return (g == null ? s.GameId : g.Title) + " / " + s.CreatedAt + " / " + SaveHistory.Bytes(s.Bytes); })).Present(dialog);
-                    if (library.SaveSnapshots.Count == 0 || !await Ui.Confirm(dialog, "Export verified snapshot bundles into " + folder.Text + "? Existing conflicting archives receive unique filenames. The provider controls upload.", "Review cloud export")) return;
+                    if (library.SaveSnapshots.Count == 0 || !await Ui.Confirm(dialog, "Export verified snapshot bundles into " + folder.Text + "? Snapshots exported before are skipped. Your sync client controls upload.", "Review cloud export")) return;
                     var clone = Json.Deserialize<LibraryData>(Json.Serialize(library)); string target = folder.Text;
                     int count = await Task.Run(() => SaveHistory.ExportAll(clone, target, CancellationToken.None, null));
                     settings.CloudFolder = target; settings.CloudProvider = provider.SelectedItem as string; settings.LastCloudBackup = clone.Experience.LastCloudBackup; Store.Save(library);
                     last.Text = "Last successful export: " + settings.LastCloudBackup;
-                    await Ui.Message(dialog, count + " snapshot bundle(s) exported.");
+                    await Ui.Message(dialog, count + " new snapshot bundle(s) exported.");
                 }),
                 Ui.Action("Close", () => dialog.Close())));
             dialog.Body = body; await dialog.Present(this);

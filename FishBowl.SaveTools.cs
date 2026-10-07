@@ -533,7 +533,9 @@ namespace EmulatorHub
                 if (string.IsNullOrWhiteSpace(snapshot.GameId) || snapshot.GameId.Any(ch => !char.IsLetterOrDigit(ch))) continue;
                 string target = Path.Combine(folder, "FishBowl Saves", snapshot.GameId);
                 Directory.CreateDirectory(target);
-                string file = SafeFiles.Unique(target, snapshot.Id + ".fishbowl-save.zip");
+                // Snapshot ids never change content, so a bundle already exported for this id is skipped.
+                if (File.Exists(Path.Combine(target, snapshot.Id + ".fishbowl-save.zip"))) continue;
+                string file = Path.Combine(target, snapshot.Id + ".fishbowl-save.zip");
                 if (progress != null) progress(file);
                 Export(library, snapshot, file, token);
                 count++;
@@ -947,6 +949,7 @@ namespace EmulatorHub
         {
             SaveHistory.EnsureData(library);
             string source = OriginalGroup(library, changed);
+            if (MatchesLatestSnapshot(library, source)) return false;
             List<GameEntry> owners = library.Games.Where(g => (g.Saves ?? new List<GameSaveEntry>()).Any(s => s.Kind == "In-game saves" && string.Equals(s.Path, source, Platform.PathComparison))).ToList();
             if (owners.Count == 1 && owners[0].SaveCopyPreference == "Never ask") return false;
             string gameId = owners.Count == 1 ? owners[0].Id : null;
@@ -963,6 +966,20 @@ namespace EmulatorHub
             if (!review.Files.Contains(source, PathComparer)) review.Files.Add(source);
             review.ChangedAt = DateTime.UtcNow.ToString("o");
             return true;
+        }
+
+        // True when a small save file already equals its newest snapshot, as right after a restore or a copy,
+        // so FishBowl does not ask to copy what it just wrote.
+        public static bool MatchesLatestSnapshot(LibraryData library, string source)
+        {
+            try
+            {
+                if (!File.Exists(source) || new FileInfo(source).Length > 64L * 1024 * 1024) return false;
+                SaveSnapshot latest = library.SaveSnapshots.Where(s => !s.IsFolder && string.Equals(s.Source, source, Platform.PathComparison)).OrderByDescending(s => s.CreatedAt, StringComparer.Ordinal).FirstOrDefault();
+                return latest != null && latest.Hash == SafeFiles.Hash(source, CancellationToken.None);
+            }
+            catch (IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
         }
 
         // A review whose game asked for "Automatic copies" and whose files are all that game's linked originals.

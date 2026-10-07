@@ -42,6 +42,13 @@ public static class SaveMonitorTests
         racer.SaveCopyPreference = "Never ask"; library.SaveReviews.Clear();
         check("never ask skips the game's changes", !SaveMonitor.Record(library, Path.Combine(folderSave, "slot.dat")) && library.SaveReviews.Count == 0);
 
+        library.SaveReviews.Clear(); quest.SaveCopyPreference = null;
+        GameSaves.Link(quest, questSave, "In-game saves");
+        SaveHistory.Capture(library, quest, questSave, "In-game saves", false, CancellationToken.None);
+        check("a save equal to its newest snapshot is not queued again", !SaveMonitor.Record(library, questSave) && library.SaveReviews.Count == 0);
+        File.WriteAllText(questSave, "two");
+        check("a save that differs from its newest snapshot is queued", SaveMonitor.Record(library, questSave) && library.SaveReviews.Count == 1);
+
         var tracker = new SaveChangeTracker(); var start = DateTime.UtcNow;
         tracker.Queue(questSave, start);
         check("tracker waits for writes to settle", tracker.Ready(start).Count == 0 && tracker.Ready(start.AddSeconds(1)).Count == 0 && tracker.Ready(start.AddSeconds(5)).Count == 1);
