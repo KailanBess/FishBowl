@@ -56,6 +56,11 @@ public static class SaveHistoryTests
         var imported = SaveHistory.Import(library, game, bundle, CancellationToken.None);
         check("exported bundle imports with the same hash", imported.Hash == first.Hash && imported.Source == null && Directory.Exists(imported.Path));
 
+        string cloud = Path.Combine(folder, "cloud"); Directory.CreateDirectory(cloud);
+        int exported = SaveHistory.ExportAll(library, cloud, CancellationToken.None, null);
+        check("cloud export writes one bundle per snapshot", exported == library.SaveSnapshots.Count && Directory.GetFiles(cloud, "*.fishbowl-save.zip", SearchOption.AllDirectories).Length == exported);
+        check("cloud export skips bundles already exported", SaveHistory.ExportAll(library, cloud, CancellationToken.None, null) == 0 && library.Experience.LastCloudBackup != null);
+
         string evil = Path.Combine(folder, "evil.zip");
         using (var archive = ZipFile.Open(evil, ZipArchiveMode.Create))
         {
@@ -72,8 +77,31 @@ public static class SaveHistoryTests
         foreach (var s in candidates) SaveHistory.Remove(library, s);
         check("cleanup removes managed snapshot folders", candidates.All(s => !Directory.Exists(s.Path)) && library.SaveSnapshots.Count == 2);
 
-        // Single-file saves (memory cards, battery saves).
+        // Scheduled linked-save capture and planned export.
+        File.WriteAllText(Path.Combine(live, "system.dat"), "scheduled change");
+        var scheduled = HubSaveSchedule.Capture(library, CancellationToken.None);
+        check("scheduled capture snapshots a changed linked save", scheduled.Snapshots.Count == 1 && scheduled.Snapshots[0].Note == "Scheduled linked-save capture");
+        HubSaveSchedule.Apply(library, scheduled);
+        var unchanged = HubSaveSchedule.Capture(library, CancellationToken.None);
+        check("scheduled capture skips unchanged saves", unchanged.Snapshots.Count == 0 && unchanged.Messages.Any(m => m.Contains("unchanged")) && library.Hub.LastCaptureReport != null);
+        library.BackupFolder = Path.Combine(folder, "backups"); library.Enhancements = new NextSettings { BackupIntervalDays = 7, NextBackupAt = DateTime.UtcNow.AddMinutes(-1).ToString("o"), BackupQuotaMegabytes = 64 };
+        check("planned export is due when its time passed", SaveHistory.PlannedExportDue(library, DateTime.UtcNow));
+        int planned = SaveHistory.ExportPlanned(library, 64, CancellationToken.None, null); SaveHistory.PlannedExportDone(library);
+        check("planned export writes each snapshot once", planned == library.SaveSnapshots.Count && SaveHistory.ExportPlanned(library, 64, CancellationToken.None, null) == 0 && !SaveHistory.PlannedExportDue(library, DateTime.UtcNow));
+
         string card = Path.Combine(folder, "card.mcd"); File.WriteAllText(card, "card one");
+        // Emulator backup archive retention.
+        library.BackupFolder = Path.Combine(folder, "emulator-backups"); string backups = HubPaths.BackupRoot(library); Directory.CreateDirectory(backups);
+        for (int i = 0; i < 4; i++) { string zip = Path.Combine(backups, "Backup " + i + ".zip"); File.WriteAllText(zip, "x"); File.SetLastWriteTimeUtc(zip, DateTime.UtcNow.AddDays(-i)); }
+        library.Experience.BackupArchiveCount = 2; library.Experience.PinnedBackupPaths.Add(Path.Combine(backups, "Backup 3.zip"));
+        var archives = BackupRetention.Archives(library, CancellationToken.None);
+        var old = BackupRetention.CleanupCandidates(library, archives);
+        check("backup cleanup keeps the newest and pinned archives", archives.Count == 4 && old.Count == 1 && old[0].EndsWith("Backup 2.zip"));
+        BackupRetention.Delete(library, old);
+        refused = false; try { BackupRetention.Delete(library, new[] { card }); } catch (IOException) { refused = true; }
+        check("backup cleanup only deletes inside the backup folder", refused && BackupRetention.Archives(library, CancellationToken.None).Count == 3);
+
+        // Single-file saves (memory cards, battery saves).
         var states = SaveHistory.Capture(library, game, card, "Save states", false, CancellationToken.None);
         check("file snapshot stores a verified copy", !states.IsFolder && File.ReadAllText(states.Path) == "card one");
         check("save-state compatibility reports recorded emulator", SaveHistory.Compatibility(library, states).StartsWith("Recorded emulator version and core match", StringComparison.Ordinal));
@@ -85,5 +113,11 @@ public static class SaveHistoryTests
         refused = false;
         try { SafeFiles.Under(folder, "../outside"); } catch (InvalidDataException) { refused = true; }
         check("SafeFiles.Under rejects escaping paths", refused);
+        if (!Platform.IsWindows)
+        {
+            string colon = Path.Combine(folder, "colon-save"); Directory.CreateDirectory(colon); File.WriteAllText(Path.Combine(colon, "Test Quest: Part 2.sav"), "c");
+            var colonSnapshot = SaveHistory.Capture(library, game, colon, "In-game saves", false, CancellationToken.None);
+            check("Linux folder snapshots keep file names with colons", File.Exists(Path.Combine(colonSnapshot.Path, "Test Quest: Part 2.sav")));
+        }
     }
 }
