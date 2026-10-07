@@ -102,6 +102,8 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 
 ## Log
 
+- **2026-10-07 (Linux parity integration):** merged latest `main` into `parity/integration` to resolve pull request merge conflicts before review. The merge applied cleanly with no file-level conflict markers, and this branch now includes current `main` history plus the Linux parity changes for Library, Home, Saves and Living room.
+
 - **2026-10-07 (Linux):** started native Linux testing of the 1.26–1.28 Linux screens (see In progress on the Linux side).
 
 - **2026-10-07 (polish 1.28.1):** refined persistent Play controls, safe detach/retry feedback, guided sharing/return, themed dropdown states, filter visibility, content-sized toolbar rows, persisted Home expansions and idle placement work. Added native/session-details/theme/schema regression coverage and clearer complete app/source release metadata and rollback guidance. Windows-only behavior is documented for Linux parity.
