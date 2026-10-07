@@ -15,6 +15,7 @@
     <Compile Include="../../FishBowl.LinuxShims.cs" Link="Shared/FishBowl.LinuxShims.cs" />
     <Compile Include="CoreTests.cs" />
     <Compile Include="../../FishBowl.Library.cs" Link="Shared/FishBowl.Library.cs" />
+    <Compile Include="../../FishBowl.Games.cs" Link="Shared/FishBowl.Games.cs" />
     <Compile Include="RecognitionTests.cs" />
       <Compile Include="../../FishBowl.GameTools.cs" Link="Shared/FishBowl.GameTools.cs" />
     <Compile Include="../../FishBowl.Integrations.cs" Link="Shared/FishBowl.Integrations.cs" />
@@ -23,8 +24,11 @@
     <Compile Include="SaveHistoryTests.cs" />
     <Compile Include="SaveMonitorTests.cs" />
       <Compile Include="../../FishBowl.Sessions.cs" Link="Shared/FishBowl.Sessions.cs" />
+      <Compile Include="../../FishBowl.LivingRoom.cs" Link="Shared/FishBowl.LivingRoom.cs" />
+      <Compile Include="LivingRoomTests.cs" />
     <Compile Include="../../FishBowl.Avalonia/LinuxJoystick.cs" Link="Platform/LinuxJoystick.cs" />
     <Compile Include="ControllerInputTests.cs" />
     <Compile Include="SessionTests.cs" />
+    <Compile Include="GamesTests.cs" />
   </ItemGroup>
 </Project>

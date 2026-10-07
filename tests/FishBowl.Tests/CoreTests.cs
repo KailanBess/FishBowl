@@ -83,9 +83,11 @@ static class T {
     SaveHistoryTests.Run(root, Check);
     SaveMonitorTests.Run(root, Check);
     SessionTests.Run(root, Check);
+    GamesTests.Run(root, Check);
     Directory.Delete(root, true);
     RecognitionTests.Run(Check);
     ControllerInputTests.Run(Check);
+    LivingRoomTests.Run(Check);
     Console.WriteLine(fails == 0 ? "ALL PASSED" : fails + " FAILED");
     return fails == 0 ? 0 : 1;
   }

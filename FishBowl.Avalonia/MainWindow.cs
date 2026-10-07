@@ -32,6 +32,7 @@ namespace EmulatorHub
         private readonly Button editButton = new Button(), removeButton = new Button(), managementButton = new Button(), favoriteButton = new Button(), informationButton = new Button();
         private readonly ComboBox platformFilter = new ComboBox();
         private readonly CheckBox favoritesOnly = new CheckBox();
+        private TextBlock footerFilterLabel;
         private readonly TextBlock infoTitle = new TextBlock(), infoVersion = new TextBlock(), infoPlatform = new TextBlock(), notesState = new TextBlock();
         private TextBox overviewText, setupText, controllersText, helpText, notesBox;
         private readonly TabControl infoTabs = new TabControl();
@@ -86,6 +87,7 @@ namespace EmulatorHub
                 pendingWarnings.Clear();
                 if (library.Theme.ShowStartupAssistant) await ShowFirstRunGuide();
                 if (library.Theme.ShowGameStorageAssistant) await ShowGameStoragePrompt();
+                if (Environment.GetCommandLineArgs().Skip(1).Any(a => a == "--living-room")) OpenLivingRoom();
             };
             Closing += (sender, e) =>
             {
@@ -111,17 +113,20 @@ namespace EmulatorHub
             Grid.SetColumn(titles, 1); banner.Children.Add(titles);
             Grid.SetColumnSpan(tux, 2); banner.Children.Add(tux);
             Grid.SetRow(banner, 1); shell.Children.Add(banner);
-            var actions = BuildPrimaryActions(); Grid.SetRow(actions, 2); shell.Children.Add(actions);
+            // The emulator actions belong to the Emulators section, as on Windows; Home and Library have their own.
+            var actions = BuildPrimaryActions();
 
             split = new Grid { ColumnDefinitions = new ColumnDefinitions("3*,8,2*") };
             split.ColumnDefinitions[0].MinWidth = 220; split.ColumnDefinitions[2].MinWidth = 200;
             split.Children.Add(BuildEmulatorList());
             var splitter = new GridSplitter { Background = p.TopBrush, ResizeDirection = GridResizeDirection.Columns }; Grid.SetColumn(splitter, 1); split.Children.Add(splitter);
             emulatorInformation = BuildInformationPanel(); Grid.SetColumn(emulatorInformation, 2); split.Children.Add(emulatorInformation);
-            var pages = BuildLibraryPages(split); Grid.SetRow(pages, 3); shell.Children.Add(pages);
+            var emulatorPage = new DockPanel(); DockPanel.SetDock(actions, Dock.Top); emulatorPage.Children.Add(actions); emulatorPage.Children.Add(split);
+            var pages = BuildLibraryPages(emulatorPage); Grid.SetRow(pages, 3); shell.Children.Add(pages);
 
             var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,240,*"), Background = p.TopBrush, Height = 44, IsVisible = library.Theme.ShowStatusBar };
-            footer.Children.Add(new TextBlock { Text = "Filter:", Foreground = p.SubtleBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
+            footerFilterLabel = new TextBlock { Text = "Filter:", Foreground = p.SubtleBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
+            footer.Children.Add(footerFilterLabel);
             filterBox.Watermark = "Name, platform or notes"; filterBox.VerticalAlignment = VerticalAlignment.Center;
             filterBox.TextChanged += delegate { RefreshHub(); };
             Grid.SetColumn(filterBox, 1); footer.Children.Add(filterBox);
@@ -133,7 +138,7 @@ namespace EmulatorHub
             Content = percent == 100 ? (Control)shell : new LayoutTransformControl { LayoutTransform = new ScaleTransform(percent / 100.0, percent / 100.0), Child = shell };
 
             DragDrop.SetAllowDrop(this, true);
-            AddHandler(DragDrop.DragOverEvent, (sender, e) => { var files = DroppedPaths(e); e.DragEffects = files.Any(Platform.IsLaunchFile) ? DragDropEffects.Copy : DragDropEffects.None; });
+            AddHandler(DragDrop.DragOverEvent, (sender, e) => { var files = DroppedPaths(e); e.DragEffects = files.Any(f => Platform.IsLaunchFile(f) || Directory.Exists(f) || GameLibraryImport.EmulatorForFile(library, f) != null) ? DragDropEffects.Copy : DragDropEffects.None; });
             AddHandler(DragDrop.DropEvent, async (sender, e) => { var files = DroppedPaths(e); await Ui.Run(this, () => HandleDroppedPaths(files)); });
         }
         private static List<string> DroppedPaths(DragEventArgs e)
@@ -214,6 +219,23 @@ namespace EmulatorHub
                 MenuAction("Game storage organizer...", "folder", () => ShowGameStorageOrganizer(null)),
                 MenuAction("Open selected emulator", "play", OpenSelectedEmulator), new Separator(),
                 MenuAction("Exit", "power", Close) } };
+            var games = new MenuItem { Header = "_Library", ItemsSource = new object[] {
+                MenuAction("Home", "info", () => libraryPages.SelectedIndex = HomePage),
+                MenuAction("Game library...", "play", () => libraryPages.SelectedIndex = LibraryPage),
+                MenuAction("Add games...", "add", AddLibraryGames),
+                MenuAction("Add games from a folder...", "folder", AddLibraryFolder),
+                MenuAction("Reopen last game", "play", ReopenLastGame), new Separator(),
+                MenuAction("Collections...", "star", ManageLibraryCollections),
+                MenuAction("Smart lists...", "search", ShowSmartLists),
+                MenuAction("Play queue...", "play", () => ShowPlayQueue(SelectedLibraryGame())),
+                MenuAction("Surprise me...", "play", ShowSurpriseMe),
+                MenuAction("Session journal and charts...", "info", () => ShowSessionJournal(null)),
+                MenuAction("Game screenshot gallery...", "image", () => ShowScreenshotGallery(SelectedLibraryGame())),
+                MenuAction("Export library CSV...", "storage", () => ExportLibraryCsv(library.Games)), new Separator(),
+                MenuAction("Library maintenance...", "check", ShowLibraryMaintenance),
+                MenuAction("Repair game paths...", "folder", RepairLibraryPaths),
+                MenuAction("Undo removal", "restore", UndoLibraryRemoval),
+                MenuAction("Customize Home, Library and saves...", "settings", CustomizeLibraryHome) } };
             var emulators = new MenuItem { Header = "_Emulators", ItemsSource = new object[] {
                 MenuAction("Setup assistant / emulator folder...", "folder", () => ShowEmulatorManager("Setup assistant")),
                 MenuAction("Find installed emulators...", "add", () => ShowEmulatorManager("Find installed")),
@@ -238,6 +260,8 @@ namespace EmulatorHub
             var view = new MenuItem { Header = "_View", ItemsSource = new object[] {
                 MenuAction("Refresh emulators", "refresh", () => { reloadProgramMetadata = true; RefreshHub(); }),
                 MenuAction("Appearance...", "settings", ShowAppearanceHub),
+                MenuAction("Living-room Library (Ctrl+L)", "controller", OpenLivingRoom),
+                MenuAction("Immersion settings...", "settings", () => ImmersionSettingsDialog.Show(this, library, () => RefreshGameLibrary())),
                 MenuAction("Full screen (F11)", "desktop", ToggleFullScreen) } };
             convertersMenu.SubmenuOpened += delegate { RefreshConvertersMenu(); }; RefreshConvertersMenu();
             linksMenu.SubmenuOpened += delegate { RefreshWebsiteLinksMenu(); }; RefreshWebsiteLinksMenu();
@@ -245,7 +269,7 @@ namespace EmulatorHub
                 MenuAction("About FishBowl", "info", () => Ui.Message(this, "FishBowl brings games and separately installed emulators together.\n\nUse Library to launch games, edit details, organize collections, and recover removed entries.")),
                 MenuAction("First-run guide...", "info", ShowFirstRunGuide),
                 MenuAction("Game storage guide...", "folder", ShowGameStoragePrompt) } };
-            menu.ItemsSource = new[] { file, emulators, tools, view, convertersMenu, linksMenu, help };
+            menu.ItemsSource = new[] { file, games, emulators, tools, view, convertersMenu, linksMenu, help };
             return menu;
         }
 
@@ -588,13 +612,16 @@ namespace EmulatorHub
             if (!IsActive) return;
             bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             if (ctrl && e.Key == Key.E) { e.Handled = true; await Ui.Run(this, AddEmulator); }
-            else if (ctrl && e.Key == Key.F) { e.Handled = true; if (libraryPages.SelectedIndex == 1) gameSearch.Focus(); else filterBox.Focus(); }
+            else if (ctrl && e.Key == Key.F) { e.Handled = true; if (libraryPages.SelectedIndex == EmulatorsPage) filterBox.Focus(); else { libraryPages.SelectedIndex = LibraryPage; gameSearch.Focus(); } }
+            else if (ctrl && e.Key == Key.R) { e.Handled = true; await Ui.Run(this, ReopenLastGame); }
+            else if (ctrl && e.Key == Key.L) { e.Handled = true; OpenLivingRoom(); }
+            else if (ctrl && e.Key == Key.H) { e.Handled = true; libraryPages.SelectedIndex = HomePage; }
             else if (ctrl && e.Key == Key.G) { e.Handled = true; await Ui.Run(this, () => ShowGameStorageOrganizer(null)); }
             else if (e.Key == Key.F11) { e.Handled = true; ToggleFullScreen(); }
             else if (e.Key == Key.Escape)
             {
                 e.Handled = true;
-                if (WindowState == WindowState.FullScreen) ToggleFullScreen(); else if (!String.IsNullOrEmpty(filterBox.Text)) filterBox.Text = ""; else ClearEmulatorSelection();
+                if (WindowState == WindowState.FullScreen) ToggleFullScreen(); else if (libraryPages.SelectedIndex == LibraryPage && !String.IsNullOrEmpty(gameSearch.Text)) gameSearch.Text = ""; else if (!String.IsNullOrEmpty(filterBox.Text)) filterBox.Text = ""; else ClearEmulatorSelection();
             }
             else if (e.Key == Key.Enter && gameList.IsKeyboardFocusWithin) { e.Handled = true; await Ui.Run(this, LaunchLibraryGame); }
             else if (e.Key == Key.Enter && emulatorList.IsKeyboardFocusWithin) { e.Handled = true; await Ui.Run(this, OpenSelectedEmulator); }
