@@ -23,11 +23,12 @@ class VisualRegressionTests
         {
             Show(main);
             var tabs = (TabControl)typeof(MainForm).GetField("workspaceNavigation", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
-            Check(tabs.SizeMode == TabSizeMode.Fixed && tabs.GetTabRect(2).Width >= TextRenderer.MeasureText("Library", tabs.Font).Width + 20, "Workspace tab labels have enough width");
+            Check(tabs.TabPages.Cast<TabPage>().Select(page=>page.Text).SequenceEqual(new[]{"Home","Emulators","Library","Play"}),"Four primary workspaces preserve original page order and append Play");
+            Check(tabs.SizeMode == TabSizeMode.Fixed && Enumerable.Range(0,tabs.TabCount).All(index=>tabs.GetTabRect(index).Width >= TextRenderer.MeasureText(tabs.TabPages[index].Text,tabs.Font).Width+20),"All workspace headers including Play retain readable width");
             var home = (HomeSurface)typeof(MainForm).GetField("homeSurface", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
             for (int i = 0; i < 60; i++)
             {
-                tabs.SelectedIndex = i % 3; Application.DoEvents();
+                tabs.SelectedIndex = i % tabs.TabCount; Application.DoEvents();
                 Check(tabs.TabPages.Cast<TabPage>().Count(page => page.Visible) == 1, "Only the active workspace is visible");
                 Check(!(bool)typeof(MainForm).GetField("workspaceTransition", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main), "Redraw resumes after every transition");
             }

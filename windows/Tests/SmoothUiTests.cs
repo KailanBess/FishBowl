@@ -29,6 +29,8 @@ class SmoothUiTests
             Check(invalidations==0,"Unchanged idle theme pass never invalidates the main window");
             Check(Buffered(main),"Main window painting is buffered");
             var tabs=(FishBowlTabs)typeof(MainForm).GetField("workspaceNavigation",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main);
+            Check(tabs.TabCount==4&&tabs.TabPages[3].Text=="Play","Play is the fourth primary workspace");
+            Control[] playControls=tabs.TabPages[3].Controls.Cast<Control>().ToArray();IntPtr playHandle=tabs.TabPages[3].Handle;
             int tabInvalidations=0; tabs.Invalidated+=delegate { tabInvalidations++; };
             for(int i=0;i<100;i++) tabs.LegacyHeaders=true;
             Check(tabInvalidations==0,"Repeated header styling does not repaint tabs");
@@ -48,10 +50,11 @@ class SmoothUiTests
             int revision=home.ContentRevision;
             for(int i=0;i<90;i++)
             {
-                tabs.SelectedIndex=i%3; Application.DoEvents();
+                tabs.SelectedIndex=i%tabs.TabCount; Application.DoEvents();
                 Check(tabs.TabPages.Cast<TabPage>().Count(p=>p.Visible)==1,"Rapid switching keeps exactly one workspace visible");
                 Check(!(bool)typeof(MainForm).GetField("workspaceTransition",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main),"Every rapid navigation restores layout");
             }
+            Check(tabs.TabPages[3].Handle==playHandle&&playControls.SequenceEqual(tabs.TabPages[3].Controls.Cast<Control>()),"Rapid workspace switching retains Play page handle and controls");
             Check(home.ContentRevision==revision,"Unchanged Home is retained while switching menus");
             Capture(main,Path.Combine(dir,"workspace.png"));
             main.Close();
@@ -59,7 +62,11 @@ class SmoothUiTests
         foreach(string theme in new[]{"FishBowl Water","Light","High Contrast"}) foreach(int percent in new[]{100,150,200})
         {
             data.Theme.Name=theme; data.Enhancements.TextPercent=percent; Store.Save(data);
-            using(var main=new MainForm(true)) { Show(main); main.Close(); }
+            using(var main=new MainForm(true)) {
+                Show(main);var navigation=(TabControl)typeof(MainForm).GetField("workspaceNavigation",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main);
+                Check(navigation.TabCount==4&&Enumerable.Range(0,navigation.TabCount).All(index=>navigation.GetTabRect(index).Width>=TextRenderer.MeasureText(navigation.TabPages[index].Text,navigation.Font).Width+20),"Four workspace headers fit "+theme+" at "+percent+"% text");
+                navigation.SelectedIndex=3;Application.DoEvents();Capture(main,Path.Combine(dir,"play-"+theme.Replace(" ","-")+"-"+percent+".png"));main.Close();
+            }
             Form[] prompts={new StartupAssistantDialog(),new GameStoragePromptDialog(),new RequirementsStoragePromptDialog(),new WhatsNewDialog("1.25.4"),new ResultsDialog("FishBowl Notifications",new[]{"READY  Pokemon X","Installed title launches successfully.","A longer notification row for wrapping and scroll layout."})};
             foreach(Form f in prompts) using(f)
             {

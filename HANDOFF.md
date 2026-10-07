@@ -2,19 +2,25 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-06, expansion integration._
+_Last updated: 2026-10-07, Windows Play workspace._
 
 ## Current state
 
 | | State |
 | --- | --- |
-| Windows | Source **1.27.0** on `fishbowl-session-remote-play`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.28.0** on `fishbowl-session-remote-play`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
-PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.27.0 work is in PR #21 on `fishbowl-session-remote-play` and targets main. Both platform implementations are included.
+PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.28.0 work is in PR #21 on `fishbowl-session-remote-play` and targets main. Both platform implementations are included.
+
+## Windows Play workspace 1.28.0
+
+Windows adds a persistent fourth Play section. Game and emulator launch paths route to exact-process native window hosts, keep sessions alive across section changes, and expose fullscreen and detach/reattach actions. Original native parent/styles/placement are restored before host destruction; emulators remain running when FishBowl closes. Matching-DPI windows use native child hosting; incompatible per-monitor renderers use a borderless owned window aligned and clipped to the Play viewport without resetting renderer DPI. Native ownership is restored before fullscreen handle changes or shutdown. Elevated/unsupported windows retain external-window fallback. The foreign process controller guard remains strict. Remote media input currently requires detaching the game window. No saved model changes are introduced; Linux embedding remains a separate task.
+
+Validation: all existing Windows regressions passed 31,089 checks. Actual emulator, embedded Library and modal game launch routing passed 17 checks. Native child/owned-window lifetime tests passed 58 checks and include exact PID/start ownership, resize, multiple sessions, DPI preservation and fullscreen. Normal and compact 100/150/200% audits report zero findings across all four sections and 64 dialog types; 199 schema-preservation checks and Linux semantic compilation pass. Required GitHub Actions build, packaging, remote-service and text-audit checks run on PR #21. Actual emulator rendering/input and multi-monitor DPI combinations require native smoke testing.
 
 ## Session, navigation and remote play 1.27.0
 
@@ -133,3 +139,7 @@ Added profile-owned crash journals, exact launcher tree tracking, Windows contro
 ### 2026-10-06 — native controller modal guard
 
 Controller navigation now checks the actual enabled native form and foreground root window, so file/folder pickers and unrelated modal windows cannot activate controls underneath. Registered FishBowl popup menus remain available. Navigation tests pass 55 checks; the preceding complete Windows regression run passed 31,069 checks. Normal/compact UI audits report zero findings. PR #21 includes the complete 1.27.0 source, media-client resources and token-service setup; current-commit CI is required before merge.
+
+### 2026-10-07 — Windows Play workspace
+
+Added persistent embedded emulator sessions and launch routing, fullscreen chrome, restored native windows on shutdown, and four-section regression coverage in PR #21. Linux continues to launch external windows. See the Play section above for compatibility and validation requirements.

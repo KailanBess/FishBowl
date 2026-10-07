@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.27.0.0")]
+[assembly: AssemblyFileVersion("1.28.0.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.27.0.0")]
+[assembly: AssemblyVersion("1.28.0.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.27.0";
+		private const string FishBowlVersion = "1.28.0";
 
-		private const string FishBowlTitleVersion = "1.27.0";
+		private const string FishBowlTitleVersion = "1.28.0";
 
 		private Icon ownedAppIcon;
 
@@ -236,6 +236,9 @@ namespace EmulatorHub
 		private readonly List<string> saveMonitorErrors = new List<string>();
 
 		private TabControl workspaceNavigation;
+        private PlaySurface playSurface;
+        private bool immersivePlayChrome;
+        private float[] savedPlayRows;
 
 		private HomeSurface homeSurface;
 
@@ -315,7 +318,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.27.0";
+			Text = "FishBowl 1.28.0";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -401,11 +404,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.27.0" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.28.0" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.27.0";
+						library.Theme.LastSeenBuild = "1.28.0";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -445,6 +448,10 @@ namespace EmulatorHub
 						MessageBox.Show(this, "Your notes could not be saved.\n\n" + ex.Message, "FishBowl");
 					}
 				}
+                if (!e.Cancel && playSurface != null && !playSurface.TryDetachAll()) {
+                    e.Cancel = true;
+                    MessageBox.Show(this, "A running emulator window could not be returned to its own window. Close it in the emulator, then retry closing FishBowl.", "FishBowl");
+                }
 			};
 		}
 
@@ -2946,16 +2953,19 @@ namespace EmulatorHub
 			}
 			if (EmulatorRuntime.State(profile.Executable) == RuntimeState.Running)
 			{
-				EmulatorRuntime.BringForward(profile.Executable);
+				playSurface.Adopt(profile.Executable, profile.Name);
+                workspaceNavigation.SelectedIndex = 3;
 				SetStatus(profile.Name + " is already running.");
 			}
 			else if (!library.Theme.ConfirmBeforeEmulatorLaunch || MessageBox.Show(this, "Open " + launchName + "? FishBowl will start the emulator normally without changing its settings.", "Open emulator", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 			{
-				ProcessStartInfo processStartInfo = EmulatorStartInfo(profile);
+				var playBeforeLaunch = SessionLedger.ProcessSnapshot();
+                ProcessStartInfo processStartInfo = EmulatorStartInfo(profile);
 				processStartInfo.Arguments = arguments ?? "";
-				using (Process.Start(processStartInfo))
-				{
-				}
+				using (Process process = Process.Start(processStartInfo))
+                {
+                    ShowPlay(process, launchName, playBeforeLaunch);
+                }
 				RefreshRuntimeStatus();
 				SetStatus("Opened " + launchName + ". Add and launch games inside the emulator.");
 			}
@@ -3384,7 +3394,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.27.0"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.28.0"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3392,7 +3402,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.27.0"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.28.0"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3400,7 +3410,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.27.0"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.28.0"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3582,6 +3592,7 @@ namespace EmulatorHub
 			if (disposing && !visualResourcesDisposed)
 			{
 				visualResourcesDisposed = true;
+                if (playSurface != null) playSurface.DetachAll();
 				DisposeSaveNotifications();
 				scheduledLibraryTimer.Dispose();
 				toolTips.Dispose();
@@ -3700,8 +3711,31 @@ namespace EmulatorHub
 			}
 		}
 
-		private void ToggleFullScreen()
+		private void ApplyPlayFullscreenChrome()
+        {
+            if (workspaceShell == null) return;
+            bool immersive = fullScreen && workspaceNavigation != null && workspaceNavigation.SelectedIndex == 3;
+            if (immersive && !immersivePlayChrome) {
+                savedPlayRows = new float[] { workspaceShell.RowStyles[0].Height, workspaceShell.RowStyles[1].Height, workspaceShell.RowStyles[4].Height };
+                workspaceShell.RowStyles[0].Height = 0;
+                workspaceShell.RowStyles[1].Height = 0;
+                workspaceShell.RowStyles[4].Height = 0;
+                immersivePlayChrome = true;
+            } else if (!immersive && immersivePlayChrome) {
+                workspaceShell.RowStyles[0].Height = savedPlayRows[0];
+                workspaceShell.RowStyles[1].Height = savedPlayRows[1];
+                workspaceShell.RowStyles[4].Height = savedPlayRows[2];
+                immersivePlayChrome = false;
+            }
+        }
+
+        private void ToggleFullScreen()
 		{
+            if (playSurface != null && !playSurface.PrepareHandleChange()) {
+                playSurface.ResumeHandleChange();
+                SetStatus("The emulator window is busy. Retry fullscreen when it responds.");
+                return;
+            }
 			SuspendLayout();
 			if (workspaceShell != null)
 			{
@@ -3735,9 +3769,11 @@ namespace EmulatorHub
 			{
 				if (workspaceShell != null)
 				{
-					workspaceShell.ResumeLayout(true);
+					ApplyPlayFullscreenChrome();
+                    workspaceShell.ResumeLayout(true);
 				}
 				ResumeLayout(true);
+                if (playSurface != null) playSurface.ResumeHandleChange();
 			}
 		}
 
@@ -4625,6 +4661,7 @@ namespace EmulatorHub
 				AccessibleName = "FishBowl workspace navigation",
 				LegacyHeaders = true,
 				RoomyHeaders = true,
+                PreferredColumns = 4,
 				Font = new Font(DisplayFont, 12f, FontStyle.Bold)
 			};
 			TabPage tabPage = new TabPage("Home");
@@ -4636,7 +4673,10 @@ namespace EmulatorHub
 			TabPage tabPage5 = new TabPage("Library");
 			tabPage5.BackColor = bottom;
 			TabPage tabPage6 = tabPage5;
-			workspaceNavigation.TabPages.AddRange(new TabPage[3] { tabPage2, tabPage4, tabPage6 });
+			var playPage = new TabPage("Play") { BackColor = bottom };
+            workspaceNavigation.TabPages.AddRange(new TabPage[4] { tabPage2, tabPage4, tabPage6, playPage });
+            playSurface = new PlaySurface(library, ToggleFullScreen) { Dock = DockStyle.Fill };
+            playPage.Controls.Add(playSurface);
 			homeSurface = new HomeSurface(library, HomeAction);
 			tabPage2.Controls.Add(homeSurface);
 			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
@@ -4667,7 +4707,7 @@ namespace EmulatorHub
 			};
 			tabPage6.Controls.Add(embeddedLibrary);
 			embeddedLibrary.Show();
-			workspaceNavigation.SelectedIndex = ((library.Experience.StartPage == "Library") ? 2 : ((library.Experience.StartPage == "Emulators") ? 1 : 0));
+			workspaceNavigation.SelectedIndex = ((library.Experience.StartPage == "Play") ? 3 : ((library.Experience.StartPage == "Library") ? 2 : ((library.Experience.StartPage == "Emulators") ? 1 : 0)));
 			workspaceNavigation.Selecting += delegate
 			{
 				CaptureWorkspace(workspaceNavigation.SelectedIndex);
@@ -4680,6 +4720,7 @@ namespace EmulatorHub
 				try
 				{
 					UpdateWorkspaceChrome();
+                    ApplyPlayFullscreenChrome();
 					if (workspaceNavigation.SelectedIndex == 0)
 					{
 						homeSurface.Reload(false);
@@ -4709,7 +4750,14 @@ namespace EmulatorHub
 			return new AquariumFrame(workspaceNavigation);
 		}
 
-		private void HomeAction(string command, GameEntry game, EmulatorProfile emulator)
+		internal void ShowPlay(Process process, string title, IList<SessionProcess> beforeLaunch)
+        {
+            if (process == null || playSurface == null || IsDisposed) return;
+            playSurface.Launch(process, title, beforeLaunch);
+            workspaceNavigation.SelectedIndex = 3;
+        }
+
+        private void HomeAction(string command, GameEntry game, EmulatorProfile emulator)
 		{
 			switch (command)
 			{
@@ -5450,7 +5498,7 @@ namespace EmulatorHub
 
 		private void CaptureWorkspace(int index)
 		{
-			if (workspaceNavigation == null || index < 0)
+			if (workspaceNavigation == null || index < 0 || index >= workspaceNavigation.TabCount || index == 3)
 			{
 				return;
 			}
@@ -5500,7 +5548,7 @@ namespace EmulatorHub
 		{
 			NextData.Ensure(library);
 			WorkspaceMemory value;
-			if (index < 0 || !library.Enhancements.Workspaces.TryGetValue(index.ToString(), out value))
+			if (workspaceNavigation == null || index < 0 || index >= workspaceNavigation.TabCount || index == 3 || !library.Enhancements.Workspaces.TryGetValue(index.ToString(), out value))
 			{
 				return;
 			}
@@ -24494,7 +24542,27 @@ namespace EmulatorHub
 					Store.Log("Jump List update: " + ex.Message);
 				}
 			}
-            if (flag) WindowsSessions.Track(owner, library, game, session, process, sessionBeforeLaunch);
+            if (flag) {
+                Control control = owner as Control;
+                MainForm main = null;
+                var launchDialogs = new List<Form>();
+                while (control != null && main == null) {
+                    main = control as MainForm;
+                    Form form = control as Form;
+                    if (form != null && form.Modal && !(form is MainForm)) launchDialogs.Add(form);
+                    control = control.Parent ?? (form == null ? null : form.Owner);
+                }
+                if (main != null) {
+                    try {
+                        main.ShowPlay(process, game.Title, sessionBeforeLaunch);
+                        if (launchDialogs.Count > 0) main.BeginInvoke((MethodInvoker)delegate {
+                            foreach (Form dialog in launchDialogs) if (!dialog.IsDisposed && dialog.Modal) dialog.Close();
+                        });
+                    }
+                    catch (Exception error) { Store.Log("Play host: " + error.Message); }
+                }
+                WindowsSessions.Track(owner, library, game, session, process, sessionBeforeLaunch);
+            }
 		}
 
         public static void UndoRemoval(IWin32Window owner, LibraryData library)
@@ -24670,7 +24738,7 @@ namespace EmulatorHub
 				TabPage tabPage4 = new TabPage("Library");
 				fishBowlTabs2.TabPages.AddRange(new TabPage[4] { tabPage, tabPage2, tabPage3, tabPage4 });
 				TableLayoutPanel tableLayoutPanel = Fields(tabPage);
-				ComboBox start = Choices(new string[3] { "Home", "Library", "Emulators" }, settings.StartPage);
+				ComboBox start = Choices(new string[4] { "Home", "Library", "Emulators", "Play" }, settings.StartPage);
 				Field(tableLayoutPanel, "Start page", start);
 				NumericUpDown count = Number(settings.HomeTileCount, 1m, 12m);
 				Field(tableLayoutPanel, "Tiles per card", count);

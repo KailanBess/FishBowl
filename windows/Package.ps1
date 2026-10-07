@@ -34,6 +34,8 @@ Game titles and artwork are stored in the library without renaming game files. R
 
 Source and platform build instructions are in the accompanying Source archive and the repository README.
 
+Play opens compatible emulator windows inside FishBowl. Switching Home, Library or Emulators leaves sessions running. Full screen expands Play; Open in window restores the emulator window. Closing FishBowl safely detaches running emulator windows. Some elevated or renderer-managed windows require external mode. Remote hosting currently uses Open in window.
+
 Session checkpoints recover observed playtime after restart and follow verified launcher descendants without stopping games on app close. Appearance and accessibility settings share one hub, with separate General preferences. Controller navigation covers current menus, overflow actions, dialogs and controls.
 
 Remote couch play includes a browser media client and host-approved keyboard controls. It requires a LiveKit deployment and the private token service described in remote-play/README.md in the Source archive. This package does not deploy the service or include credentials. Live streaming and emulator key mappings require a two-device test; Linux can join as a browser guest.

@@ -48,7 +48,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Shared C# 5 compilation failed' }
       - name: Package complete Windows app and source
         shell: pwsh
-        run: ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion 1.27.0
+        run: ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion 1.28.0
       - uses: actions/upload-artifact@v7
         with:
           name: FishBowl-windows

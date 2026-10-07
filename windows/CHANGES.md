@@ -1,3 +1,11 @@
+# Windows 1.28.0 Play workspace
+
+- Added Play alongside Home, Emulators and Library. Game and emulator launches route to a persistent native window host; section changes retain running sessions.
+- Added fullscreen, session selection, Show in Play and Open in window using existing controls and appearance.
+- Per-monitor renderers use a borderless owned window aligned and clipped to Play, preserving renderer DPI.
+- Native windows are matched by exact process/start identity and restored before host disposal or handle recreation. FishBowl closes without terminating emulators.
+- Linux retains external emulator windows; native embedding needs a separate platform implementation. Renderer/elevation compatibility and actual emulator smoke tests remain required.
+
 # Windows and Linux 1.27.0 session and controller improvements
 
 - Added durable, profile-owned playtime checkpoints. Restart recovers saved active time and resumes exact running process identities without counting app downtime. Games remain running when FishBowl closes.

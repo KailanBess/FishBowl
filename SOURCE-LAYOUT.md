@@ -4,11 +4,12 @@ FishBowl has two front ends that share their data model and emulator logic.
 
 ## Windows (`windows/`)
 
-The Windows application, source version **1.27.0**, is built from:
+The Windows application, source version **1.28.0**, is built from:
 
 - `windows/FishBowl.cs`, `windows/FishBowl.InputPainting.cs` and `windows/FishBowl.TextFit.cs`: the WinForms application
 - `FishBowl.Model.cs` and `FishBowl.GameRecognition.cs` (repository root): the shared data model and game identification
 - `windows/FishBowl.Navigation.cs`, `windows/FishBowl.Sessions.cs` and `windows/FishBowl.RemotePlay.cs`: unified appearance/controller navigation, session UI tracking and the local browser/input bridge
+- `windows/Play.cs`: exact-process native child/owned-window hosting, persistent Play sessions and safe detach/restore
 - `remote-play/client/`: embedded browser media client and the pinned LiveKit SDK, including its license
 
 `windows/FishBowl.Setup.cs` builds the installer. Run `windows/Build.ps1` to build both executables beside the source, and `windows/Run Tests.ps1` to run the regression tests in `windows/Tests/`. Executables are distributed through GitHub Releases, not committed.
