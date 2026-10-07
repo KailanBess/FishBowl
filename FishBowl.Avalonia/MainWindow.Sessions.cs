@@ -37,9 +37,8 @@ namespace EmulatorHub
         private void StartLibrarySession(GameEntry game, Process process, List<SessionProcess> beforeLaunch, DateTime started, string program)
         {
             LibraryProfiles.Ensure(library);
-            if (library.PlaySessions == null) library.PlaySessions = new List<PlaySession>();
-            var record = new PlaySession { Id = Guid.NewGuid().ToString("N"), GameId = game.Id, StartedAt = started.ToString("o"), EmulatorPath = program, DiscPath = game.Path, Profile = library.UserTools?.ActiveId };
-            library.PlaySessions.Add(record);
+            var record = GamePlay.BeginSession(library, game, program, true);
+            record.StartedAt = started.ToString("o");
             try
             {
                 var tracker = SessionLedger.Start(Store.DataDirectory, record, process, beforeLaunch, SessionLedger.ProfileKey(library));
@@ -75,10 +74,10 @@ namespace EmulatorHub
                     LibraryProfiles.SaveActive(library); Store.Save(library); lastSessionSave = Environment.TickCount64;
                     foreach (var tracker in completed)
                     {
-                        SessionLedger.Commit(tracker); sessionTrackers.Remove(tracker.SessionId); gameProcesses.Remove(tracker.GameId); tracker.Dispose();
+                        SessionLedger.Commit(tracker); sessionTrackers.Remove(tracker.SessionId); gameProcesses.Remove(tracker.GameId); OfferSessionRecap(tracker); tracker.Dispose();
                     }
                     LibraryProfiles.ActiveLaunches = sessionTrackers.Count;
-                    if (completed.Length > 0) RefreshGameLibrary();
+                    if (completed.Length > 0) { RefreshGameLibrary(); if (livingRoom != null) livingRoom.RefreshGames(); }
                 }
                 lastSessionError = null;
             }

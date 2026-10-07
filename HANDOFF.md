@@ -2,7 +2,7 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-07, Windows Web and confirmed shutdown._
+_Last updated: 2026-10-07, main merged into PR #25 and conflicts resolved._
 
 ## Current state
 
@@ -112,6 +112,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-07 (PR #25 merge sync):** merged latest `main` into `fishbowl-web-game-view` to resolve GitHub merge conflicts. Resolved `windows/Build.ps1` by keeping the Web browser build input (`FishBowl.Browser.cs`) and main's shared game/living-room sources (`FishBowl.Games.cs`, `FishBowl.LivingRoom.cs`) in the Windows compiler file list.
 
 - **2026-10-07 (Linux):** started native Linux testing of the 1.26–1.28 Linux screens (see In progress on the Linux side).
 

@@ -1388,7 +1388,9 @@ namespace EmulatorHub
                 {
                     if (!emulator.Extensions.Any(ext => String.Equals(ext.Trim().TrimStart('.'), Path.GetExtension(file).TrimStart('.'), StringComparison.OrdinalIgnoreCase))) continue;
                     if (library.Games.Any(game => String.Equals(game.Path, file, StringComparison.OrdinalIgnoreCase))) continue;
-                    library.Games.Add(new GameEntry { Id = Guid.NewGuid().ToString("N"), EmulatorId = emulator.Id, Title = Path.GetFileNameWithoutExtension(file), Path = file, AddedAt = DateTime.UtcNow.ToString("o"), Tags = new List<string>() });
+                    // Like Windows: games the player removed stay removed, and FishBowl's own staging files are skipped.
+                    if (GameLibraryRemoval.IsExcluded(library, file) || file.IndexOf(".fishbowl-", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                    library.Games.Add(new GameEntry { Id = Guid.NewGuid().ToString("N"), EmulatorId = emulator.Id, Title = Path.GetFileNameWithoutExtension(file), Path = file, AddedAt = DateTime.UtcNow.ToString("o"), Tags = new List<string>(), ConsoleLabel = GameStorage.ConsoleFor(file) });
                     added++;
                 }
             }
