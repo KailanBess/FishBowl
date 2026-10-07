@@ -18,6 +18,8 @@ namespace EmulatorHub
         private readonly List<string> saveMonitorErrors = new List<string>();
         private readonly SaveChangeTracker saveChangeTracker = new SaveChangeTracker();
         private readonly DispatcherTimer saveMonitorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        private readonly DispatcherTimer backupScheduleTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+        private CancellationTokenSource captureCancellation; private bool plannedExportRunning;
         private int saveWatchGeneration; private string lastSaveObserved; private bool reviewingSaves, automaticCopyRunning, pendingSaveNotice;
 
         // Library > Game saves submenu (the Windows build lists these in its Library menu).
@@ -33,6 +35,8 @@ namespace EmulatorHub
                 MenuAction("Save monitoring status...", "info", ShowSaveMonitoringStatus), new Separator(),
                 MenuAction("Storage and backup dashboard...", "storage", ShowStorageDashboard),
                 MenuAction("Optional cloud backup folder...", "export", ShowCloudBackupFolder),
+                MenuAction("Backup schedule...", "refresh", ShowLinkedSaveSchedule),
+                MenuAction("Backup planner...", "storage", ShowBackupPlanner),
                 MenuAction("Emulator backups / restore...", "export", () => ShowEmulatorManager("Backups")) } };
             menu.SubmenuOpened += delegate { prompt.IsChecked = !library.Theme.DisableInGameSaveNotifications; };
             return menu;
@@ -66,6 +70,8 @@ namespace EmulatorHub
         {
             saveMonitorTimer.Tick += async delegate { await Ui.Run(this, () => { ProcessSaveChanges(); return Task.CompletedTask; }); };
             saveMonitorTimer.Start();
+            backupScheduleTimer.Tick += delegate { RunScheduledSaveWork(); }; backupScheduleTimer.Start();
+            Closed += delegate { backupScheduleTimer.Stop(); if (captureCancellation != null) captureCancellation.Cancel(); };
             Closed += delegate { saveMonitorTimer.Stop(); StopSaveWatchers(); };
             ConfigureSaveMonitoring();
         }
@@ -266,6 +272,111 @@ namespace EmulatorHub
                     last.Text = "Last successful export: " + settings.LastCloudBackup;
                     await Ui.Message(dialog, count + " new snapshot bundle(s) exported.");
                 }),
+                Ui.Action("Close", () => dialog.Close())));
+            dialog.Body = body; await dialog.Present(this);
+        }
+
+        // ----- Schedules ---------------------------------------------------------------------------------------------
+
+        private static string NextExportText(NextSettings settings) { DateTime next; return DateTime.TryParse(settings.NextBackupAt, out next) ? next.ToLocalTime().ToString("g") : "After saving the schedule"; }
+        private NextSettings EnsureEnhancements() { if (library.Enhancements == null) library.Enhancements = new NextSettings(); return library.Enhancements; }
+        private HubSettings EnsureHub() { if (library.Hub == null) library.Hub = new HubSettings(); return library.Hub; }
+
+        // Runs once a minute: the linked-save capture schedule and the scheduled snapshot export, never during play.
+        private void RunScheduledSaveWork()
+        {
+            if (LibraryProfiles.ActiveLaunches > 0 || automaticCopyRunning || reviewingSaves) return;
+            var hub = EnsureHub();
+            if (hub.CaptureMinutes > 0 && captureCancellation == null)
+            {
+                DateTime next;
+                if (!DateTime.TryParse(hub.NextCaptureAt, out next)) { hub.NextCaptureAt = DateTime.UtcNow.AddMinutes(hub.CaptureMinutes).ToString("o"); Store.Save(library); }
+                else if (DateTime.UtcNow >= next.ToUniversalTime()) StartLinkedSaveCapture(null);
+            }
+            if (!plannedExportRunning && SaveHistory.PlannedExportDue(library, DateTime.UtcNow)) StartPlannedExport(null);
+        }
+
+        // Captures changed linked saves on a copy of the library and merges the snapshots back (HubSaveSchedule).
+        private Task StartLinkedSaveCapture(Window report)
+        {
+            var hub = EnsureHub(); var copy = Json.Deserialize<LibraryData>(Json.Serialize(library));
+            var cancellation = captureCancellation = new CancellationTokenSource();
+            var done = new TaskCompletionSource<bool>();
+            Task.Run(() => HubSaveSchedule.Capture(copy, cancellation.Token)).ContinueWith(task => Ui.Post(async () =>
+            {
+                try
+                {
+                    hub.LastCaptureReport = task.IsCanceled ? "Capture cancelled; new snapshots from the batch were discarded." : task.IsFaulted ? task.Exception.GetBaseException().Message : String.Join(Environment.NewLine, task.Result.Messages);
+                    if (!task.IsFaulted && !task.IsCanceled) HubSaveSchedule.Apply(library, task.Result);
+                    hub.NextCaptureAt = DateTime.UtcNow.AddMinutes(Math.Max(1, hub.CaptureMinutes)).ToString("o");
+                    Store.Save(library);
+                    if (report != null) await new ResultsDialog("Linked-save capture", (hub.LastCaptureReport ?? "").Split('\n').Select(l => l.TrimEnd('\r')).Where(l => l.Length > 0).DefaultIfEmpty("No games have linked original saves yet.")).Present(report);
+                }
+                catch (Exception error) { Store.Log("Scheduled linked saves: " + error.Message); }
+                finally { captureCancellation = null; cancellation.Dispose(); done.TrySetResult(true); }
+            }));
+            return done.Task;
+        }
+
+        private async Task StartPlannedExport(Window owner)
+        {
+            var settings = EnsureEnhancements(); plannedExportRunning = true;
+            try
+            {
+                var copy = Json.Deserialize<LibraryData>(Json.Serialize(library)); long quota = settings.BackupQuotaMegabytes;
+                int count = await Task.Run(() => SaveHistory.ExportPlanned(copy, quota, CancellationToken.None, null));
+                SaveHistory.PlannedExportDone(library); Store.Save(library);
+                if (owner != null) await Ui.Message(owner, count + " snapshot(s) exported to " + SaveHistory.PlannedFolder(library) + ".");
+            }
+            catch (Exception error)
+            {
+                Store.Log("Scheduled backup failed: " + error.Message);
+                if (owner != null) throw;
+                settings.NextBackupAt = DateTime.UtcNow.AddHours(1.0).ToString("o"); Store.Save(library);
+            }
+            finally { plannedExportRunning = false; }
+        }
+
+        private async Task ShowLinkedSaveSchedule()
+        {
+            var hub = EnsureHub();
+            var dialog = new FishDialog("Linked-save backup schedule", 720);
+            var interval = new NumericUpDown { Minimum = 0, Maximum = 10080, Value = hub.CaptureMinutes, FormatString = "0" };
+            var report = Ui.Paragraphs(hub.LastCaptureReport ?? "No scheduled captures yet."); report.Height = 160; report.Background = Ui.P.SurfaceBrush;
+            var body = new StackPanel { Spacing = 4 };
+            body.Children.Add(Ui.Caption("Capture every N minutes (0 = off)")); body.Children.Add(interval);
+            body.Children.Add(Ui.Hint("While FishBowl is open, capture changed original saves linked to games whose emulator is verifiably closed. Unchanged contents and managed snapshots are skipped. Keep sufficient backup space; use reviewed retention to remove old snapshots."));
+            body.Children.Add(Ui.Caption("Last capture")); body.Children.Add(report);
+            body.Children.Add(Ui.Actions(
+                Ui.Action("Save schedule", () => { hub.CaptureMinutes = (int)(interval.Value ?? 0); hub.NextCaptureAt = DateTime.UtcNow.AddMinutes(Math.Max(1, hub.CaptureMinutes)).ToString("o"); Store.Save(library); dialog.Close(); }, true),
+                Ui.Action("Capture linked saves now", async () => { if (captureCancellation != null) throw new IOException("A capture is already running."); if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before capturing saves."); await StartLinkedSaveCapture(dialog); report.Text = hub.LastCaptureReport ?? ""; }),
+                Ui.Action("Stop scheduled capture", () => { if (captureCancellation != null) captureCancellation.Cancel(); }),
+                Ui.Action("Snapshot export schedule", ShowBackupPlanner),
+                Ui.Action("Close", () => dialog.Close())));
+            dialog.Body = body; await dialog.Present(this);
+        }
+
+        private async Task ShowBackupPlanner()
+        {
+            var settings = EnsureEnhancements(); SaveHistory.EnsureData(library);
+            var dialog = new FishDialog("Backup planner and quota", 640);
+            var interval = new NumericUpDown { Minimum = 0, Maximum = 365, Value = settings.BackupIntervalDays, FormatString = "0" };
+            var quota = new NumericUpDown { Minimum = 1, Maximum = 1048576, Value = Math.Max(1, settings.BackupQuotaMegabytes), FormatString = "0" };
+            var status = Ui.Text("", 13);
+            Action preview = () =>
+            {
+                long used = SaveHistory.SnapshotStorage(library), limit = (long)(quota.Value ?? 1) * 1024 * 1024;
+                status.Text = "Managed snapshot storage: " + SaveHistory.Bytes(used) + "\nEstimated next 30 days: " + SaveHistory.Bytes(SaveHistory.EstimatedGrowth(library, 30)) + " (recent 30-day average)\nQuota use for this snapshot set: " + Math.Round(100.0 * used / Math.Max(1L, limit), 1) + "%\nNext export: " + ((interval.Value ?? 0) == 0 ? "Disabled" : NextExportText(settings)) + "\nLast export: " + (settings.LastPlannedBackup ?? "Not yet") + "\nExport folder: " + SaveHistory.PlannedFolder(library);
+            };
+            interval.ValueChanged += delegate { preview(); }; quota.ValueChanged += delegate { preview(); }; preview();
+            var body = new StackPanel { Spacing = 4 };
+            body.Children.Add(Ui.Caption("Export every N days (0 disables)")); body.Children.Add(interval);
+            body.Children.Add(Ui.Caption("Scheduled export quota (MB)")); body.Children.Add(quota);
+            body.Children.Add(Ui.Caption("Plan and storage")); body.Children.Add(status);
+            body.Children.Add(Ui.Actions(
+                Ui.Action("Save schedule", () => { settings.BackupIntervalDays = (int)(interval.Value ?? 0); settings.BackupQuotaMegabytes = (long)(quota.Value ?? 1); settings.NextBackupAt = settings.BackupIntervalDays == 0 ? null : DateTime.UtcNow.AddDays(settings.BackupIntervalDays).ToString("o"); Store.Save(library); preview(); }, true),
+                Ui.Action("Export snapshot set now", async () => { if (plannedExportRunning) return; settings.BackupQuotaMegabytes = (long)(quota.Value ?? 1); await StartPlannedExport(dialog); preview(); }),
+                Ui.Action("Open export folder", () => { var folder = SaveHistory.PlannedFolder(library); Directory.CreateDirectory(folder); Platform.Open(folder); }),
                 Ui.Action("Close", () => dialog.Close())));
             dialog.Body = body; await dialog.Present(this);
         }

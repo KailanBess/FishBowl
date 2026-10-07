@@ -77,6 +77,18 @@ public static class SaveHistoryTests
         foreach (var s in candidates) SaveHistory.Remove(library, s);
         check("cleanup removes managed snapshot folders", candidates.All(s => !Directory.Exists(s.Path)) && library.SaveSnapshots.Count == 2);
 
+        // Scheduled linked-save capture and planned export.
+        File.WriteAllText(Path.Combine(live, "system.dat"), "scheduled change");
+        var scheduled = HubSaveSchedule.Capture(library, CancellationToken.None);
+        check("scheduled capture snapshots a changed linked save", scheduled.Snapshots.Count == 1 && scheduled.Snapshots[0].Note == "Scheduled linked-save capture");
+        HubSaveSchedule.Apply(library, scheduled);
+        var unchanged = HubSaveSchedule.Capture(library, CancellationToken.None);
+        check("scheduled capture skips unchanged saves", unchanged.Snapshots.Count == 0 && unchanged.Messages.Any(m => m.Contains("unchanged")) && library.Hub.LastCaptureReport != null);
+        library.BackupFolder = Path.Combine(folder, "backups"); library.Enhancements = new NextSettings { BackupIntervalDays = 7, NextBackupAt = DateTime.UtcNow.AddMinutes(-1).ToString("o"), BackupQuotaMegabytes = 64 };
+        check("planned export is due when its time passed", SaveHistory.PlannedExportDue(library, DateTime.UtcNow));
+        int planned = SaveHistory.ExportPlanned(library, 64, CancellationToken.None, null); SaveHistory.PlannedExportDone(library);
+        check("planned export writes each snapshot once", planned == library.SaveSnapshots.Count && SaveHistory.ExportPlanned(library, 64, CancellationToken.None, null) == 0 && !SaveHistory.PlannedExportDue(library, DateTime.UtcNow));
+
         // Single-file saves (memory cards, battery saves).
         string card = Path.Combine(folder, "card.mcd"); File.WriteAllText(card, "card one");
         var states = SaveHistory.Capture(library, game, card, "Save states", false, CancellationToken.None);

@@ -562,6 +562,56 @@ namespace EmulatorHub
             return bytes < 1048576 ? Math.Max(1L, bytes / 1024) + " KB" : bytes < 1073741824 ? (bytes / 1024.0 / 1024.0).ToString("0.0") + " MB" : (bytes / 1024.0 / 1024.0 / 1024.0).ToString("0.00") + " GB";
         }
 
+        // ----- Scheduled snapshot export (NextTools.BackupPlanner / RunScheduledBackup) -----
+
+        public static string PlannedFolder(LibraryData library) { return Path.Combine(HubPaths.BackupRoot(library), "Scheduled snapshots"); }
+
+        // Average snapshot growth over the last 30 days, projected over the given number of days.
+        public static long EstimatedGrowth(LibraryData library, int days)
+        {
+            DateTime cutoff = DateTime.UtcNow.AddDays(-30.0);
+            long recent = library.SaveSnapshots.Where(s => { DateTime created; return DateTime.TryParse(s.CreatedAt, out created) && created.ToUniversalTime() >= cutoff; }).Sum(s => s.Bytes);
+            return (long)(recent / 30.0 * Math.Max(0, days));
+        }
+
+        public static bool PlannedExportDue(LibraryData library, DateTime utcNow)
+        {
+            DateTime next;
+            return library.Enhancements != null && library.Enhancements.BackupIntervalDays > 0 && DateTime.TryParse(library.Enhancements.NextBackupAt, out next) && next.ToUniversalTime() <= utcNow;
+        }
+
+        // Exports snapshots not yet in the scheduled-export folder, within the quota (in MB). Returns the number exported.
+        public static int ExportPlanned(LibraryData library, long quotaMegabytes, CancellationToken token, Action<string> progress)
+        {
+            string folder = PlannedFolder(library);
+            Directory.CreateDirectory(folder);
+            long limit = Math.Max(1L, quotaMegabytes) * 1024 * 1024;
+            long used = Directory.GetFiles(folder, "*.zip").Sum(f => new FileInfo(f).Length);
+            int count = 0;
+            foreach (SaveSnapshot snapshot in library.SaveSnapshots.ToArray())
+            {
+                token.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(snapshot.Id) || snapshot.Id.Any(c => !char.IsLetterOrDigit(c) && c != '-' && c != '_')) throw new IOException("Snapshot ID is invalid.");
+                string target = Path.Combine(folder, snapshot.Id + ".zip");
+                if (File.Exists(target)) continue;
+                if (used + snapshot.Bytes > limit) throw new IOException("The scheduled export quota would be exceeded. Increase the quota or review old exports.");
+                if (progress != null) progress("Export " + snapshot.CreatedAt);
+                Export(library, snapshot, target, token);
+                long length = new FileInfo(target).Length;
+                if (used + length > limit) { File.Delete(target); throw new IOException("This new archive exceeds the scheduled export quota."); }
+                used += length; count++;
+            }
+            return count;
+        }
+
+        // Records a finished scheduled export and the next due time.
+        public static void PlannedExportDone(LibraryData library)
+        {
+            NextSettings settings = library.Enhancements;
+            settings.LastPlannedBackup = DateTime.Now.ToString("g");
+            settings.NextBackupAt = settings.BackupIntervalDays <= 0 ? null : DateTime.UtcNow.AddDays(settings.BackupIntervalDays).ToString("o");
+        }
+
         public static List<SaveSnapshot> CleanupCandidates(LibraryData library, GameEntry game)
         {
             EnsureData(library);
@@ -1016,6 +1066,130 @@ namespace EmulatorHub
             int start = settings.QuietStartHour, end = settings.QuietEndHour;
             if (start < 0 || end < 0 || start == end) return false;
             return start < end ? (now.Hour >= start && now.Hour < end) : (now.Hour >= start || now.Hour < end);
+        }
+    }
+
+    // Scheduled capture of changed linked saves (moved from windows/FishBowl.cs; the schedule dialog stays per platform).
+    public class ScheduledSaveResult
+    {
+        public List<SaveSnapshot> Snapshots = new List<SaveSnapshot>();
+
+        public List<string> Messages = new List<string>();
+    }
+    public static partial class HubSaveSchedule
+    {
+        public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token)
+        {
+            return Capture(copy, token, null);
+        }
+
+        public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token, Action<string> progress)
+        {
+            ScheduledSaveResult scheduledSaveResult = new ScheduledSaveResult();
+            string managed = Path.Combine(GameStorage.Root(copy), "Game Saves");
+            try
+            {
+                string hash;
+                foreach (GameEntry g in copy.Games)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!(g.Saves ?? new List<GameSaveEntry>()).Any((GameSaveEntry link) => !string.IsNullOrWhiteSpace(link.Path) && !SafeFiles.Within(link.Path, managed)))
+                    {
+                        continue;
+                    }
+                    EmulatorProfile emulatorProfile = SaveHistory.LaunchEmulator(copy, g);
+                    if (emulatorProfile == null || !Platform.IsDirectProgram(emulatorProfile.Executable) || EmulatorRuntime.State(emulatorProfile.Executable) != RuntimeState.Stopped)
+                    {
+                        scheduledSaveResult.Messages.Add(g.Title + ": skipped; a closed executable could not be verified.");
+                        continue;
+                    }
+                    try
+                    {
+                        SaveHistory.RequireClosed(copy, new SaveSnapshot
+                        {
+                            GameId = g.Id
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
+                        continue;
+                    }
+                    GameSaveEntry[] array = (g.Saves ?? new List<GameSaveEntry>()).ToArray();
+                    foreach (GameSaveEntry link2 in array)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (string.IsNullOrWhiteSpace(link2.Path) || SafeFiles.Within(link2.Path, managed))
+                        {
+                            continue;
+                        }
+                        if (!File.Exists(link2.Path) && !Directory.Exists(link2.Path))
+                        {
+                            scheduledSaveResult.Messages.Add(g.Title + ": linked save missing.");
+                            continue;
+                        }
+                        try
+                        {
+                            hash = SafeFiles.Hash(link2.Path, token);
+                            if (copy.SaveSnapshots.Any((SaveSnapshot s) => s.GameId == g.Id && s.Source == link2.Path && s.Kind == link2.Kind && s.Hash == hash))
+                            {
+                                scheduledSaveResult.Messages.Add(g.Title + ": unchanged save skipped.");
+                                continue;
+                            }
+                            SaveSnapshot saveSnapshot = SaveHistory.Capture(copy, g, link2.Path, link2.Kind, false, token);
+                            saveSnapshot.Note = "Scheduled linked-save capture";
+                            scheduledSaveResult.Snapshots.Add(saveSnapshot);
+                            scheduledSaveResult.Messages.Add(g.Title + ": verified save captured.");
+                            if (progress != null)
+                            {
+                                progress(g.Title + ": verified save captured.");
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
+                        }
+                    }
+                }
+                token.ThrowIfCancellationRequested();
+                return scheduledSaveResult;
+            }
+            catch (OperationCanceledException)
+            {
+                foreach (SaveSnapshot snapshot in scheduledSaveResult.Snapshots)
+                {
+                    SaveHistory.Remove(copy, snapshot);
+                }
+                throw;
+            }
+        }
+
+        public static void Apply(LibraryData d, ScheduledSaveResult result)
+        {
+            foreach (SaveSnapshot s in result.Snapshots)
+            {
+                List<SaveSnapshot> saveSnapshots = d.SaveSnapshots;
+                Func<SaveSnapshot, bool> predicate = (SaveSnapshot x) => x.Id == s.Id;
+                if (!saveSnapshots.Any(predicate))
+                {
+                    d.SaveSnapshots.Add(s);
+                    GameEntry gameEntry = d.Games.FirstOrDefault((GameEntry x) => x.Id == s.GameId);
+                    if (gameEntry != null)
+                    {
+                        GameSaves.Link(gameEntry, s.Path, s.Kind);
+                    }
+                }
+            }
+            if (result.Snapshots.Count > 0)
+            {
+                d.Experience.LastSuccessfulBackup = DateTime.UtcNow.ToString("o");
+            }
+            if (d.Hub == null) d.Hub = new HubSettings();
+            d.Hub.LastCaptureReport = string.Join(Environment.NewLine, result.Messages);
         }
     }
 }
