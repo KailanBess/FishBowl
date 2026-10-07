@@ -103,9 +103,22 @@ namespace EmulatorHub
             AddHandler(PointerPressedEvent, (sender, e) => { if (Wake()) e.Handled = true; }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
             AddHandler(PointerMovedEvent, (sender, e) => { lastInput = DateTime.UtcNow; }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
             idleTimer.Tick += delegate { if (IsActive && !ambient && overlayCancel == null && Immersion.AmbientDue(data, lastInput, DateTime.UtcNow)) ShowAmbient(); };
-            Opened += delegate { Current = this; WindowState = WindowState.FullScreen; Focus(); idleTimer.Start(); };
+            Opened += delegate { Current = this; EnterFullScreen(0); Focus(); idleTimer.Start(); };
             Closed += delegate { if (Current == this) Current = null; idleTimer.Stop(); if (ambientTimer != null) ambientTimer.Stop(); foreach (var bitmap in covers.Values) bitmap.Dispose(); covers.Clear(); };
             Reload(null);
+        }
+
+        // Some window managers ignore a full-screen request made while the window is still being mapped; ask again.
+        private void EnterFullScreen(int attempt)
+        {
+            if (attempt > 0 && WindowState == WindowState.FullScreen) WindowState = WindowState.Normal;
+            WindowState = WindowState.FullScreen;
+            if (attempt < 4) DispatcherTimer.RunOnce(() => { if (IsVisible && !CoversScreen()) EnterFullScreen(attempt + 1); }, TimeSpan.FromMilliseconds(300));
+        }
+        private bool CoversScreen()
+        {
+            var screen = Screens.ScreenFromWindow(this);
+            return screen == null || WindowState != WindowState.FullScreen ? WindowState == WindowState.FullScreen && screen == null : Bounds.Width * screen.Scaling >= screen.Bounds.Width - 2 && Bounds.Height * screen.Scaling >= screen.Bounds.Height - 2;
         }
 
         public GameEntry SelectedGame { get { return selected >= 0 && selected < games.Count ? games[selected] : null; } }

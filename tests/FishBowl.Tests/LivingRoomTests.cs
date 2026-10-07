@@ -29,7 +29,7 @@ public static class LivingRoomTests
         check("grid up/down keep the column and stop at edges", LivingRoom.Move(1, 7, 3, CouchAction.Down) == 4 && LivingRoom.Move(1, 7, 3, CouchAction.Up) == 1 && LivingRoom.Move(6, 7, 3, CouchAction.Down) == 6);
         check("grid down into a shorter last row lands on its last tile", LivingRoom.Move(5, 7, 3, CouchAction.Down) == 6);
         check("grid handles empty and out-of-range selections", LivingRoom.Move(0, 0, 3, CouchAction.Down) == -1 && LivingRoom.Move(9, 4, 3, CouchAction.Up) == 0);
-        check("play time wording", LivingRoom.PlayTime(0) == "Not played yet" && LivingRoom.PlayTime(600) == "10 min played" && LivingRoom.PlayTime(5400) == "1.5 hours played");
+        check("play time wording", LivingRoom.PlayTime(0) == "No play time recorded" && LivingRoom.PlayTime(600) == "10 min played" && LivingRoom.PlayTime(5400) == "1.5 hours played");
         var wave = Immersion.Wave(50, true);
         check("interface sound is a valid PCM wave", wave.Length == 44 + 22050 * 180 / 1000 * 2 && System.Text.Encoding.ASCII.GetString(wave, 0, 4) == "RIFF" && System.Text.Encoding.ASCII.GetString(wave, 8, 4) == "WAVE");
         check("muted interface sound is silent", Immersion.Wave(0, false).Skip(44).All(b => b == 0));

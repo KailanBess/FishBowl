@@ -300,7 +300,7 @@ namespace EmulatorHub
 			TimeSpan time = TimeSpan.FromSeconds(Math.Max(0L, seconds));
 			if (time.TotalMinutes < 1.0)
 			{
-				return "Not played yet";
+				return "No play time recorded";
 			}
 			if (time.TotalHours < 1.0)
 			{
