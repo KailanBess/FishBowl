@@ -31,15 +31,8 @@ namespace EmulatorHub
         {
             if (libraryPages == null) return;
             companionServer?.Update(IntegrationData.CompanionSnapshot(library));
-            homeCards.Children.Clear(); couchCards.Children.Clear();
+            homeCards.Children.Clear();
             if (libraryPages.SelectedIndex == HomePage) BuildHome();
-            foreach (var game in library.Games.OrderByDescending(g => g.Favorite).ThenBy(g => g.Title))
-            {
-                var captured = game;
-                var card = new Button { Content = GameLibraryRow(game, true), Width = 380, Margin = new Thickness(6), Padding = new Thickness(14), MinHeight = 158 };
-                card.Click += async delegate { await Ui.Run(this, () => LaunchGame(captured)); }; couchCards.Children.Add(card);
-            }
-            if (library.Games.Count == 0) couchCards.Children.Add(Ui.Hint("Add games in Library to use Living room. Use Tab and Enter to select and launch a game."));
         }
 
         private void BuildHome()

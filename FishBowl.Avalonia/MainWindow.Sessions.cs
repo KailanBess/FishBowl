@@ -74,10 +74,10 @@ namespace EmulatorHub
                     LibraryProfiles.SaveActive(library); Store.Save(library); lastSessionSave = Environment.TickCount64;
                     foreach (var tracker in completed)
                     {
-                        SessionLedger.Commit(tracker); sessionTrackers.Remove(tracker.SessionId); gameProcesses.Remove(tracker.GameId); tracker.Dispose();
+                        SessionLedger.Commit(tracker); sessionTrackers.Remove(tracker.SessionId); gameProcesses.Remove(tracker.GameId); OfferSessionRecap(tracker); tracker.Dispose();
                     }
                     LibraryProfiles.ActiveLaunches = sessionTrackers.Count;
-                    if (completed.Length > 0) RefreshGameLibrary();
+                    if (completed.Length > 0) { RefreshGameLibrary(); if (livingRoom != null) livingRoom.RefreshGames(); }
                 }
                 lastSessionError = null;
             }

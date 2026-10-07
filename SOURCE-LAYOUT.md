@@ -36,6 +36,6 @@ It must not compile `windows/FishBowl.cs`. Windows behaviour reaches Linux by mo
   - The Linux build adds `[JsonExtensionData]` to each model class, so fields from newer versions survive a Linux save.
 - **Artwork:** `FishBowl.png` and `FishBowl.ico` at the root are used by the Linux app and installer. Windows keeps its own copies in `windows/`.
 
-Shared expansion helpers: `FishBowl.GameTools.cs` (imports, mods, media and history), `FishBowl.Integrations.cs` (catalogs, achievements and companion) and `FishBowl.SaveTools.cs` (verified file save snapshots). Both platforms compile these helpers.
+Shared expansion helpers: `FishBowl.GameTools.cs` (imports, mods, media and history), `FishBowl.Integrations.cs` (catalogs, achievements and companion) , `FishBowl.SaveTools.cs` (verified file save snapshots) and `FishBowl.LivingRoom.cs` (Immersion settings, shelves, presets, session recaps and living-room grid navigation). Both platforms compile these helpers.
 
 `FishBowl.Sessions.cs` supplies verified process-tree identities and durable, profile-owned journals on both platforms. `FishBowl.Avalonia/LinuxJoystick.cs` decodes existing Linux joystick devices; platform session/controller screens stay in Avalonia. `remote-play/server.mjs` is a separate, private reference token service, not an automatically deployed part of the desktop application. See [remote-play setup](remote-play/README.md).

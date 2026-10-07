@@ -25,7 +25,6 @@ namespace EmulatorHub
         private readonly TextBlock gameCount = new TextBlock();
         private readonly StackPanel gameDetails = new StackPanel { Spacing = 8 };
         private readonly StackPanel homeCards = new StackPanel { Spacing = 14 };
-        private readonly WrapPanel couchCards = new WrapPanel();
         private readonly Dictionary<string, Process> gameProcesses = new Dictionary<string, Process>();
         private bool rebuildingGames;
         private TabControl libraryPages;
@@ -101,7 +100,7 @@ namespace EmulatorHub
             var details = new ScrollViewer { Content = gameDetails, Padding = new Thickness(12, 0, 6, 0), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetColumn(details, 2); body.Children.Add(details); panel.Children.Add(body);
 
             var home = new ScrollViewer { Content = homeCards, Padding = new Thickness(18), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-            var couch = new ScrollViewer { Content = couchCards, Margin = new Thickness(18) };
+            var couch = new ScrollViewer { Content = LivingRoomPage() };
             libraryPages.ItemsSource = new[] { new TabItem { Header = "Home", Content = home }, new TabItem { Header = "Library", Content = panel }, new TabItem { Header = "Emulators", Content = emulators }, new TabItem { Header = "Living room", Content = couch } };
             libraryPages.SelectionChanged += (sender, e) => { if (e.Source != libraryPages) return; UpdateSectionChrome(); RefreshHomeCards(); };
             libraryPages.SelectedIndex = library.Experience.StartPage == "Library" ? LibraryPage : library.Experience.StartPage == "Emulators" ? EmulatorsPage : HomePage;

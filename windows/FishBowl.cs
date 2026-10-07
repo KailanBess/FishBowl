@@ -34104,41 +34104,13 @@ namespace EmulatorHub
 			return list;
 		}
 	}
-	public static class Immersion
+	public static partial class Immersion
 	{
 		private static readonly object soundGate = new object();
 
 		private static DateTime lastSound;
 
 		private static bool soundBusy;
-
-		public static ImmersionSettings Ensure(LibraryData d)
-		{
-			HubSettings hubSettings = Hub.Ensure(d);
-			if (hubSettings.Immersion == null)
-			{
-				hubSettings.Immersion = new ImmersionSettings();
-			}
-			return hubSettings.Immersion;
-		}
-
-		public static string ArtworkStamp(string path)
-		{
-			try
-			{
-				FileInfo fileInfo = new FileInfo(path);
-				return fileInfo.Exists ? (path + "|" + fileInfo.Length + "|" + fileInfo.LastWriteTimeUtc.Ticks) : (path ?? "");
-			}
-			catch
-			{
-				return path ?? "";
-			}
-		}
-
-		public static bool Animate(LibraryData d)
-		{
-			return Ensure(d).Transitions && !d.Enhancements.ReducedMotion;
-		}
 
 		public static Bitmap ImageCopy(string path, int width, int height)
 		{
@@ -34190,25 +34162,6 @@ namespace EmulatorHub
 			return bitmap;
 		}
 
-		public static DateTime Date(string text)
-		{
-			DateTime result;
-			return DateTime.TryParse(text, out result) ? result : DateTime.MinValue;
-		}
-
-		public static List<GameEntry> Shelf(LibraryData d, string shelf)
-		{
-			IEnumerable<GameEntry> games = d.Games;
-			games = ((shelf == "Favorites") ? (from g in games
-				where g.Favorite
-				orderby g.Title
-				select g) : ((!(shelf == "Recently added")) ? (from g in games
-				where g.LaunchCount > 0 && !string.Equals(g.PlayStatus, "Completed", StringComparison.OrdinalIgnoreCase)
-				orderby Date(g.LastLaunched) descending
-				select g) : games.OrderByDescending((GameEntry g) => Date(g.AddedAt))));
-			return games.Take(40).ToList();
-		}
-
 		public static void Show(IWin32Window owner, LibraryData d, GameEntry g)
 		{
 			NextData.Ensure(d);
@@ -34216,37 +34169,6 @@ namespace EmulatorHub
 			using (ImmersionWindow immersionWindow = new ImmersionWindow(d, g))
 			{
 				immersionWindow.ShowDialog(owner);
-			}
-		}
-
-		public static byte[] Wave(int volume, bool launch)
-		{
-			volume = Math.Max(0, Math.Min(100, volume));
-			int num = 22050 * (launch ? 180 : 65) / 1000;
-			using (MemoryStream memoryStream = new MemoryStream())
-			{
-				using (BinaryWriter binaryWriter = new BinaryWriter(memoryStream))
-				{
-					binaryWriter.Write(Encoding.ASCII.GetBytes("RIFF"));
-					binaryWriter.Write(36 + num * 2);
-					binaryWriter.Write(Encoding.ASCII.GetBytes("WAVEfmt "));
-					binaryWriter.Write(16);
-					binaryWriter.Write((short)1);
-					binaryWriter.Write((short)1);
-					binaryWriter.Write(22050);
-					binaryWriter.Write(44100);
-					binaryWriter.Write((short)2);
-					binaryWriter.Write((short)16);
-					binaryWriter.Write(Encoding.ASCII.GetBytes("data"));
-					binaryWriter.Write(num * 2);
-					for (int i = 0; i < num; i++)
-					{
-						double num2 = Math.Sin(Math.PI * (double)i / (double)num);
-						double num3 = (launch ? ((i < num / 2) ? 440 : 660) : 520);
-						binaryWriter.Write((short)(Math.Sin(Math.PI * 2.0 * num3 * (double)i / 22050.0) * num2 * 5000.0 * (double)volume / 100.0));
-					}
-					return memoryStream.ToArray();
-				}
 			}
 		}
 
@@ -34327,58 +34249,6 @@ namespace EmulatorHub
 					sessionRecap.ShowDialog(owner);
 				}
 			});
-		}
-
-		public static void ApplyPreset(LibraryData d, string preset)
-		{
-			if (!(preset == "Current"))
-			{
-				if (!new string[3] { "Arcade", "Minimal", "Retro" }.Contains(preset))
-				{
-					throw new ArgumentException("Unknown immersion preset.");
-				}
-				if (d.Cosmetics == null)
-				{
-					d.Cosmetics = new CosmeticSettings();
-				}
-				CosmeticSettings cosmetics = d.Cosmetics;
-				cosmetics.CustomPalette = true;
-				cosmetics.TextColor = "#F4F5F7";
-				cosmetics.MutedColor = "#CBD2DC";
-				cosmetics.SelectionColor = "";
-				cosmetics.FocusColor = "";
-				cosmetics.ArtworkFrame = ((preset == "Minimal") ? "None" : "Rounded");
-				cosmetics.LibrarySpacing = ((preset == "Minimal") ? "Compact" : "Comfortable");
-				switch (preset)
-				{
-				case "Arcade":
-					cosmetics.TopColor = "#20112C";
-					cosmetics.BottomColor = "#110D19";
-					cosmetics.SurfaceColor = "#2B2038";
-					cosmetics.AccentColor = "#DA9CFA";
-					cosmetics.SecondaryColor = "#9BCDF8";
-					cosmetics.BackgroundStyle = "Gradient";
-					break;
-				case "Retro":
-					cosmetics.TopColor = "#29251D";
-					cosmetics.BottomColor = "#15140F";
-					cosmetics.SurfaceColor = "#353129";
-					cosmetics.AccentColor = "#E7C67F";
-					cosmetics.SecondaryColor = "#AFCEAA";
-					cosmetics.BackgroundStyle = "Dots";
-					break;
-				case "Minimal":
-					cosmetics.TopColor = "#20242B";
-					cosmetics.BottomColor = "#14171C";
-					cosmetics.SurfaceColor = "#292F37";
-					cosmetics.AccentColor = "#B9D6ED";
-					cosmetics.SecondaryColor = "#C5CDD9";
-					cosmetics.BackgroundStyle = "Plain";
-					break;
-				default:
-					throw new ArgumentException("Unknown immersion preset.");
-				}
-			}
 		}
 	}
 	public class FadingCover : PictureBox
@@ -34661,17 +34531,7 @@ namespace EmulatorHub
 		{
 			if (!UserTools.Guest)
 			{
-				note = (note ?? "").Trim();
-				if (note.Length > 2000)
-				{
-					throw new ArgumentException("Session notes must be at most 2000 characters.");
-				}
-				g.PersonalRating = Math.Max(0, Math.Min(5, rating));
-				if (note.Length > 0)
-				{
-					session.Note = (string.IsNullOrWhiteSpace(session.Note) ? note : (session.Note + "\r\n" + note));
-					g.Notes = (g.Notes ?? "").TrimEnd() + "\r\n[" + DateTime.Now.ToString("g") + "] " + note;
-				}
+				Immersion.SaveRecap(g, session, note, rating);
 				Store.Save(d);
 			}
 		}

@@ -21,8 +21,8 @@ namespace EmulatorHub
             controllerTimer.Tick += delegate
             {
                 var desktop = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
-                var active = desktop?.Windows.LastOrDefault(w => w.IsActive && (w == this || w is FishDialog));
-                var actions = controllerDevice.Poll(library.UserTools?.Controller == true, active != null, Environment.TickCount64);
+                var active = desktop?.Windows.LastOrDefault(w => w.IsActive && (w == this || w is FishDialog || w is LivingRoomWindow));
+                var actions = controllerDevice.Poll(library.UserTools?.Controller == true || LivingRoomOpen, active != null, Environment.TickCount64);
                 if (active != null) foreach (var action in actions) RouteController(active, action);
             };
             controllerTimer.Start();
@@ -30,6 +30,7 @@ namespace EmulatorHub
         private void RouteController(Window window, ControllerAction action)
         {
             if (!window.IsActive) return;
+            var room = window as LivingRoomWindow; if (room != null) { room.Perform(action); return; }
             var focused = window.FocusManager?.GetFocusedElement() as Control;
             var ancestry = focused == null ? Array.Empty<Control>() : new[] { focused }.Concat(focused.GetVisualAncestors().OfType<Control>()).ToArray();
             var combo = ancestry.OfType<ComboBox>().FirstOrDefault();
@@ -48,6 +49,14 @@ namespace EmulatorHub
                 if (tabs != null && tabs.Items.Count > 0) tabs.SelectedIndex = (Math.Max(0, tabs.SelectedIndex) + (action == ControllerAction.NextTab ? 1 : tabs.Items.Count - 1)) % tabs.Items.Count;
                 return;
             }
+            if (action == ControllerAction.Menu)
+            {
+                // Start opens the window's menu bar, like the Windows build.
+                var first = window.GetVisualDescendants().OfType<Menu>().SelectMany(m => m.Items.OfType<MenuItem>()).FirstOrDefault(m => m.IsEffectivelyEnabled);
+                if (first != null) { first.Focus(NavigationMethod.Tab); first.IsSubMenuOpen = true; }
+                return;
+            }
+            if (action == ControllerAction.Details || action == ControllerAction.Favorite) return;
             if (focused == null) { FocusControllerFirst(window); return; }
             if (action == ControllerAction.Activate)
             {
@@ -98,7 +107,7 @@ namespace EmulatorHub
             enabled.IsCheckedChanged += delegate { LibraryProfiles.Ensure(library).Controller = enabled.IsChecked == true; Store.Save(library); };
             var state = Ui.Hint(controllerDevice.Status); var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) }; timer.Tick += delegate { state.Text = controllerDevice.Status; };
             body.Children.Add(enabled); body.Children.Add(state);
-            body.Children.Add(Ui.Hint("Use the left stick or directional pad to move, A to select, B to go back, and shoulders to switch tabs. Navigation pauses while another app is active. Linux requires a readable /dev/input/js device; no packages or permissions are changed."));
+            body.Children.Add(Ui.Hint("Use the left stick or directional pad to move, A to select, B to go back, shoulders to switch tabs and Start to open the menu. In the Living-room Library, X marks a favorite and Y opens the focus view; the controller works there even when navigation is off. Navigation pauses while another app is active. Linux reads game controllers through the kernel's input devices; no packages or permissions are changed."));
             body.Children.Add(Ui.Action("Close", dialog.Close)); dialog.Body = body; timer.Start(); try { await dialog.Present(this); } finally { timer.Stop(); }
         }
     }
