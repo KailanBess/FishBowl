@@ -50,7 +50,7 @@ namespace EmulatorHub {
   static string Quote(string value) { return "\""+value.Replace("\"","\\\"")+"\""; }
   public static ProcessStartInfo StartInfo(BrowserPreferences settings,string profile,string url,bool existing) {
    string address=Address(url);string executable=Resolve(settings);
-   string arguments=settings.Engine=="Firefox" ? (existing?"--profile "+Quote(profile)+" --new-tab "+Quote(address):"--new-instance --profile "+Quote(profile)+" --kiosk "+Quote(address)) : "--user-data-dir="+Quote(profile)+" --no-first-run --no-default-browser-check --app="+Quote(address);
+   string arguments=settings.Engine=="Firefox" ? (existing?"--profile "+Quote(profile)+" --new-tab "+Quote(address):"--new-instance --profile "+Quote(profile)+" --new-window "+Quote(address)) : "--user-data-dir="+Quote(profile)+" --no-first-run --no-default-browser-check --app="+Quote(address);
    return new ProcessStartInfo(executable,arguments){UseShellExecute=false,WorkingDirectory=Path.GetDirectoryName(executable)};
   }
   public static void OpenExternal(LibraryData library,string url) { var settings=Settings(library);Process.Start(new ProcessStartInfo(Resolve(settings),Quote(Address(url))){UseShellExecute=false}); }
@@ -94,7 +94,7 @@ namespace EmulatorHub {
    show=ExperienceUi.Button("Show in app",delegate{inWindow=false;timer.Start();UpdateState();});
    full=ExperienceUi.Button("Full screen",delegate{if(fullscreen!=null)fullscreen();});
    bar.Controls.AddRange(new Control[]{back,forward,reload,external,show,full,stop,ExperienceUi.Button("Browser settings",delegate{using(var dialog=new BrowserSettingsDialog(library))if(dialog.ShowDialog(FindForm())==DialogResult.OK){if(!HasRunningBrowser)address.Text=FishBowlWeb.Settings(library).HomePage;else status.Text="Browser settings saved. Close this Web session and press Go to use the new browser.";}})});
-   host=new PlayWindowHost();empty=ExperienceUi.Label("Browse inside FishBowl. Firefox is the default; Browser settings lets you choose another installed browser. Enter a web address or search, then press Go.",130);empty.Dock=DockStyle.Top;empty.Padding=new Padding(16);host.Controls.Add(empty);
+   host=new PlayWindowHost{PreserveRendererWindow=true};empty=ExperienceUi.Label("Browse inside FishBowl. Firefox is the default; Browser settings lets you choose another installed browser. Enter a web address or search, then press Go.",130);empty.Dock=DockStyle.Top;empty.Padding=new Padding(16);host.Controls.Add(empty);
    status=ExperienceUi.Label("Web is ready. No browser runs until you press Go.",80);status.Dock=DockStyle.Bottom;status.AutoSize=true;
    Controls.Add(host);Controls.Add(status);Controls.Add(bar);timer=new Timer{Interval=150};timer.Tick+=Tick;UpdateState();
   }

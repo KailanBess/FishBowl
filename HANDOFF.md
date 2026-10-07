@@ -8,13 +8,17 @@ _Last updated: 2026-10-07, Windows Web and confirmed shutdown._
 
 | | State |
 | --- | --- |
-| Windows | Source **1.29.0** on `fishbowl-web-game-view`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.29.1** on `fishbowl-web-game-view`, pending review in PR #25. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
 PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. PR #21 is merged (Windows 1.28.1). New 1.29.0 work on `fishbowl-web-game-view` targets main and issue #23; Linux testing status from PR #24 is preserved.
+
+## Windows browser hosting 1.29.1
+
+Issue #27 follows up on browsers opening outside Web. Web now requests borderless owned-window hosting even at matching DPI, preserving the browser's GPU context instead of calling SetParent. Firefox starts with new-window rather than desktop kiosk mode. Actual installed Firefox rendered a page inside Web, hid on Home, restored the same page on return, and rendered in fullscreen with FishBowl's exit control visible. Dedicated profiles and strict process/window identities remain in use. Normal emulator hosting defaults are unchanged. Browser fixtures pass 30 checks, game-exit fixtures pass 35 and retained native hosting passes 88. Final regressions, overflow audits and CI validate the final commit; downloads/permissions, other browser versions and mixed monitors remain live checks.
 
 ## Windows Web and shutdown 1.29.0
 
@@ -174,3 +178,11 @@ Launch fixture ownership expands Windows short/long executable path aliases befo
 ### 2026-10-07 — Firefox Web and game shutdown
 
 Added installed-browser Web integration and optional shared preferences, saved game-view edges, native menu restoration and confirmed graceful exit in PR #21, tracked by #23. Added native browser/exit regressions and five-workspace layout coverage. Browser and emulator renderers retain external fallback; complete native rendering verification remains required.
+
+- 2026-10-07: 1.29.1 fixes Web browser hosting (issue #27) with owned-window rendering, normal Firefox startup and fullscreen restoration coverage. Live Firefox page/section/fullscreen checks passed; normal shutdown verification and final CI are recorded in the PR.
+
+#### 1.29.1 delivery state
+
+Browser fixtures pass 30 checks; game-exit/hosting/launch fixtures pass 35/88/19, and normal/compact overflow audits report zero findings across five sections and 67 dialogs. The original full run timed out in PolishTests after library navigation; the repeat passed that suite and all remaining suites. Combined runs cover every Windows regression suite, with over 31,000 numbered checks. GitHub file-write APIs returned internal errors, the noninteractive Git helper failed to start its shell, and automatic approval review rejected the alternative authentication step because its approval category is disabled. The complete app/source packages are prepared locally. GitHub file-write access recovered on retry; 1.29.1 is being synchronized to PR #25. Required CI must pass before merging; no release is published.
+
+- 2026-10-07: GitHub file-write access recovered; sync the tested 1.29.1 source to PR #25 and run required CI. No merge or release publication.

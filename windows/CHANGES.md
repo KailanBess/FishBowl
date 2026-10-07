@@ -1,3 +1,8 @@
+# Windows 1.29.1 browser hosting
+
+- Web uses borderless owned-window hosting to preserve browser rendering and DPI while keeping the browser inside FishBowl. Firefox starts as a normal window instead of desktop kiosk mode.
+- Section changes hide and restore the same browser; fullscreen preserves its window and FishBowl's exit controls.
+
 # Windows 1.29.0 Web and game view
 
 - Web hosts installed Firefox by default, with selectable Microsoft Edge or Google Chrome adapters. Browser settings saves engine/program/home page choices; separate FishBowl profiles hold browsing data. Personal browser windows are not adopted or closed.

@@ -168,6 +168,7 @@ namespace EmulatorHub
         bool OwnsWindow { get { return PlayNative.Matches(window,pid,started) && PlayNative.GetProp(window,ownership)==ownershipValue; } }
         public bool IsAttached { get { return attached && IsHandleCreated && OwnsWindow && (anchored ? anchorOwner!=null && anchorOwner.IsHandleCreated && PlayNative.GetWindow(window,4)==anchorOwner.Handle : PlayNative.GetParent(window)==Handle); } }
         public bool IsAnchored { get { return IsAttached && anchored; } }
+        public bool PreserveRendererWindow { get; set; }
         public IntPtr GameWindow { get { return window; } }
         public PlayWindowHost() { Dock = DockStyle.Fill; BackColor = FishBowlPalette.ThemeBottom; TabStop = true; }
         public void ConfigureView(PlayViewSettings settings)
@@ -248,7 +249,7 @@ namespace EmulatorHub
             {
                 IntPtr target = Handle;
                 if(desiredDpi==IntPtr.Zero) throw new InvalidOperationException();
-                if(view.ShowControls && originalMenu!=IntPtr.Zero || !PlayNative.AreDpiAwarenessContextsEqual(PlayNative.GetWindowDpiAwarenessContext(target),desiredDpi)) return EmbedAnchored();
+                if(PreserveRendererWindow || view.ShowControls && originalMenu!=IntPtr.Zero || !PlayNative.AreDpiAwarenessContextsEqual(PlayNative.GetWindowDpiAwarenessContext(target),desiredDpi)) return EmbedAnchored();
                 anchored=false;
                 altered=true;
                 ApplyMenu();
