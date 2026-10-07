@@ -2,19 +2,43 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-06, expansion integration._
+_Last updated: 2026-10-07, Windows Play polish._
 
 ## Current state
 
 | | State |
 | --- | --- |
-| Windows | Source **1.26.2** on `fishbowl-expansion`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.28.1** on `fishbowl-session-remote-play`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
-Expansion builds on #18 (themes 1.25.12) and main through merged #19 (Linux dialog focus). PR #20 includes and supersedes #18; it can be reviewed directly against main. Both platform implementations are included.
+PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.28.1 work is in PR #21 on `fishbowl-session-remote-play` and targets main. Both platform implementations are included. Issue #22 tracks Windows Play polish.
+
+## Windows polish 1.28.1
+
+Play adds explicit fullscreen exit, disabled unavailable controls, clearer empty/waiting/error states, session details and confirmed native detach feedback. A guided Share session action restores and preselects the exact selected window for remote hosting, then returns previously embedded sessions to Play when sharing closes. No token service or credentials are deployed. The token endpoint preference persists; changing a target stops guest input.
+
+Dropdown choice surfaces follow themes/high contrast, including empty/selected/disabled states; editable text fields keep native editing. The footer shows filters only in Emulators. Toolbar layout can shrink a row previously expanded during initial layout. Home expansions persist in optional `ThemeSettings.ExpandedHomeCards`; Linux preserves this field but does not apply Windows Home expansion behavior. Linux's package version changes only to keep paired release archives aligned.
+
+Native Play placement skips unchanged bounds, settled/hidden polling slows and decorative motion pauses during active Play. Executable lookup can use limited process-query rights; exact PID/start/window ownership checks remain mandatory. Unsupported or unverifiable windows keep external fallback. Native session guidance is covered at enlarged text sizes. The full Windows regression pass covered 31,385 checks before the final toolbar/overflow refinements; final targeted native Play coverage passes 88 checks. Schema preservation passes 202 checks; Linux semantic compilation passes. GitHub checks validate the final source commit before review.
+
+App/source packages include source commit metadata, checksums, explicit download labels and upgrade/rollback instructions. Draft tagged releases require source on main plus normal/compact overflow checks. Source-only changes remain in PR #21; no public release is published before review. See docs/PLAY-VALIDATION.md for live emulator, input, monitor and remote checks. Actual embedded Azahar rendering, audio, physical controllers, mixed-DPI monitors and two-device remote streaming remain unverified.
+
+## Windows Play workspace 1.28.0
+
+Windows adds a persistent fourth Play section. Game and emulator launch paths route to exact-process native window hosts, keep sessions alive across section changes, and expose fullscreen and detach/reattach actions. Original native parent/styles/placement are restored before host destruction; emulators remain running when FishBowl closes. Matching-DPI windows use native child hosting; incompatible per-monitor renderers use a borderless owned window aligned and clipped to the Play viewport without resetting renderer DPI. Native ownership is restored before fullscreen handle changes or shutdown. Elevated/unsupported windows retain external-window fallback. The foreign process controller guard remains strict. Remote media input currently requires detaching the game window. No saved model changes are introduced; Linux embedding remains a separate task.
+
+Validation: all existing Windows regressions passed 31,089 checks. Actual emulator, embedded Library and modal game launch routing passed 19 checks. Native child/owned-window lifetime tests passed 58 checks and include exact PID/start ownership, resize, multiple sessions, DPI preservation and fullscreen. Normal and compact 100/150/200% audits report zero findings across all four sections and 64 dialog types; 199 schema-preservation checks and Linux semantic compilation pass. Required GitHub Actions build, packaging, remote-service and text-audit checks run on PR #21. Actual emulator rendering/input and multi-monitor DPI combinations require native smoke testing.
+
+## Session, navigation and remote play 1.27.0
+
+Shared session journals store observed seconds, exact PID/start identities and profile ownership. Recovery applies only missing deltas, preserves other profiles and excludes app downtime. Windows background polling follows verified launcher children; Linux uses procfs identities. Unverifiable instant Linux launchers remain uncertain rather than attaching unrelated processes. Journals commit only after library saves; games are not terminated on shutdown.
+
+Windows Appearance and accessibility unifies existing panels; General preferences keep startup/backup settings. Controller navigation handles menu/submenu/overflow actions, choices, lists, checks, numeric fields and tabs, with active-process, reconnect and repeat guards. Linux reads existing joystick devices and reuses the current settings style. Physical controllers and Linux display sessions need native smoke testing.
+
+Remote media client and reference Node token service are under `remote-play/`. Windows explicitly chooses a single game window, approves one guest and sends only supported keyboard keys to that exact foreground game. Linux provides browser joining; native hosting is unsupported. SDKs are pinned; no service is deployed and no credentials are bundled. Actual two-device video/audio/input, account/provider calls and physical emulator input remain live-test requirements. See remote-play/README.md. Normal/compact 100/150/200% audits check all main sections and 64 dialog types and report zero text overflow. Validation details accompany the PR.
 
 ## Compact controls and color harmony 1.26.2
 
@@ -40,7 +64,7 @@ Library recovery and layout fixes: normalized multi-disc grouping, large-text la
 
 ## Known issues
 
-- **Flaky Windows test:** "actual emulator-process session time recorded" in `IntegrationTests` failed once on `main` and passed on re-run with no changes. It depends on timing; make it wait for the session instead of a fixed delay.
+- Session completion checks in Integration/Immersion/Hub use bounded condition waits, including the two-second verified launcher grace period.
 - **Remaining text overflow:** the 1.25.11 audit reports zero findings at 100/150/200% on normal and compact desktops.
 
 ## In progress on the Linux side
@@ -75,6 +99,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-07 (polish 1.28.1):** refined persistent Play controls, safe detach/retry feedback, guided sharing/return, themed dropdown states, filter visibility, content-sized toolbar rows, persisted Home expansions and idle placement work. Added native/session-details/theme/schema regression coverage and clearer complete app/source release metadata and rollback guidance. Windows-only behavior is documented for Linux parity.
 
 - **2026-10-06 (compact UI 1.26.2):** introduced optional control density and color harmony preferences, smaller Windows controls/cards and consistent theme-relative colors; retained text scaling and all Home options.
 
@@ -117,3 +143,19 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
   - Opened #11 (text overflow) and #9 (Tux easter egg). Filed #10.
 - **2026-10-05:** shared the data model (#8, re-landing #7), published the 1.25.8 source (#6), and added the text overflow audit (#5), the bug report form (#4) and the Windows source, assets and CI (#3).
 - **2026-09-30:** first Linux version merged (#1).
+
+### 2026-10-06 — sessions, navigation and remote play
+
+Added profile-owned crash journals, exact launcher tree tracking, Windows controller/appearance integration, Linux joystick/session parity and the browser media client/private token service. Main through merged PR #20 is the base. Updated bounded completion fixtures, C#5/build/package references and service CI. Service/device smoke testing remains explicitly required.
+
+### 2026-10-06 — native controller modal guard
+
+Controller navigation now checks the actual enabled native form and foreground root window, so file/folder pickers and unrelated modal windows cannot activate controls underneath. Registered FishBowl popup menus remain available. Navigation tests pass 55 checks; the preceding complete Windows regression run passed 31,069 checks. Normal/compact UI audits report zero findings. PR #21 includes the complete 1.27.0 source, media-client resources and token-service setup; current-commit CI is required before merge.
+
+### 2026-10-07 — Windows Play workspace
+
+Added persistent embedded emulator sessions and launch routing, fullscreen chrome, restored native windows on shutdown, and four-section regression coverage in PR #21. Linux continues to launch external windows. See the Play section above for compatibility and validation requirements.
+
+#### CI fixture portability
+
+Launch fixture ownership expands Windows short/long executable path aliases before comparing exact paths and still validates process creation time. Tests reject future start thresholds and identical executable names in other directories. This avoids false ownership failures on runners using short TEMP paths. Native hosting and app behavior are unchanged.

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.26.2.0")]
+[assembly: AssemblyFileVersion("1.28.1.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.26.2.0")]
+[assembly: AssemblyVersion("1.28.1.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.26.2";
+		private const string FishBowlVersion = "1.28.1";
 
-		private const string FishBowlTitleVersion = "1.26.2";
+		private const string FishBowlTitleVersion = "1.28.1";
 
 		private Icon ownedAppIcon;
 
@@ -236,6 +236,9 @@ namespace EmulatorHub
 		private readonly List<string> saveMonitorErrors = new List<string>();
 
 		private TabControl workspaceNavigation;
+        private PlaySurface playSurface;
+        private bool immersivePlayChrome;
+        private float[] savedPlayRows;
 
 		private HomeSurface homeSurface;
 
@@ -315,7 +318,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.26.2";
+			Text = "FishBowl 1.28.1";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -401,11 +404,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.26.2" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.28.1" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.26.2";
+						library.Theme.LastSeenBuild = "1.28.1";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -426,6 +429,7 @@ namespace EmulatorHub
                         // Startup preferences change the Home cache key; settle it before later selection updates.
                         if (homeSurface != null) homeSurface.Reload(false);
                         if (emulatorHome != null) emulatorHome.Reload(false);
+                        if (!isolatedPreview) WindowsSessions.Recover(this, library);
 					}
 				});
 			};
@@ -444,6 +448,10 @@ namespace EmulatorHub
 						MessageBox.Show(this, "Your notes could not be saved.\n\n" + ex.Message, "FishBowl");
 					}
 				}
+                if (!e.Cancel && playSurface != null && !playSurface.TryDetachAll()) {
+                    e.Cancel = true;
+                    MessageBox.Show(this, "A running emulator window could not be returned to its own window. Close it in the emulator, then retry closing FishBowl.", "FishBowl");
+                }
 			};
 		}
 
@@ -1883,7 +1891,7 @@ namespace EmulatorHub
 			toolStripMenuItem13.DropDownItems.Add(linksMenu);
 			CompactMenus.Arrange(toolStripMenuItem2, toolStripMenuItem3, toolStripMenuItem8, toolStripMenuItem10);
 			toolStripMenuItem3.DropDownItems.Add(MenuAction("User tools...", "settings", ShowUserTools));
-            toolStripMenuItem3.DropDownItems.Add(MenuAction("Home and appearance...", "settings", delegate { UiPolishTools.Open(this, library, delegate { ApplyAppearanceNow(); homeSurface.Reload(); }); }));
+            toolStripMenuItem3.DropDownItems.Add(MenuAction("Home and appearance...", "settings", ShowAppearanceHub));
             toolStripMenuItem3.DropDownItems.Add(MenuAction("Game tools...", "play", delegate { WindowsGameTools.OpenLibrary(this, library, delegate { homeSurface.Reload(); embeddedLibrary.ReloadLibrary(); }); }));
             toolStripMenuItem3.DropDownItems.Add(MenuAction("Integrations...", "info", delegate { IntegrationTools.Open(this, library, delegate { homeSurface.Reload(); embeddedLibrary.ReloadLibrary(); RefreshHub(); }); }));
 
@@ -1926,14 +1934,7 @@ namespace EmulatorHub
 				EmulatorProfile selectedProfile = multiplayerDialog.SelectedProfile;
 				if (multiplayerDialog.Mode == "Remote couch play")
 				{
-					if (string.IsNullOrWhiteSpace(library.Multiplayer.RelayGatewayUrl))
-					{
-						MessageBox.Show(this, "Remote couch play needs a LiveKit Cloud token endpoint before it can start. FishBowl keeps this unconfigured by default so no LiveKit API secret or private session information is stored in the app. Use Privacy and connection settings to enter your endpoint after its server is set up.", "Remote couch play");
-					}
-					else
-					{
-						MessageBox.Show(this, "FishBowl saved the private session preference and confirmed a LiveKit Cloud token endpoint is configured. The LiveKit media client is not included in this desktop build yet, so FishBowl will not expose a game window or controller data until that service is connected.", "Remote couch play");
-					}
+                    RemotePlayTools.Open(this, library, selectedProfile);
 					return;
 				}
 				if (multiplayerDialog.Mode == "Native online")
@@ -2952,16 +2953,21 @@ namespace EmulatorHub
 			}
 			if (EmulatorRuntime.State(profile.Executable) == RuntimeState.Running)
 			{
-				EmulatorRuntime.BringForward(profile.Executable);
+				playSurface.Adopt(profile.Executable, profile.Name);
+                workspaceNavigation.SelectedIndex = 3;
+            var frame = workspaceNavigation.Parent as AquariumFrame;
+            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
 				SetStatus(profile.Name + " is already running.");
 			}
 			else if (!library.Theme.ConfirmBeforeEmulatorLaunch || MessageBox.Show(this, "Open " + launchName + "? FishBowl will start the emulator normally without changing its settings.", "Open emulator", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 			{
-				ProcessStartInfo processStartInfo = EmulatorStartInfo(profile);
+				var playBeforeLaunch = SessionLedger.ProcessSnapshot();
+                ProcessStartInfo processStartInfo = EmulatorStartInfo(profile);
 				processStartInfo.Arguments = arguments ?? "";
-				using (Process.Start(processStartInfo))
-				{
-				}
+				using (Process process = Process.Start(processStartInfo))
+                {
+                    ShowPlay(process, launchName, playBeforeLaunch);
+                }
 				RefreshRuntimeStatus();
 				SetStatus("Opened " + launchName + ". Add and launch games inside the emulator.");
 			}
@@ -3390,7 +3396,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.26.2"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.28.1"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3398,7 +3404,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.26.2"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.28.1"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3406,7 +3412,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.26.2"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.28.1"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3588,6 +3594,7 @@ namespace EmulatorHub
 			if (disposing && !visualResourcesDisposed)
 			{
 				visualResourcesDisposed = true;
+                if (playSurface != null) playSurface.DetachAll();
 				DisposeSaveNotifications();
 				scheduledLibraryTimer.Dispose();
 				toolTips.Dispose();
@@ -3706,8 +3713,31 @@ namespace EmulatorHub
 			}
 		}
 
-		private void ToggleFullScreen()
+		private void ApplyPlayFullscreenChrome()
+        {
+            if (workspaceShell == null) return;
+            bool immersive = fullScreen && workspaceNavigation != null && workspaceNavigation.SelectedIndex == 3;
+            if (immersive && !immersivePlayChrome) {
+                savedPlayRows = new float[] { workspaceShell.RowStyles[0].Height, workspaceShell.RowStyles[1].Height, workspaceShell.RowStyles[4].Height };
+                workspaceShell.RowStyles[0].Height = 0;
+                workspaceShell.RowStyles[1].Height = 0;
+                workspaceShell.RowStyles[4].Height = 0;
+                immersivePlayChrome = true;
+            } else if (!immersive && immersivePlayChrome) {
+                workspaceShell.RowStyles[0].Height = savedPlayRows[0];
+                workspaceShell.RowStyles[1].Height = savedPlayRows[1];
+                workspaceShell.RowStyles[4].Height = savedPlayRows[2];
+                immersivePlayChrome = false;
+            }
+        }
+
+        private void ToggleFullScreen()
 		{
+            if (playSurface != null && !playSurface.PrepareHandleChange()) {
+                playSurface.ResumeHandleChange();
+                SetStatus("The emulator window is busy. Retry fullscreen when it responds.");
+                return;
+            }
 			SuspendLayout();
 			if (workspaceShell != null)
 			{
@@ -3725,7 +3755,7 @@ namespace EmulatorHub
 					base.WindowState = FormWindowState.Normal;
 					base.Bounds = TextFit.WorkingAreaOverride ?? Screen.FromControl(this).Bounds;
 					fullScreen = true;
-					SetStatus("Full-screen mode. Press F11 to return.");
+					SetStatus("Full-screen mode. Use Exit full screen in Play, or F11 when FishBowl has focus.");
 				}
 				else
 				{
@@ -3741,9 +3771,11 @@ namespace EmulatorHub
 			{
 				if (workspaceShell != null)
 				{
-					workspaceShell.ResumeLayout(true);
+					ApplyPlayFullscreenChrome();
+                    workspaceShell.ResumeLayout(true);
 				}
 				ResumeLayout(true);
+                if (playSurface != null) { playSurface.SetFullscreen(fullScreen); playSurface.ResumeHandleChange(); }
 			}
 		}
 
@@ -4007,43 +4039,7 @@ namespace EmulatorHub
 
 		private void ShowSettings()
 		{
-			using (SettingsDialog settingsDialog = new SettingsDialog(library.Theme, library.BackupFolder))
-			{
-				if (settingsDialog.ShowDialog(this) == DialogResult.OK)
-				{
-					bool flag = !string.Equals(library.Theme.Name, settingsDialog.Theme.Name, StringComparison.OrdinalIgnoreCase) || library.Theme.StartMaximized != settingsDialog.Theme.StartMaximized || !string.Equals(library.Theme.AccentColor, settingsDialog.Theme.AccentColor, StringComparison.OrdinalIgnoreCase) || !string.Equals(library.Theme.AppIconColor, settingsDialog.Theme.AppIconColor, StringComparison.OrdinalIgnoreCase) || !string.Equals(library.Theme.FontFamily, settingsDialog.Theme.FontFamily, StringComparison.OrdinalIgnoreCase) || library.Theme.UiScalePercent != settingsDialog.Theme.UiScalePercent || !string.Equals(library.Theme.ListDensity, settingsDialog.Theme.ListDensity, StringComparison.OrdinalIgnoreCase) || library.Theme.ShowBanner != settingsDialog.Theme.ShowBanner || library.Theme.ShowStatusBar != settingsDialog.Theme.ShowStatusBar || library.Theme.ShowInformationPanel != settingsDialog.Theme.ShowInformationPanel || library.Theme.ShowEmulatorIcons != settingsDialog.Theme.ShowEmulatorIcons || library.Theme.EnableMotion != settingsDialog.Theme.EnableMotion;
-					library.Theme = settingsDialog.Theme;
-					library.BackupFolder = settingsDialog.BackupFolder;
-					ApplyThemeColors();
-					try
-					{
-						Platform.UpdateAppShortcutIcons(FishBowlBranding.WriteShortcutIcon());
-					}
-					catch
-					{
-					}
-					Store.Save(library);
-					ConfigureGameFolderWatchers();
-					ConfigureScheduledLibraryScan();
-					if (flag && MessageBox.Show(this, "These settings need FishBowl to restart before they can take effect.\n\nRestart FishBowl now?", "Restart FishBowl", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-					{
-						Store.Log("Restarting to apply settings.");
-						ProcessStartInfo processStartInfo = new ProcessStartInfo(Application.ExecutablePath);
-						processStartInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
-						processStartInfo.UseShellExecute = true;
-						Process.Start(processStartInfo);
-						Close();
-					}
-					else if (flag)
-					{
-						MessageBox.Show("Settings saved. Restart FishBowl whenever you are ready to apply them.", "FishBowl");
-					}
-					else
-					{
-						SetStatus("Settings saved and applied.");
-					}
-				}
-			}
+			WindowsAppearance.General(this, library, delegate { ConfigureGameFolderWatchers(); ConfigureScheduledLibraryScan(); ApplyAppearanceNow(); });
 		}
 
 		private void EnablePortableMode()
@@ -4658,7 +4654,7 @@ namespace EmulatorHub
 			}
 		}
 
-		private Control BuildWorkspace(Control emulatorPanel)
+        private Control BuildWorkspace(Control emulatorPanel)
 		{
 			ExperienceData.Ensure(library);
 			workspaceNavigation = new FishBowlTabs
@@ -4667,6 +4663,7 @@ namespace EmulatorHub
 				AccessibleName = "FishBowl workspace navigation",
 				LegacyHeaders = true,
 				RoomyHeaders = true,
+                PreferredColumns = 4,
 				Font = new Font(DisplayFont, 12f, FontStyle.Bold)
 			};
 			TabPage tabPage = new TabPage("Home");
@@ -4678,7 +4675,11 @@ namespace EmulatorHub
 			TabPage tabPage5 = new TabPage("Library");
 			tabPage5.BackColor = bottom;
 			TabPage tabPage6 = tabPage5;
-			workspaceNavigation.TabPages.AddRange(new TabPage[3] { tabPage2, tabPage4, tabPage6 });
+			var playPage = new TabPage("Play") { BackColor = bottom };
+            workspaceNavigation.TabPages.AddRange(new TabPage[4] { tabPage2, tabPage4, tabPage6, playPage });
+            playSurface = new PlaySurface(library, ToggleFullScreen) { Dock = DockStyle.Fill };
+            playPage.Controls.Add(playSurface);
+            playSurface.SessionStateChanged += delegate { var frame = workspaceNavigation.Parent as AquariumFrame; if (frame != null) { frame.PauseForPlay = workspaceNavigation.SelectedIndex == 3 && playSurface.HasSessions; frame.ApplyState(); } };
 			homeSurface = new HomeSurface(library, HomeAction);
 			tabPage2.Controls.Add(homeSurface);
 			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
@@ -4693,9 +4694,12 @@ namespace EmulatorHub
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			primaryToolbar.AutoSize = true;
+            primaryToolbar.MinimumSize = Size.Empty;
+            ((FlowLayoutPanel)primaryToolbar).AutoSizeMode = AutoSizeMode.GrowAndShrink;
 			primaryToolbar.Dock = DockStyle.Fill;
 			emulatorPanel.Dock = DockStyle.Fill;
-			tableLayoutPanel2.Controls.Add(primaryToolbar, 0, 0);
+            tableLayoutPanel2.Controls.Add(primaryToolbar, 0, 0);
+            primaryToolbar.Layout += delegate { FitPrimaryToolbar(); };
 			tableLayoutPanel2.Controls.Add(emulatorPanel, 0, 1);
 			tabPage4.Controls.Add(tableLayoutPanel2);
 			emulatorHome = new HomeSurface(library, HomeAction);
@@ -4709,7 +4713,7 @@ namespace EmulatorHub
 			};
 			tabPage6.Controls.Add(embeddedLibrary);
 			embeddedLibrary.Show();
-			workspaceNavigation.SelectedIndex = ((library.Experience.StartPage == "Library") ? 2 : ((library.Experience.StartPage == "Emulators") ? 1 : 0));
+			workspaceNavigation.SelectedIndex = ((library.Experience.StartPage == "Play") ? 3 : ((library.Experience.StartPage == "Library") ? 2 : ((library.Experience.StartPage == "Emulators") ? 1 : 0)));
 			workspaceNavigation.Selecting += delegate
 			{
 				CaptureWorkspace(workspaceNavigation.SelectedIndex);
@@ -4722,6 +4726,9 @@ namespace EmulatorHub
 				try
 				{
 					UpdateWorkspaceChrome();
+                    ApplyPlayFullscreenChrome();
+                    var frame = workspaceNavigation.Parent as AquariumFrame;
+                    if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
 					if (workspaceNavigation.SelectedIndex == 0)
 					{
 						homeSurface.Reload(false);
@@ -4751,7 +4758,16 @@ namespace EmulatorHub
 			return new AquariumFrame(workspaceNavigation);
 		}
 
-		private void HomeAction(string command, GameEntry game, EmulatorProfile emulator)
+		internal void ShowPlay(Process process, string title, IList<SessionProcess> beforeLaunch)
+        {
+            if (process == null || playSurface == null || IsDisposed) return;
+            playSurface.Launch(process, title, beforeLaunch);
+            workspaceNavigation.SelectedIndex = 3;
+            var frame = workspaceNavigation.Parent as AquariumFrame;
+            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
+        }
+
+        private void HomeAction(string command, GameEntry game, EmulatorProfile emulator)
 		{
 			switch (command)
 			{
@@ -4829,7 +4845,19 @@ namespace EmulatorHub
 			ConfigureSaveNotifications();
 		}
 
-		private void UpdateWorkspaceChrome()
+        private bool fittingPrimaryToolbar;
+        private void FitPrimaryToolbar()
+        {
+            if (fittingPrimaryToolbar || primaryToolbar == null) return;
+            var parent = primaryToolbar.Parent as TableLayoutPanel;
+            if (parent == null || parent.RowStyles.Count == 0 || parent.RowStyles[0].SizeType != SizeType.Absolute) return;
+            int need = primaryToolbar.Controls.Cast<Control>().Where(c => c.Visible || !primaryToolbar.Visible).Select(c => c.Bottom + c.Margin.Bottom).DefaultIfEmpty(0).Max() + primaryToolbar.Padding.Bottom + primaryToolbar.Margin.Vertical;
+            if (need <= 0 || parent.RowStyles[0].Height <= need + 2) return;
+            fittingPrimaryToolbar = true;
+            try { parent.RowStyles[0].Height = need; parent.PerformLayout(); }
+            finally { fittingPrimaryToolbar = false; }
+        }
+        private void UpdateWorkspaceChrome()
 		{
 			if (workspaceNavigation != null)
 			{
@@ -4847,6 +4875,9 @@ namespace EmulatorHub
 					workspaceFooter.ColumnStyles[0].Width = (flag ? 46 : 0);
 					workspaceFooter.ColumnStyles[1].Width = (flag ? 240 : 0);
 					filterBox.Visible = flag;
+                    var filterLabel = workspaceFooter.GetControlFromPosition(0, 0);
+                    if (filterLabel != null) filterLabel.Visible = flag;
+                    workspaceFooter.PerformLayout();
 				}
 			}
 		}
@@ -4940,7 +4971,12 @@ namespace EmulatorHub
 			});
 		}
 
-		private void ShowLiveAppearance()
+        private void ShowAppearanceHub() {
+            WindowsAppearance.Open(this, library, delegate { ApplyAppearanceNow(); homeSurface.Reload(); }, ShowLiveAppearanceCore, ShowCosmeticsCore);
+        }
+        private void ShowLiveAppearance() { ShowAppearanceHub(); }
+        private void ShowCosmetics() { ShowAppearanceHub(); }
+		private void ShowLiveAppearanceCore()
 		{
 			NextData.Ensure(library);
 			ThemeSettings original = NextData.Copy(library.Theme);
@@ -5487,7 +5523,7 @@ namespace EmulatorHub
 
 		private void CaptureWorkspace(int index)
 		{
-			if (workspaceNavigation == null || index < 0)
+			if (workspaceNavigation == null || index < 0 || index >= workspaceNavigation.TabCount || index == 3)
 			{
 				return;
 			}
@@ -5537,7 +5573,7 @@ namespace EmulatorHub
 		{
 			NextData.Ensure(library);
 			WorkspaceMemory value;
-			if (index < 0 || !library.Enhancements.Workspaces.TryGetValue(index.ToString(), out value))
+			if (workspaceNavigation == null || index < 0 || index >= workspaceNavigation.TabCount || index == 3 || !library.Enhancements.Workspaces.TryGetValue(index.ToString(), out value))
 			{
 				return;
 			}
@@ -5757,7 +5793,7 @@ namespace EmulatorHub
 			}
 		}
 
-		private void ShowCosmetics()
+		private void ShowCosmeticsCore()
 		{
 			if (library.Cosmetics == null)
 			{
@@ -6487,6 +6523,7 @@ namespace EmulatorHub
 		{
 			FishBowlPalette.StyleWindow(this);
 			NextUi.ApplyAccessibility(this);
+            NavigationController.Attach(this);
 			Polish.Accessibility(this);
 			foreach (FlowLayoutPanel bar in NextUi.Descendants(this).OfType<FlowLayoutPanel>().ToArray())
 			{
@@ -13556,7 +13593,7 @@ namespace EmulatorHub
 			});
 			base.Controls.Add(new TextBox
 			{
-				Text = "• Menu navigation uses buffered surfaces and retains unchanged Home content.\r\n• Idle events no longer repeatedly repaint every open window. Theme changes and new controls still update.\r\n• Welcome, update notes, storage prompts and startup notifications share matching headers, logos, spacing and action footers.\r\n• Startup buttons have room for their labels and icons at larger text sizes. Notification text supports scrolling and keyboard focus.\r\n• Installed 3DS games use their main content metadata when launched. Game names and available icons are retained locally.",
+				Text = "• Play keeps emulator sessions running while you browse Home, Library and Emulators.\r\n• Fullscreen has a visible Exit full screen action. Open in window confirms recovery before changing session state.\r\n• Share session selects your running game, restores its own window for sharing, then returns it to Play.\r\n• Dropdowns follow the active theme. Unrelated filters stay hidden and Home expansions survive restart.\r\n• Idle placement work and decorative motion are reduced during Play. Session details under More explains controls and recovery.\r\n• App and source packages include clear download labels, version checksums and upgrade/rollback instructions.",
 				ReadOnly = true,
 				Multiline = true,
 				BorderStyle = BorderStyle.None,
@@ -16417,7 +16454,7 @@ namespace EmulatorHub
 			if (comboBox != null)
 			{
 				comboBox.FlatStyle = FlatStyle.Standard;
-				comboBox.DrawMode = DrawMode.Normal;
+				if (comboBox.DropDownStyle != ComboBoxStyle.DropDownList) comboBox.DrawMode = DrawMode.Normal;
 			}
 			ListView list = control as ListView;
 			if (list != null && !list.OwnerDraw)
@@ -16591,7 +16628,8 @@ namespace EmulatorHub
         protected override void OnLayout(LayoutEventArgs e)
         {
             var filter = Controls.OfType<Label>().FirstOrDefault(label => label.Text == "Filter:");
-            if (filter != null && ColumnStyles.Count > 0) {
+            if (filter != null && !filter.Visible && ColumnStyles.Count > 0) ColumnStyles[0].Width = 0;
+            if (filter != null && filter.Visible && ColumnStyles.Count > 0) {
                 int need = TextRenderer.MeasureText(filter.Text, filter.Font).Width + filter.Margin.Horizontal + 12;
                 if (ColumnStyles[0].Width < need) ColumnStyles[0].Width = need;
             }
@@ -17305,7 +17343,7 @@ namespace EmulatorHub
 			MultiplayerCapability multiplayerCapability = new MultiplayerCapability();
 			multiplayerCapability.NativeOnline = "Check the emulator's own multiplayer or netplay settings.";
 			multiplayerCapability.LocalPlay = "Configure additional controllers inside the emulator.";
-			multiplayerCapability.RemoteCouchPlay = "Available after a FishBowl LiveKit Cloud token service is configured.";
+			multiplayerCapability.RemoteCouchPlay = "Browser window streaming and approved keyboard/gamepad-to-keyboard controls use the configured LiveKit token service. Start the game first; configure matching keys in the emulator.";
 			multiplayerCapability.Notes = "FishBowl never changes the emulator's multiplayer settings.";
 			MultiplayerCapability multiplayerCapability2 = multiplayerCapability;
 			switch (name)
@@ -23367,6 +23405,7 @@ namespace EmulatorHub
 			this.library = library;
             ControlDensityTools.Configure(library);
 			this.action = action;
+            foreach (string card in library.Theme.ExpandedHomeCards ?? new List<string>()) expandedCards.Add(card);
 			Dock = DockStyle.Fill;
 			BackColor = FishBowlPalette.DeepSeaSurface;
 			base.AutoScaleMode = AutoScaleMode.Dpi;
@@ -23558,6 +23597,7 @@ namespace EmulatorHub
 				if (more == null)
 				{
 					ContextMenuStrip menu = new ContextMenuStrip();
+            NavigationController.Register(menu);
 					more = ExperienceUi.Button("More", delegate { });
 					Button anchor = more;
 					more.Click += delegate { menu.Show(anchor, new Point(0, anchor.Height)); };
@@ -23600,7 +23640,10 @@ namespace EmulatorHub
                 toggle.Text = expanded ? "Show less" : "Show all (" + content.Length + ")";
                 LayoutCards();
             };
-            toggle.Click += delegate { if (!expandedCards.Add(card.AccessibleName)) expandedCards.Remove(card.AccessibleName); apply(); };
+            toggle.Click += delegate {
+                if (!expandedCards.Add(card.AccessibleName)) expandedCards.Remove(card.AccessibleName);
+                library.Theme.ExpandedHomeCards = expandedCards.OrderBy(x => x).ToList(); Store.Save(library); apply();
+            };
             body.Controls.Add(toggle);
             apply();
         }
@@ -23653,6 +23696,7 @@ namespace EmulatorHub
 				action("Game", game, null);
 			});
 			ContextMenuStrip context = new ContextMenuStrip();
+            NavigationController.Register(context);
 			context.Items.Add("Game details", null, delegate
 			{
 				action("Game details", game, null);
@@ -24497,6 +24541,7 @@ namespace EmulatorHub
 			UserSaveRoutes.Arguments(library, emulatorProfile, true);
 			ProcessStartInfo processStartInfo = Platform.StartInfo(emulatorProfile.Executable, text);
 			processStartInfo.WorkingDirectory = ((Hub.Native(game) && !string.IsNullOrWhiteSpace(game.Extras.WorkingDirectory)) ? game.Extras.WorkingDirectory : Path.GetDirectoryName(emulatorProfile.Executable));
+            var sessionBeforeLaunch = SessionLedger.ProcessSnapshot();
 			Process process;
 			try
 			{
@@ -24510,7 +24555,7 @@ namespace EmulatorHub
 			Immersion.Sound(library, true);
 			game.LastLaunched = DateTime.Now.ToString("g");
 			game.LaunchCount++;
-			bool flag = Platform.IsDirectProgram(emulatorProfile.Executable) && process != null;
+			bool flag = process != null;
 			PlaySession session = NextData.BeginSession(library, game, emulatorProfile.Executable, flag);
 			game.SessionTrackingNote = (flag ? "Tracking the launched emulator process; game changes inside that process cannot be distinguished." : "Time not tracked: launcher or wrapper process is uncertain.");
 			Hub.Record(library, "Launched " + game.Title);
@@ -24527,73 +24572,27 @@ namespace EmulatorHub
 					Store.Log("Jump List update: " + ex.Message);
 				}
 			}
-			if (flag)
-			{
-				UserTools.ActiveLaunches++;
-				UserTools.ActiveSessions.TryAdd(session.Id, 0);
-				bool completionQueued = false;
-				Stopwatch clock = Stopwatch.StartNew();
-				Task.Factory.StartNew(delegate
-				{
-					try
-					{
-						process.WaitForExit();
-						clock.Stop();
-						Control control = owner as Control;
-						Action method = delegate
-						{
-							try
-							{
-								NextData.CompleteSession(library, game, session, (long)clock.Elapsed.TotalSeconds);
-								game.SessionTrackingNote = "Recorded emulator session: " + clock.Elapsed.ToString();
-								Store.Save(library);
-							}
-							finally
-							{
-								Interlocked.Decrement(ref UserTools.ActiveLaunches);
-								byte value2;
-								UserTools.ActiveSessions.TryRemove(session.Id, out value2);
-							}
-							Immersion.AfterSession(owner, library, game, session);
-						};
-						if (control != null && !control.IsDisposed && control.IsHandleCreated)
-						{
-							control.BeginInvoke(method);
-							completionQueued = true;
-						}
-						else
-						{
-							LibraryData libraryData = Store.Load();
-							NextData.Ensure(libraryData);
-							PlaySession playSession = libraryData.PlaySessions.FirstOrDefault((PlaySession p) => p.Id == session.Id);
-							GameEntry gameEntry = libraryData.Games.FirstOrDefault((GameEntry g) => g.Id == game.Id);
-							if (playSession != null && gameEntry != null)
-							{
-								NextData.CompleteSession(libraryData, gameEntry, playSession, (long)clock.Elapsed.TotalSeconds);
-								Store.Save(libraryData);
-							}
-						}
-					}
-					catch (Exception ex2)
-					{
-						Store.Log("Session tracking ended: " + ex2.Message);
-					}
-					finally
-					{
-						if (!completionQueued)
-						{
-							Interlocked.Decrement(ref UserTools.ActiveLaunches);
-							byte value;
-							UserTools.ActiveSessions.TryRemove(session.Id, out value);
-						}
-						process.Dispose();
-					}
-				});
-			}
-			else if (process != null)
-			{
-				process.Dispose();
-			}
+            if (flag) {
+                Control control = owner as Control;
+                MainForm main = null;
+                var launchDialogs = new List<Form>();
+                while (control != null && main == null) {
+                    main = control as MainForm;
+                    Form form = control as Form;
+                    if (form != null && form.Modal && !(form is MainForm)) launchDialogs.Add(form);
+                    control = control.Parent ?? (form == null ? null : form.Owner);
+                }
+                if (main != null) {
+                    try {
+                        main.ShowPlay(process, game.Title, sessionBeforeLaunch);
+                        if (launchDialogs.Count > 0) main.BeginInvoke((MethodInvoker)delegate {
+                            foreach (Form dialog in launchDialogs) if (!dialog.IsDisposed && dialog.Modal) dialog.Close();
+                        });
+                    }
+                    catch (Exception error) { Store.Log("Play host: " + error.Message); }
+                }
+                WindowsSessions.Track(owner, library, game, session, process, sessionBeforeLaunch);
+            }
 		}
 
         public static void UndoRemoval(IWin32Window owner, LibraryData library)
@@ -24769,7 +24768,7 @@ namespace EmulatorHub
 				TabPage tabPage4 = new TabPage("Library");
 				fishBowlTabs2.TabPages.AddRange(new TabPage[4] { tabPage, tabPage2, tabPage3, tabPage4 });
 				TableLayoutPanel tableLayoutPanel = Fields(tabPage);
-				ComboBox start = Choices(new string[3] { "Home", "Library", "Emulators" }, settings.StartPage);
+				ComboBox start = Choices(new string[4] { "Home", "Library", "Emulators", "Play" }, settings.StartPage);
 				Field(tableLayoutPanel, "Start page", start);
 				NumericUpDown count = Number(settings.HomeTileCount, 1m, 12m);
 				Field(tableLayoutPanel, "Tiles per card", count);
@@ -27538,6 +27537,7 @@ namespace EmulatorHub
 			{
 			});
 			ContextMenuStrip menu = new ContextMenuStrip();
+            NavigationController.Register(menu);
 			more.Click += delegate
 			{
 				menu.Show(more, new Point(0, more.Height));
@@ -29217,6 +29217,7 @@ namespace EmulatorHub
 		public static ContextMenuStrip Menu()
 		{
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
+            NavigationController.Register(contextMenuStrip);
 			contextMenuStrip.Renderer = new FishBowlMenuRenderer();
 			contextMenuStrip.BackColor = FishBowlPalette.ThemeSurface;
 			contextMenuStrip.ForeColor = FishBowlPalette.ThemeInk;
@@ -30117,6 +30118,7 @@ namespace EmulatorHub
 				Add(flowLayoutPanel2, "Switch", delegate
 				{
 					Switch(d, s.Users.First((BowlUser x) => x.Name == users.Text).Id);
+                    WindowsSessions.Recover(owner, d);
 					Store.Save(d);
 					refresh();
 					f.Close();
@@ -30688,7 +30690,7 @@ namespace EmulatorHub
 
 		private readonly NotifyIcon notification = new NotifyIcon();
 
-		private ushort previous;
+
 
 		private DateTime hideNotice;
 
@@ -30718,6 +30720,7 @@ namespace EmulatorHub
 			{
 				Navigate();
 			}
+            else NavigationController.Reset();
 			if (UserTools.Guest || userToolSettings.BreakMinutes <= 0 || DateTime.UtcNow < nextReminder)
 			{
 				return;
@@ -30790,121 +30793,12 @@ namespace EmulatorHub
 
 		private void Navigate()
 		{
-			Form activeForm = Form.ActiveForm;
-			State state;
-			if (activeForm == null || !Read(out state))
-			{
-				previous = 0;
-				return;
-			}
-			ushort pressed = (ushort)(state.Pad.Buttons & ~previous);
-			previous = state.Pad.Buttons;
-			ApplyButtons(activeForm, owner, pressed);
+			NavigationController.Poll(owner);
 		}
 
 		public static void ApplyButtons(Form f, Form owner, ushort pressed)
 		{
-			Control activeControl = f.ActiveControl;
-			while (activeControl is ContainerControl && ((ContainerControl)activeControl).ActiveControl != null)
-			{
-				activeControl = ((ContainerControl)activeControl).ActiveControl;
-			}
-			if ((pressed & 0x1000u) != 0)
-			{
-				MainForm mainForm = f as MainForm;
-				if (mainForm != null && mainForm.ActivateControllerSelection(activeControl))
-				{
-					return;
-				}
-				Button button = activeControl as Button;
-				if (button != null)
-				{
-					button.PerformClick();
-				}
-				else if (activeControl is CheckBox)
-				{
-					((CheckBox)activeControl).Checked = !((CheckBox)activeControl).Checked;
-				}
-				else if (activeControl is ComboBox)
-				{
-					((ComboBox)activeControl).DroppedDown = !((ComboBox)activeControl).DroppedDown;
-				}
-				else if (activeControl is ListView || activeControl is ListBox)
-				{
-					typeof(Control).GetMethod("OnDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(activeControl, new object[1] { EventArgs.Empty });
-				}
-			}
-			if ((pressed & 0x2000u) != 0 && f != owner)
-			{
-				f.Close();
-			}
-			int num = ((((uint)pressed & (true ? 1u : 0u)) != 0) ? (-1) : (((pressed & 2u) != 0) ? 1 : 0));
-			if (num != 0)
-			{
-				ListBox listBox = activeControl as ListBox;
-				ListView listView = activeControl as ListView;
-				ComboBox comboBox = activeControl as ComboBox;
-				if (listBox != null && listBox.Items.Count > 0)
-				{
-					listBox.SelectedIndex = Math.Max(0, Math.Min(listBox.Items.Count - 1, listBox.SelectedIndex + num));
-				}
-				else if (comboBox != null && comboBox.Items.Count > 0)
-				{
-					comboBox.SelectedIndex = Math.Max(0, Math.Min(comboBox.Items.Count - 1, comboBox.SelectedIndex + num));
-				}
-				else if (listView != null && listView.Items.Count > 0)
-				{
-					int num2 = ((listView.SelectedIndices.Count > 0) ? listView.SelectedIndices[0] : 0);
-					ListViewItem listViewItem = listView.Items[Math.Max(0, Math.Min(listView.Items.Count - 1, num2 + num))];
-					listView.SelectedItems.Clear();
-					listViewItem.Selected = true;
-					listViewItem.Focused = true;
-					listViewItem.EnsureVisible();
-				}
-				else
-				{
-					f.SelectNextControl(activeControl, num > 0, true, true, true);
-				}
-			}
-			if ((pressed & 0xCu) != 0)
-			{
-				NumericUpDown numericUpDown = activeControl as NumericUpDown;
-				Control control = ((activeControl == null) ? null : activeControl.Parent);
-				while (numericUpDown == null && control != null)
-				{
-					numericUpDown = control as NumericUpDown;
-					control = control.Parent;
-				}
-				if (numericUpDown != null)
-				{
-					numericUpDown.Value = Math.Max(numericUpDown.Minimum, Math.Min(numericUpDown.Maximum, numericUpDown.Value + (((pressed & 8u) != 0) ? numericUpDown.Increment : (-numericUpDown.Increment))));
-				}
-				else
-				{
-					f.SelectNextControl(activeControl, (pressed & 8) != 0, true, true, true);
-				}
-			}
-			if ((pressed & 0x300) == 0)
-			{
-				return;
-			}
-			TabControl tabControl = null;
-			for (Control control = ((activeControl == null) ? null : activeControl.Parent); control != null; control = control.Parent)
-			{
-				if (control is TabControl)
-				{
-					tabControl = (TabControl)control;
-					break;
-				}
-			}
-			if (tabControl == null)
-			{
-				tabControl = Descendants(f).OfType<TabControl>().FirstOrDefault((TabControl t) => t.Visible);
-			}
-			if (tabControl != null && tabControl.TabCount > 0)
-			{
-				tabControl.SelectedIndex = (tabControl.SelectedIndex + (((pressed & 0x200u) != 0) ? 1 : (tabControl.TabCount - 1))) % tabControl.TabCount;
-			}
+			NavigationController.ApplyButtons(f, owner, pressed);
 		}
 
 		private static IEnumerable<Control> Descendants(Control c)
@@ -35995,9 +35889,10 @@ namespace EmulatorHub
 			ApplyState();
 		}
 
+		public bool PauseForPlay { get; set; }
 		public bool ShouldAnimate()
 		{
-			return FluidStyle.Bubbles && FluidStyle.Motion && !FishBowlHighlights.ReducedMotion && !SystemInformation.HighContrast && base.Visible && owner != null && owner.WindowState != FormWindowState.Minimized && Form.ActiveForm == owner;
+			return !PauseForPlay && FluidStyle.Bubbles && FluidStyle.Motion && !FishBowlHighlights.ReducedMotion && !SystemInformation.HighContrast && base.Visible && owner != null && owner.WindowState != FormWindowState.Minimized && Form.ActiveForm == owner;
 		}
 
 		public void ApplyState()

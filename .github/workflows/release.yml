@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Reviewed source version, for example 1.26.0'
+        description: 'Reviewed source version, for example 1.28.1'
         required: true
 permissions:
   contents: write
@@ -19,6 +19,11 @@ jobs:
         run: |
           ./windows/Build.ps1
           & './windows/Run Tests.ps1'
+          & './windows/Run Overflow Audit.ps1'
+          & './windows/Run Overflow Audit.ps1' -Compact
+          foreach ($report in @('windows/overflow-audit/overflow-report.md','windows/overflow-audit-compact/overflow-report.md')) {
+            if ((Get-Content $report -Raw) -notmatch '\*\*0 findings\*\*') { throw "Text overflow found in $report" }
+          }
       - name: Package matching app, installer and source
         shell: pwsh
         env:
@@ -58,6 +63,11 @@ jobs:
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Require reviewed source on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - uses: actions/download-artifact@v8
         with:
           path: packages
@@ -66,4 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          find packages/FishBowl-release-windows -type f \( -name '*.zip' -o -name 'SHA256SUMS.txt' -o -name '*.exe' -o -name '*.ico' -o -name '*.bat' -o -name '*.ps1' -o -name 'README.md' \) -print0 | xargs -0 gh release create "$GITHUB_REF_NAME" "packages/FishBowl-release-linux-x64/FishBowl-${GITHUB_REF_NAME#v}-linux-x64.tar.gz" --draft --title "FishBowl $GITHUB_REF_NAME" --generate-notes
+          version="${GITHUB_REF_NAME#v}"
+          folder="packages/FishBowl-release-windows"
+          (cd "$folder" && sha256sum --check SHA256SUMS.txt)
+          gh release create "$GITHUB_REF_NAME" "$folder/FishBowl-$version.zip" "$folder/FishBowl-$version-Source.zip" "packages/FishBowl-release-linux-x64/FishBowl-$version-linux-x64.tar.gz" "$folder/SHA256SUMS.txt" "$folder/BUILD-INFO.json" "$folder/RELEASE-NOTES.md" --draft --title "FishBowl $GITHUB_REF_NAME" --notes-file "$folder/RELEASE-NOTES.md"

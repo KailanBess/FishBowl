@@ -1,0 +1,45 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { TokenVerifier } from 'livekit-server-sdk';
+import { createService, validateConfig } from '../server.mjs';
+import { KEYS, normalizeKeys, gamepadKeys } from '../client/controls.js';
+const config = {url:'wss://example.invalid', key:'fixture',apiSecret:'fixture-secret-32-characters-long',hostKey:'fixture-host-key-32-characters-long'};
+test('configuration permits secure service or loopback only', () => {
+  assert.throws(()=>validateConfig({}));
+  assert.throws(()=>validateConfig({LIVEKIT_URL:'ws://example.com',LIVEKIT_API_KEY:'key',LIVEKIT_API_SECRET:'secret',FISHBOWL_HOST_KEY:config.hostKey}));
+  assert.equal(validateConfig({LIVEKIT_URL:'wss://example.com',LIVEKIT_API_KEY:'key',LIVEKIT_API_SECRET:'secret',FISHBOWL_HOST_KEY:config.hostKey}).url,'wss://example.com/');
+  assert.throws(()=>validateConfig({LIVEKIT_URL:'wss://user:password@example.com',LIVEKIT_API_KEY:'key',LIVEKIT_API_SECRET:'secret',FISHBOWL_HOST_KEY:config.hostKey}));
+});
+test('room lifecycle, actual signed grants, approval boundary and expiry', async t => {
+  let clock=Date.now(), deleted=[];
+  const service=createService(config,{now:()=>clock,roomService:{createRoom:async()=>{},deleteRoom:async name=>deleted.push(name)}});
+  service.server.listen(0,'127.0.0.1'); await new Promise(resolve=>service.server.once('listening',resolve));
+  t.after(()=>service.server.close()); const origin='http://127.0.0.1:'+service.server.address().port;
+  const post=async(path,body,auth='',extra={})=>fetch(origin+path,{method:'POST',headers:{'Content-Type':'application/json',...(auth?{Authorization:auth}:{}),...extra},body:JSON.stringify(body)});
+  assert.equal((await post('/api/rooms',{})).status,401);
+  assert.equal((await post('/api/rooms',{},'Bearer '+config.hostKey,{Origin:'https://attacker.invalid'})).status,403);
+  const created=await post('/api/rooms',{room_name:'attacker',identity:'admin'},'Bearer '+config.hostKey,{Origin:'http://127.0.0.1:1234'});
+  assert.equal(created.status,201); assert.equal(created.headers.get('Access-Control-Allow-Origin'),'http://127.0.0.1:1234');
+  const host=await created.json(); assert.ok(host.room_name.startsWith('fishbowl-')); assert.ok(host.identity.startsWith('host-')); assert.ok(host.invite.length>=32);
+  const hostClaims=await new TokenVerifier(config.key,config.apiSecret).verify(host.participant_token);
+  assert.equal(hostClaims.video.room,host.room_name); assert.equal(hostClaims.video.canPublish,true); assert.deepEqual(hostClaims.video.canPublishSources,['screen_share','screen_share_audio']); assert.ok(hostClaims.exp-hostClaims.nbf<=300);
+  const guestResponse=await post('/api/token',{invite:host.invite,room_name:'attacker',participant_identity:host.identity,canPublish:true}); assert.equal(guestResponse.status,201);
+  const guest=await guestResponse.json(), claims=await new TokenVerifier(config.key,config.apiSecret).verify(guest.participant_token);
+  assert.equal(claims.video.room,host.room_name); assert.equal(claims.video.canPublish,false); assert.equal(claims.video.canPublishData,true); assert.equal(claims.video.roomAdmin,undefined); assert.ok(claims.sub.startsWith('guest-')); assert.equal(guest.host_identity,host.identity);
+  assert.equal((await post('/api/token',{invite:'invalid'})).status,403);
+  assert.equal((await post('/api/stop',{invite:host.invite})).status,401);
+  assert.equal((await post('/api/stop',{invite:host.invite},'Bearer '+config.hostKey)).status,200); assert.deepEqual(deleted,[host.room_name]);
+  assert.equal((await post('/api/token',{invite:host.invite})).status,403);
+  const second=await (await post('/api/rooms',{},'Bearer '+config.hostKey)).json(); clock+=2*60*60*1000+1;
+  assert.equal((await post('/api/token',{invite:second.invite})).status,403); await service.cleanup(); assert.ok(deleted.includes(second.room_name));
+  const page=await fetch(origin+'/'); assert.equal(page.status,200); assert.ok((await page.text()).includes('Remote couch play')); assert.ok(page.headers.get('Content-Security-Policy').includes("frame-ancestors 'none'"));
+  assert.equal((await fetch(origin+'/../../server.mjs')).status,404);
+  for(let i=0;i<31;i++) await post('/api/token',{invite:'invalid'});
+  assert.equal((await post('/api/token',{invite:'invalid'})).status,429);
+});
+test('controls reject arbitrary keys and map standard gamepads',()=>{
+  assert.equal(normalizeKeys(['ControlLeft','Delete']),null); assert.equal(normalizeKeys('KeyZ'),null); assert.equal(normalizeKeys(Array(13).fill('KeyZ')),null); assert.deepEqual(normalizeKeys(['KeyZ','KeyZ']),['KeyZ']);
+  assert.deepEqual(gamepadKeys({mapping:'standard',axes:[-.7,.1],buttons:[{pressed:true}]}),['ArrowLeft','KeyZ']);
+  assert.deepEqual(gamepadKeys({mapping:'standard',axes:[.1,.2],buttons:[]}),[]);
+  assert.deepEqual(gamepadKeys({mapping:'custom',axes:[-1,-1],buttons:[]}),[]); assert.equal(KEYS.length,12);
+});

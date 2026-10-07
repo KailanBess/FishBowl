@@ -9,7 +9,8 @@ namespace EmulatorHub
 {
     public partial class MainWindow
     {
-        private async Task CustomizeLibraryHome()
+        private Task CustomizeLibraryHome() { return CustomizeLibraryHome(this); }
+        private async Task CustomizeLibraryHome(Window owner)
         {
             var dialog = new FishDialog("Customize home", 540); var body = new StackPanel { Spacing = 8 };
             var recent = Ui.Check("Show recently played", !(library.Theme.HiddenHomeCards ?? new List<string>()).Contains("Recently played"));
@@ -18,7 +19,7 @@ namespace EmulatorHub
             body.Children.Add(recent); body.Children.Add(favorites); body.Children.Add(Ui.Caption("Order")); body.Children.Add(order);
             body.Children.Add(Ui.Actions(Ui.Action("Larger text", () => { library.Theme.UiScalePercent = 125; library.Theme.ListDensity = "Comfortable"; Store.Save(library); }), Ui.Action("High contrast", () => { library.Theme.Name = "High Contrast"; library.Theme.SelectionContrast = "Strong"; Store.Save(library); }), Ui.Action("Reduced motion", () => { library.Theme.EnableMotion = false; Store.Save(library); })));
             body.Children.Add(Ui.Hint("Accessibility appearance presets apply after restart."));
-            body.Children.Add(dialog.Footer("Save", () => { library.Theme.HiddenHomeCards = new List<string>(); if (recent.IsChecked != true) library.Theme.HiddenHomeCards.Add("Recently played"); if (favorites.IsChecked != true) library.Theme.HiddenHomeCards.Add("Favorites"); library.Theme.HomeCardOrder = order.SelectedIndex == 1 ? new List<string> { "Favorites", "Recently played" } : new List<string> { "Recently played", "Favorites" }; Store.Save(library); RefreshHomeCards(); return Task.FromResult(true); })); dialog.Body = body; await dialog.Present(this);
+            body.Children.Add(dialog.Footer("Save", () => { library.Theme.HiddenHomeCards = new List<string>(); if (recent.IsChecked != true) library.Theme.HiddenHomeCards.Add("Recently played"); if (favorites.IsChecked != true) library.Theme.HiddenHomeCards.Add("Favorites"); library.Theme.HomeCardOrder = order.SelectedIndex == 1 ? new List<string> { "Favorites", "Recently played" } : new List<string> { "Recently played", "Favorites" }; Store.Save(library); RefreshHomeCards(); return Task.FromResult(true); })); dialog.Body = body; await dialog.Present(owner);
         }
 
         private async Task ShowLibraryGameTools()

@@ -124,6 +124,7 @@ class UiPolishTests
             foreach (bool compact in new[] { false, true })
             {
                 TextFit.WorkingAreaOverride = compact ? new Rectangle(0, 0, 1024, 720) : new Rectangle(0, 0, 1280, 900);
+                data.Theme.ExpandedHomeCards = null;
                 var invoked = new List<string>();
                 using (var host = new Form { ClientSize = compact ? new Size(1000, 650) : new Size(1200, 780), ShowInTaskbar = false })
                 using (var home = new HomeSurface(data, delegate(string command, GameEntry chosenGame, EmulatorProfile emulator) { invoked.Add(command); }))
@@ -151,6 +152,7 @@ class UiPolishTests
                     expand.PerformClick(); Application.DoEvents(); home.RefreshLayout();
                     Check(NextUi.Descendants(pinned).OfType<PictureBox>().Count(c => c.Visible) == 12 && pinned.Height > collapsedHeight, "expanding reveals every configured game and grows card");
                     Check(expand.Text == "Show less", "expanded card offers collapse");
+                    Check(Json.Deserialize<LibraryData>(Json.Serialize(data)).Theme.ExpandedHomeCards.Contains("Pinned games"), "Home expansion survives saved data roundtrip");
                     home.Reload(); Application.DoEvents();
                     pinned = cards.Controls.Cast<Control>().Single(c => c.AccessibleName == "Pinned games");
                     Check(NextUi.Descendants(pinned).OfType<PictureBox>().Count(c => c.Visible) == 12, "reload retains expanded state and all games");

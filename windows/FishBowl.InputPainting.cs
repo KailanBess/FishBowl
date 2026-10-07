@@ -36,8 +36,32 @@ namespace EmulatorHub
             watched.Add(c, new object());
             c.ControlAdded += delegate(object sender, ControlEventArgs e) { style(e.Control); };
         }
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object> choices = new System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object>();
         public static void Style(Control c)
         {
+            var choice = c as ComboBox;
+            if (choice != null && choice.DropDownStyle == ComboBoxStyle.DropDownList) {
+                choice.DrawMode = DrawMode.OwnerDrawFixed;
+                choice.ItemHeight = Math.Max(18, choice.Font.Height + 6);
+                choice.BackColor = FishBowlPalette.DeepSeaSurface;
+                choice.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, choice.BackColor);
+                object marker;
+                if (!choices.TryGetValue(choice, out marker)) {
+                    choices.Add(choice, new object());
+                    choice.FontChanged += delegate { choice.ItemHeight = Math.Max(18, choice.Font.Height + 6); };
+                    choice.EnabledChanged += delegate { choice.Invalidate(); };
+                    choice.DrawItem += delegate(object sender, DrawItemEventArgs e) {
+                        bool selected = (e.State & DrawItemState.Selected) != 0;
+                        Color background = selected ? CosmeticRuntime.Selection : choice.BackColor;
+                        Color ink = FishBowlPalette.EnsureReadable(choice.Enabled ? choice.ForeColor : FishBowlPalette.ThemeSubtle, background);
+                        if (SystemInformation.HighContrast) { background = selected ? SystemColors.Highlight : SystemColors.Window; ink = selected ? SystemColors.HighlightText : SystemColors.WindowText; }
+                        using (var brush = new SolidBrush(background)) e.Graphics.FillRectangle(brush, e.Bounds);
+                        string caption = e.Index >= 0 && e.Index < choice.Items.Count ? choice.GetItemText(choice.Items[e.Index]) : choice.Text;
+                        FishBowlText.DrawText(e.Graphics, caption, choice.Font, new Rectangle(e.Bounds.X + 5, e.Bounds.Y, Math.Max(1, e.Bounds.Width - 10), e.Bounds.Height), ink, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                        if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
+                    };
+                }
+            }
             var text = c as TextBoxBase;
             if (text != null)
             {

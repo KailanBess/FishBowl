@@ -1,3 +1,29 @@
+# Windows 1.28.1 polish and recovery
+
+- Play shows actionable waiting/recovery states, disables unavailable actions and labels fullscreen exit explicitly. More opens session guidance; failed detach keeps the game in Play.
+- Share session detaches and selects the exact running window for remote hosting, then returns an embedded session to Play when sharing closes. The token service setting persists; target changes stop guest input.
+- Dropdown selection, empty and disabled states follow the active theme while native editing remains intact. Emulator filters disappear outside Emulators and toolbar height shrinks to its content.
+- Home expansions persist across restarts; existing advanced tools remain in More menus and current settings screens.
+- Idle Play avoids repeated renderer placement/clipping, slows settled/hidden process polling and pauses decorative motion during active Play. Process image lookup can use Windows limited-query access while retaining exact PID/start/window ownership checks.
+- App/source downloads include source commit metadata, checksums and upgrade/rollback instructions. Tagged draft releases require source on main and passing normal/compact text audits. Physical controllers, audio, multi-monitor rendering and two-device remote streaming still require live verification.
+
+# Windows 1.28.0 Play workspace
+
+- Added Play alongside Home, Emulators and Library. Game and emulator launches route to a persistent native window host; section changes retain running sessions.
+- Added fullscreen, session selection, Show in Play and Open in window using existing controls and appearance.
+- Per-monitor renderers use a borderless owned window aligned and clipped to Play, preserving renderer DPI.
+- Native windows are matched by exact process/start identity and restored before host disposal or handle recreation. FishBowl closes without terminating emulators.
+- Linux retains external emulator windows; native embedding needs a separate platform implementation. Renderer/elevation compatibility and actual emulator smoke tests remain required.
+
+# Windows and Linux 1.27.0 session and controller improvements
+
+- Added durable, profile-owned playtime checkpoints. Restart recovers saved active time and resumes exact running process identities without counting app downtime. Games remain running when FishBowl closes.
+- Follows verified launcher descendants, excludes pre-existing processes and PID reuse, and conservatively marks unverifiable launches uncertain.
+- Windows Appearance and accessibility routes share one hub. General startup/backup preferences retain their separate screen and current controls.
+- Added Windows controller deadzone/repeat/reconnect guards and menu, overflow, dialog, checkbox/list/choice/numeric/tab navigation. Linux reads existing joystick devices and routes input only to the active FishBowl window.
+- Added the browser LiveKit media client, private room token service, invitations and host-approved keyboard/gamepad-to-keyboard controls. Windows hosts choose a single game window; Linux can join through the browser. Service setup, real two-device streaming and emulator input testing remain required.
+- Session tests wait for verified completion instead of fixed delays. Shared journal recovery safely ignores malformed JSON. Normal/compact text audits include the remote-play dialog.
+
 # Windows 1.26.2 compact controls and theme harmony
 
 - Compact control sizing is the default, reducing box/button padding, toolbar/banner spacing and Home card dimensions while preserving configured fonts and text scaling. Standard and Roomy remain available; the controller preset uses Roomy.
