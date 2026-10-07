@@ -114,6 +114,13 @@ namespace EmulatorHub
             string t = (text ?? "").Trim().ToLowerInvariant();
             if (t.Contains("favorite") || t.Contains("favour")) return t.Contains("★") || t.Contains("favorited") ? "star-filled" : "star";
             if (t.StartsWith("cancel") || t.StartsWith("close")) return "close";
+            if (t == "play" || t.StartsWith("play ") || t.StartsWith("launch") || t.StartsWith("reopen") || t.StartsWith("continue") || t.StartsWith("start a")) return "play";
+            if (t.Contains("collection") || t.Contains("smart list") || t.Contains("queue") || t.Contains("library")) return "library";
+            if (t.StartsWith("pin") || t.StartsWith("unpin") || t.Contains("tag")) return "tag";
+            if (t.Contains("surprise")) return "game";
+            if (t.Contains("csv") || t.StartsWith("export")) return "export";
+            if (t.Contains("session") || t.Contains("journal") || t.Contains("playtime")) return "note";
+            if (t.Contains("cover") || t.Contains("artwork") || t.Contains("screenshot")) return "image";
             if (t.StartsWith("remove") || t.StartsWith("forget")) return "remove";
             if (t.Contains("firmware") || t.Contains("bios")) return "chip";
             if (t.Contains("restore")) return "restore";

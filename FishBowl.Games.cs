@@ -347,6 +347,70 @@ namespace EmulatorHub
 		}
 	}
 
+	// New Library entries from files the player adds (single files or a scanned folder).
+	public static class GameLibraryImport
+	{
+		public static EmulatorProfile EmulatorForFile(LibraryData library, string file)
+		{
+			string extension = (Path.GetExtension(file) ?? "").TrimStart('.');
+			if (extension.Length == 0) return null;
+			List<EmulatorProfile> matches = (library.Emulators ?? new List<EmulatorProfile>()).Where((EmulatorProfile e) => (e.Extensions ?? new List<string>()).Any((string x) => string.Equals((x ?? "").Trim().TrimStart('.'), extension, StringComparison.OrdinalIgnoreCase))).ToList();
+			return matches.FirstOrDefault((EmulatorProfile e) => e.Favorite) ?? matches.FirstOrDefault();
+		}
+
+		// A Library entry for a file; launchFile marks programs and shortcuts that run without an emulator.
+		public static GameEntry NewEntry(LibraryData library, string file, bool launchFile)
+		{
+			EmulatorProfile emulator = EmulatorForFile(library, file);
+			bool native = emulator == null && launchFile;
+			GameEntry game = new GameEntry();
+			game.Id = Guid.NewGuid().ToString("N");
+			game.Path = Path.GetFullPath(file);
+			game.Title = Path.GetFileNameWithoutExtension(file);
+			game.EmulatorId = emulator == null ? null : emulator.Id;
+			game.AddedAt = DateTime.UtcNow.ToString("o");
+			game.Tags = new List<string>();
+			game.RequiresEmulatorAssignment = emulator == null && !native;
+			game.Extras = new GameExtras();
+			game.Extras.Native = native;
+			game.Extras.WorkingDirectory = native ? Path.GetDirectoryName(game.Path) : null;
+			game.ConsoleLabel = native ? null : GameStorage.ConsoleFor(file);
+			return game;
+		}
+
+		// Files under a folder that an emulator in the Library can open and that are not already listed or removed.
+		public static List<string> FolderCandidates(LibraryData library, string folder, int limit)
+		{
+			HashSet<string> extensions = new HashSet<string>((library.Emulators ?? new List<EmulatorProfile>()).SelectMany((EmulatorProfile e) => e.Extensions ?? new List<string>()).Select((string x) => (x ?? "").Trim().TrimStart('.').ToLowerInvariant()).Where((string x) => x.Length > 0));
+			HashSet<string> existing = new HashSet<string>(library.Games.Select((GameEntry g) => g.Path ?? ""), StringComparer.OrdinalIgnoreCase);
+			List<string> result = new List<string>();
+			if (!Directory.Exists(folder)) return result;
+			Stack<string> pending = new Stack<string>();
+			pending.Push(folder);
+			while (pending.Count > 0 && result.Count < limit)
+			{
+				string current = pending.Pop();
+				string[] files, folders;
+				try { files = Directory.GetFiles(current); folders = Directory.GetDirectories(current); }
+				catch (UnauthorizedAccessException) { continue; }
+				catch (IOException) { continue; }
+				foreach (string child in folders.OrderByDescending((string f) => f, StringComparer.OrdinalIgnoreCase))
+				{
+					if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0 && !Path.GetFileName(child).StartsWith(".")) pending.Push(child);
+				}
+				foreach (string file in files.OrderBy((string f) => f, StringComparer.OrdinalIgnoreCase))
+				{
+					if (result.Count >= limit) break;
+					if (file.IndexOf(".fishbowl-", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+					if (!extensions.Contains((Path.GetExtension(file) ?? "").TrimStart('.').ToLowerInvariant())) continue;
+					if (existing.Contains(file) || GameLibraryRemoval.IsExcluded(library, file)) continue;
+					result.Add(file);
+				}
+			}
+			return result;
+		}
+	}
+
 	// Launch paths and play-session bookkeeping shared by both apps.
 	public static class GamePlay
 	{
