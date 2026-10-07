@@ -48,6 +48,7 @@ Some contributors are new to programming tools, Git and GitHub. Besides doing th
 
 ## Code rules
 
+- **No games, firmware or emulator files, ever.** Never commit, upload or attach ROMs, disc images, BIOS, firmware, keys or emulator builds, in the repository, releases or issues. Test fixtures are tiny generated files with made-up titles (e.g. `Test Quest.gba`), never real game names. `.gitignore` blocks common game and firmware file types; don't override it.
 - **C# 5 in shared files:** `FishBowl.Model.cs`, `FishBowl.GameRecognition.cs`, `FishBowl.Core.cs`, `FishBowl.Platform.cs` and everything in `windows/` must compile with the .NET Framework C# 5 compiler.
   - **Not allowed:** `?.`, `??=`, `$"..."`, `=>` members, `nameof`, `out var`, `is T x`, tuples, local functions, property initializers.
   - **Linux-only APIs** go behind `#if NETCOREAPP`.

@@ -48,6 +48,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-10-13 (Linux):** restored the "no games, firmware or emulator files" rule that missed PR #24's merge: `AGENTS.md` code rule, a "Bring your own games and emulators" README section and `.gitignore` entries for more game, firmware and key file types (merged with the existing list). Deleted merged branches on GitHub.
+
 - **2026-10-13 (Linux):** README gains Screenshots and Tutorials sections (eight short walkthroughs) with images in `docs/images/`. They are Linux screenshots taken headlessly from a demo library of made-up games and generated covers; Windows screenshots could be added beside them. Snapshot rows on Linux no longer say "Not reported by this program" when the emulator reports no version, and the Living room tab's button now shows the real shortcut, Ctrl+B. Fixed the README's stale version table and controller note.
 
 - **2026-10-13 (Linux):** branch `parity/details-3` (stacked on #38) fills the remaining game-details gaps and Home quick actions, and adds bubble rails and main-window ambient artwork (see Linux work). Linux build and core tests pass; checked headlessly with a fake library.

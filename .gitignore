@@ -63,3 +63,13 @@ TestResults/
 *.nsp
 *.xci
 *.rom
+*.n64
+*.z64
+*.v64
+*.cso
+*.cue
+*.rvz
+*.nca
+*.pbp
+*.keys
+*.AppImage
