@@ -20,7 +20,7 @@ PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.28.0 
 
 Windows adds a persistent fourth Play section. Game and emulator launch paths route to exact-process native window hosts, keep sessions alive across section changes, and expose fullscreen and detach/reattach actions. Original native parent/styles/placement are restored before host destruction; emulators remain running when FishBowl closes. Matching-DPI windows use native child hosting; incompatible per-monitor renderers use a borderless owned window aligned and clipped to the Play viewport without resetting renderer DPI. Native ownership is restored before fullscreen handle changes or shutdown. Elevated/unsupported windows retain external-window fallback. The foreign process controller guard remains strict. Remote media input currently requires detaching the game window. No saved model changes are introduced; Linux embedding remains a separate task.
 
-Validation: all existing Windows regressions passed 31,089 checks. Actual emulator, embedded Library and modal game launch routing passed 17 checks. Native child/owned-window lifetime tests passed 58 checks and include exact PID/start ownership, resize, multiple sessions, DPI preservation and fullscreen. Normal and compact 100/150/200% audits report zero findings across all four sections and 64 dialog types; 199 schema-preservation checks and Linux semantic compilation pass. Required GitHub Actions build, packaging, remote-service and text-audit checks run on PR #21. Actual emulator rendering/input and multi-monitor DPI combinations require native smoke testing.
+Validation: all existing Windows regressions passed 31,089 checks. Actual emulator, embedded Library and modal game launch routing passed 19 checks. Native child/owned-window lifetime tests passed 58 checks and include exact PID/start ownership, resize, multiple sessions, DPI preservation and fullscreen. Normal and compact 100/150/200% audits report zero findings across all four sections and 64 dialog types; 199 schema-preservation checks and Linux semantic compilation pass. Required GitHub Actions build, packaging, remote-service and text-audit checks run on PR #21. Actual emulator rendering/input and multi-monitor DPI combinations require native smoke testing.
 
 ## Session, navigation and remote play 1.27.0
 
@@ -143,3 +143,7 @@ Controller navigation now checks the actual enabled native form and foreground r
 ### 2026-10-07 — Windows Play workspace
 
 Added persistent embedded emulator sessions and launch routing, fullscreen chrome, restored native windows on shutdown, and four-section regression coverage in PR #21. Linux continues to launch external windows. See the Play section above for compatibility and validation requirements.
+
+#### CI fixture portability
+
+Launch fixture ownership expands Windows short/long executable path aliases before comparing exact paths and still validates process creation time. Tests reject future start thresholds and identical executable names in other directories. This avoids false ownership failures on runners using short TEMP paths. Native hosting and app behavior are unchanged.
