@@ -102,7 +102,7 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 
 ## Log
 
-- **2026-10-07 (Linux):** started native Linux testing of the 1.26–1.28 Linux screens (see In progress on the Linux side).
+- **2026-10-07 (Linux):** started native Linux testing of the 1.26–1.28 Linux screens (see In progress on the Linux side). Added a "Bring your own games and emulators" notice to the README, a no-games/firmware/emulator-files rule to `AGENTS.md`, and `.gitignore` entries for game and firmware file types.
 
 - **2026-10-07 (polish 1.28.1):** refined persistent Play controls, safe detach/retry feedback, guided sharing/return, themed dropdown states, filter visibility, content-sized toolbar rows, persisted Home expansions and idle placement work. Added native/session-details/theme/schema regression coverage and clearer complete app/source release metadata and rollback guidance. Windows-only behavior is documented for Linux parity.
 

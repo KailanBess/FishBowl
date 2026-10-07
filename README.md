@@ -11,6 +11,10 @@ Source version **1.28.1** adds a polished Windows Play workspace with embedded e
 
 For Windows, choose **FishBowl-1.28.1.zip** to run the app; keep its six files together. **FishBowl-1.28.1-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
 
+## Bring your own games and emulators
+
+**FishBowl does not include, download or link to games (ROMs, disc images), BIOS, firmware, keys or emulator packages.** It organizes and launches files you already have. Install emulators yourself from their official sources, and use only games and firmware you have dumped from hardware you own, or that you are otherwise legally allowed to use. Never post copyrighted games or firmware in issues or pull requests.
+
 ## Features
 
 ### Windows
