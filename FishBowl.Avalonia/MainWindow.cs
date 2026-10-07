@@ -86,6 +86,7 @@ namespace EmulatorHub
                 pendingWarnings.Clear();
                 if (library.Theme.ShowStartupAssistant) await ShowFirstRunGuide();
                 if (library.Theme.ShowGameStorageAssistant) await ShowGameStoragePrompt();
+                if (Environment.GetCommandLineArgs().Skip(1).Any(a => a == "--living-room")) OpenLivingRoom();
             };
             Closing += (sender, e) =>
             {
@@ -238,6 +239,8 @@ namespace EmulatorHub
             var view = new MenuItem { Header = "_View", ItemsSource = new object[] {
                 MenuAction("Refresh emulators", "refresh", () => { reloadProgramMetadata = true; RefreshHub(); }),
                 MenuAction("Appearance...", "settings", ShowAppearanceHub),
+                MenuAction("Living-room Library (Ctrl+L)", "controller", OpenLivingRoom),
+                MenuAction("Immersion settings...", "settings", () => ImmersionSettingsDialog.Show(this, library, () => RefreshGameLibrary())),
                 MenuAction("Full screen (F11)", "desktop", ToggleFullScreen) } };
             convertersMenu.SubmenuOpened += delegate { RefreshConvertersMenu(); }; RefreshConvertersMenu();
             linksMenu.SubmenuOpened += delegate { RefreshWebsiteLinksMenu(); }; RefreshWebsiteLinksMenu();
@@ -589,6 +592,7 @@ namespace EmulatorHub
             bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             if (ctrl && e.Key == Key.E) { e.Handled = true; await Ui.Run(this, AddEmulator); }
             else if (ctrl && e.Key == Key.F) { e.Handled = true; if (libraryPages.SelectedIndex == 1) gameSearch.Focus(); else filterBox.Focus(); }
+            else if (ctrl && e.Key == Key.L) { e.Handled = true; OpenLivingRoom(); }
             else if (ctrl && e.Key == Key.G) { e.Handled = true; await Ui.Run(this, () => ShowGameStorageOrganizer(null)); }
             else if (e.Key == Key.F11) { e.Handled = true; ToggleFullScreen(); }
             else if (e.Key == Key.Escape)

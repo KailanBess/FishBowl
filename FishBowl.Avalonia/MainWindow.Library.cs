@@ -20,7 +20,6 @@ namespace EmulatorHub
         private readonly CheckBox gameFavorites = Ui.Check("Favorites only", false);
         private readonly StackPanel gameDetails = new StackPanel { Spacing = 8 };
         private readonly StackPanel homeCards = new StackPanel { Spacing = 14 };
-        private readonly WrapPanel couchCards = new WrapPanel();
         private readonly Dictionary<string, Process> gameProcesses = new Dictionary<string, Process>();
         private bool rebuildingGames;
         private TabControl libraryPages;
@@ -49,7 +48,7 @@ namespace EmulatorHub
             body.Children.Add(gameList);
             var details = new ScrollViewer { Content = gameDetails }; Grid.SetColumn(details, 2); body.Children.Add(details); panel.Children.Add(body);
             var home = new ScrollViewer { Content = homeCards, Margin = new Thickness(18) };
-            var couch = new ScrollViewer { Content = couchCards, Margin = new Thickness(18) };
+            var couch = new ScrollViewer { Content = LivingRoomPage() };
             libraryPages.ItemsSource = new[] { new TabItem { Header = "Home", Content = home }, new TabItem { Header = "Library", Content = panel }, new TabItem { Header = "Emulators", Content = emulators }, new TabItem { Header = "Living room", Content = couch } };
             libraryPages.SelectionChanged += delegate { RefreshHomeCards(); };
             RefreshGameLibrary();
@@ -110,7 +109,7 @@ namespace EmulatorHub
         {
             if (libraryPages == null) return;
             companionServer?.Update(IntegrationData.CompanionSnapshot(library));
-            homeCards.Children.Clear(); couchCards.Children.Clear();
+            homeCards.Children.Clear();
             homeCards.Children.Add(Ui.Text("Home", 24, true));
             homeCards.Children.Add(Ui.Text(library.Games.Count + " games Â· " + library.Emulators.Count + " emulators Â· " + TimeSpan.FromSeconds(library.Games.Sum(g => g.TotalPlaySeconds)).TotalHours.ToString("0.0") + " hours played", 14, false, p.SubtleBrush));
             homeCards.Children.Add(Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Open library", () => libraryPages.SelectedIndex = 1), Ui.Action("Profiles", ManageLibraryProfiles), Ui.Action("Appearance", ShowAppearanceHub), Ui.Action("Customize home", CustomizeLibraryHome)));
@@ -121,13 +120,6 @@ namespace EmulatorHub
                 foreach (var game in entries) { var captured = game; var button = new Button { Content = GameLibraryRow(game), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(10) }; button.Click += async delegate { await Ui.Run(this, () => LaunchGame(captured)); }; homeCards.Children.Add(button); }
                 if (!entries.Any()) homeCards.Children.Add(Ui.Hint(section == "Favorites" ? "Mark games as favorites in Library to show them here." : "Your played games will appear here."));
             }
-            foreach (var game in library.Games.OrderByDescending(g => g.Favorite).ThenBy(g => g.Title))
-            {
-                var captured = game;
-                var card = new Button { Content = GameLibraryRow(game, true), Width = 380, Margin = new Thickness(6), Padding = new Thickness(14), MinHeight = 158 };
-                card.Click += async delegate { await Ui.Run(this, () => LaunchGame(captured)); }; couchCards.Children.Add(card);
-            }
-            if (library.Games.Count == 0) couchCards.Children.Add(Ui.Hint("Add games in Library to use Living room. Use Tab and Enter to select and launch a game."));
         }
 
         private void ShowLibraryGameDetails()
