@@ -69,6 +69,8 @@ Library recovery and layout fixes: normalized multi-disc grouping, large-text la
 
 ## In progress on the Linux side
 
+**Now (2026-10-07):** the Linux maintainer is running the new Linux screens on a real Linux desktop for the first time, fixing what breaks and filling gaps, on branches `parity/library` (Home, Library, sessions, collections, maintenance), `parity/saves` (saves, save history, backups) and `parity/livingroom` (living room, controllers). **Windows-side agents: please don't change the Linux UI files (`FishBowl.Avalonia/`) or these shared files' Linux paths until those branches merge**, to avoid conflicts. Windows work and shared-model additions are fine; note them here as usual.
+
 These exist as branches on the Linux maintainer's machine and will arrive as separate pull requests:
 
 - **Launch options (Linux):**
@@ -99,6 +101,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-07 (Linux):** started native Linux testing of the 1.26–1.28 Linux screens (see In progress on the Linux side).
 
 - **2026-10-07 (polish 1.28.1):** refined persistent Play controls, safe detach/retry feedback, guided sharing/return, themed dropdown states, filter visibility, content-sized toolbar rows, persisted Home expansions and idle placement work. Added native/session-details/theme/schema regression coverage and clearer complete app/source release metadata and rollback guidance. Windows-only behavior is documented for Linux parity.
 
