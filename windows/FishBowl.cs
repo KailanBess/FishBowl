@@ -25318,49 +25318,6 @@ namespace EmulatorHub
 			return list;
 		}
 	}
-	public static class BackupIntegrity
-	{
-		public static BackupManifest Verify(string path, CancellationToken token)
-		{
-			using (ZipArchive zipArchive = ZipFile.OpenRead(path))
-			{
-				BackupManifest backupManifest = EmulatorBackups.ReadManifest(zipArchive);
-				HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-				foreach (BackupFile file in backupManifest.Files)
-				{
-					token.ThrowIfCancellationRequested();
-					if (!hashSet.Add(file.ArchivePath))
-					{
-						throw new InvalidDataException("Duplicate backup path.");
-					}
-					ZipArchiveEntry entry = zipArchive.GetEntry(file.ArchivePath);
-					if (entry == null || entry.Length != file.Size)
-					{
-						throw new InvalidDataException("Backup entry is missing or has the wrong size.");
-					}
-					using (Stream stream = entry.Open())
-					{
-						using (SHA256 sHA = SHA256.Create())
-						{
-							byte[] array = new byte[65536];
-							int inputCount;
-							while ((inputCount = stream.Read(array, 0, array.Length)) > 0)
-							{
-								token.ThrowIfCancellationRequested();
-								sHA.TransformBlock(array, 0, inputCount, array, 0);
-							}
-							sHA.TransformFinalBlock(new byte[0], 0, 0);
-							if (!BitConverter.ToString(sHA.Hash).Replace("-", "").Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
-							{
-								throw new InvalidDataException("Backup content hash mismatch.");
-							}
-						}
-					}
-				}
-				return backupManifest;
-			}
-		}
-	}
 	public class RequirementsScanResult
 	{
 		public List<RequirementFileSnapshot> Current = new List<RequirementFileSnapshot>();
@@ -25512,43 +25469,22 @@ namespace EmulatorHub
 
 		public static Dictionary<string, string> SnapshotFiles(SaveSnapshot snapshot, CancellationToken token)
 		{
-			Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-			if (snapshot.IsFolder)
-			{
-				foreach (string item in SafeFiles.Tree(snapshot.Path, token))
-				{
-					dictionary[item.Substring(snapshot.Path.TrimEnd('\\', '/').Length + 1)] = SafeFiles.HashFile(item, token);
-				}
-			}
-			else if (File.Exists(snapshot.Path))
-			{
-				dictionary[Path.GetFileName(snapshot.Source ?? snapshot.Path)] = SafeFiles.HashFile(snapshot.Path, token);
-			}
-			return dictionary;
+			return SaveHistory.SnapshotFiles(snapshot, token);
 		}
 
 		public static string[] SnapshotChanges(SaveSnapshot before, SaveSnapshot after, CancellationToken token)
 		{
-			Dictionary<string, string> old = ((before == null) ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) : SnapshotFiles(before, token));
-			Dictionary<string, string> next = SnapshotFiles(after, token);
-			return (from k in old.Keys.Union(next.Keys, StringComparer.OrdinalIgnoreCase)
-				orderby k
-				select (!old.ContainsKey(k)) ? ("Added: " + k) : ((!next.ContainsKey(k)) ? ("Removed: " + k) : ((old[k] != next[k]) ? ("Changed: " + k) : null)) into k
-				where k != null
-				select k).ToArray();
+			return SaveHistory.SnapshotChanges(before, after, token);
 		}
 
 		public static long SnapshotStorage(LibraryData data)
 		{
-			return data.SaveSnapshots.Sum((SaveSnapshot s) => s.Bytes);
+			return SaveHistory.SnapshotStorage(data);
 		}
 
 		public static long EstimatedGrowth(LibraryData data, int days)
 		{
-			DateTime cutoff = DateTime.UtcNow.AddDays(-30.0);
-			DateTime result;
-			List<SaveSnapshot> source = data.SaveSnapshots.Where((SaveSnapshot s) => DateTime.TryParse(s.CreatedAt, out result) && result.ToUniversalTime() >= cutoff).ToList();
-			return (long)((double)source.Sum((SaveSnapshot s) => s.Bytes) / 30.0 * (double)Math.Max(0, days));
+			return SaveHistory.EstimatedGrowth(data, days);
 		}
 	}
 	public static class NextMedia
@@ -26448,7 +26384,7 @@ namespace EmulatorHub
 
 		private static string PlannedFolder(LibraryData data)
 		{
-			return Path.Combine(HubPaths.BackupRoot(data), "Scheduled snapshots");
+			return SaveHistory.PlannedFolder(data);
 		}
 
 		public static void RunScheduledBackup(IWin32Window owner, LibraryData data)
@@ -26480,40 +26416,8 @@ namespace EmulatorHub
 			plannedRunning = true;
 			try
 			{
-				BackgroundWork<int>.Run(owner, "Export scheduled snapshots", delegate(CancellationToken token, Action<string> progress)
-				{
-					string text = PlannedFolder(data);
-					Directory.CreateDirectory(text);
-					long num = Directory.GetFiles(text, "*.zip").Sum((string p) => new FileInfo(p).Length);
-					int num2 = 0;
-					SaveSnapshot[] array = data.SaveSnapshots.ToArray();
-					SaveSnapshot[] array2 = array;
-					foreach (SaveSnapshot saveSnapshot in array2)
-					{
-						token.ThrowIfCancellationRequested();
-						string text2 = Path.Combine(text, SafeId(saveSnapshot.Id) + ".zip");
-						if (!File.Exists(text2))
-						{
-							if (num + saveSnapshot.Bytes > Math.Max(1L, quota) * 1024 * 1024)
-							{
-								throw new IOException("The scheduled export quota would be exceeded. Increase the quota or review old exports.");
-							}
-							progress("Export " + saveSnapshot.CreatedAt);
-							SaveHistory.Export(data, saveSnapshot, text2, token);
-							long length = new FileInfo(text2).Length;
-							if (num + length > Math.Max(1L, quota) * 1024 * 1024)
-							{
-								File.Delete(text2);
-								throw new IOException("This new archive exceeds the scheduled export quota.");
-							}
-							num += length;
-							num2++;
-						}
-					}
-					return num2;
-				});
-				data.Enhancements.LastPlannedBackup = DateTime.Now.ToString("g");
-				data.Enhancements.NextBackupAt = ((data.Enhancements.BackupIntervalDays <= 0) ? null : DateTime.UtcNow.AddDays(data.Enhancements.BackupIntervalDays).ToString("o"));
+				BackgroundWork<int>.Run(owner, "Export scheduled snapshots", (CancellationToken token, Action<string> progress) => SaveHistory.ExportPlanned(data, quota, token, progress));
+				SaveHistory.PlannedExportDone(data);
 				Store.Save(data);
 			}
 			finally
@@ -31469,26 +31373,7 @@ namespace EmulatorHub
 
 		public static string RestorePreview(SaveSnapshot s, CancellationToken token)
 		{
-			SaveHistory.Verify(s, token);
-			Dictionary<string, string> incoming = NextData.SnapshotFiles(s, token);
-			SaveSnapshot saveSnapshot = new SaveSnapshot();
-			saveSnapshot.Path = s.Source;
-			saveSnapshot.Source = s.Source;
-			saveSnapshot.IsFolder = s.IsFolder;
-			SaveSnapshot snapshot = saveSnapshot;
-			Dictionary<string, string> dictionary = NextData.SnapshotFiles(snapshot, token);
-			StringBuilder stringBuilder = new StringBuilder("Restore destination: " + s.Source + "\r\nExisting contents will be backed up. Emulator must be closed.\r\n\r\n");
-			foreach (KeyValuePair<string, string> item in incoming)
-			{
-				string value;
-				string text = ((!dictionary.TryGetValue(item.Key, out value)) ? "ADD" : ((value == item.Value) ? "UNCHANGED" : "REPLACE"));
-				stringBuilder.AppendLine(text + " " + item.Key);
-			}
-			foreach (string item2 in dictionary.Keys.Where((string key) => !incoming.ContainsKey(key)))
-			{
-				stringBuilder.AppendLine("REMOVE FROM LIVE (retained in rollback): " + item2);
-			}
-			return stringBuilder.ToString();
+			return SaveHistory.RestorePreview(s, token);
 		}
 
 		public static List<string> CloudConflicts(string root, CancellationToken token)
@@ -33107,12 +32992,6 @@ namespace EmulatorHub
 			}
 		}
 	}
-	public class ScheduledSaveResult
-	{
-		public List<SaveSnapshot> Snapshots = new List<SaveSnapshot>();
-
-		public List<string> Messages = new List<string>();
-	}
 	public sealed class RecoveryMarker
 	{
 		private string signature;
@@ -33179,121 +33058,8 @@ namespace EmulatorHub
 			Owned = false;
 		}
 	}
-	public static class HubSaveSchedule
+	public static partial class HubSaveSchedule
 	{
-		public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token)
-		{
-			return Capture(copy, token, null);
-		}
-
-		public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token, Action<string> progress)
-		{
-			ScheduledSaveResult scheduledSaveResult = new ScheduledSaveResult();
-			string managed = Path.Combine(GameStorage.Root(copy), "Game Saves");
-			try
-			{
-				string hash;
-				foreach (GameEntry g in copy.Games)
-				{
-					token.ThrowIfCancellationRequested();
-					if (!(g.Saves ?? new List<GameSaveEntry>()).Any((GameSaveEntry link) => !string.IsNullOrWhiteSpace(link.Path) && !SafeFiles.Within(link.Path, managed)))
-					{
-						continue;
-					}
-					EmulatorProfile emulatorProfile = NextData.LaunchEmulator(copy, g);
-					if (emulatorProfile == null || !Platform.IsDirectProgram(emulatorProfile.Executable) || EmulatorRuntime.State(emulatorProfile.Executable) != 0)
-					{
-						scheduledSaveResult.Messages.Add(g.Title + ": skipped; a closed executable could not be verified.");
-						continue;
-					}
-					try
-					{
-						SaveHistory.RequireClosed(copy, new SaveSnapshot
-						{
-							GameId = g.Id
-						});
-					}
-					catch (Exception ex)
-					{
-						scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
-						continue;
-					}
-					GameSaveEntry[] array = (g.Saves ?? new List<GameSaveEntry>()).ToArray();
-					foreach (GameSaveEntry link2 in array)
-					{
-						token.ThrowIfCancellationRequested();
-						if (string.IsNullOrWhiteSpace(link2.Path) || SafeFiles.Within(link2.Path, managed))
-						{
-							continue;
-						}
-						if (!File.Exists(link2.Path) && !Directory.Exists(link2.Path))
-						{
-							scheduledSaveResult.Messages.Add(g.Title + ": linked save missing.");
-							continue;
-						}
-						try
-						{
-							hash = SafeFiles.Hash(link2.Path, token);
-							if (copy.SaveSnapshots.Any((SaveSnapshot s) => s.GameId == g.Id && s.Source == link2.Path && s.Kind == link2.Kind && s.Hash == hash))
-							{
-								scheduledSaveResult.Messages.Add(g.Title + ": unchanged save skipped.");
-								continue;
-							}
-							SaveSnapshot saveSnapshot = SaveHistory.Capture(copy, g, link2.Path, link2.Kind, false, token);
-							saveSnapshot.Note = "Scheduled linked-save capture";
-							scheduledSaveResult.Snapshots.Add(saveSnapshot);
-							scheduledSaveResult.Messages.Add(g.Title + ": verified save captured.");
-							if (progress != null)
-							{
-								progress(g.Title + ": verified save captured.");
-							}
-						}
-						catch (OperationCanceledException)
-						{
-							throw;
-						}
-						catch (Exception ex)
-						{
-							scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
-						}
-					}
-				}
-				token.ThrowIfCancellationRequested();
-				return scheduledSaveResult;
-			}
-			catch (OperationCanceledException)
-			{
-				foreach (SaveSnapshot snapshot in scheduledSaveResult.Snapshots)
-				{
-					SaveHistory.Remove(copy, snapshot);
-				}
-				throw;
-			}
-		}
-
-		public static void Apply(LibraryData d, ScheduledSaveResult result)
-		{
-			foreach (SaveSnapshot s in result.Snapshots)
-			{
-				List<SaveSnapshot> saveSnapshots = d.SaveSnapshots;
-				Func<SaveSnapshot, bool> predicate = (SaveSnapshot x) => x.Id == s.Id;
-				if (!saveSnapshots.Any(predicate))
-				{
-					d.SaveSnapshots.Add(s);
-					GameEntry gameEntry = d.Games.FirstOrDefault((GameEntry x) => x.Id == s.GameId);
-					if (gameEntry != null)
-					{
-						GameSaves.Link(gameEntry, s.Path, s.Kind);
-					}
-				}
-			}
-			if (result.Snapshots.Count > 0)
-			{
-				d.Experience.LastSuccessfulBackup = DateTime.UtcNow.ToString("o");
-			}
-			Hub.Ensure(d).LastCaptureReport = string.Join("\r\n", result.Messages);
-		}
-
 		public static void Settings(IWin32Window owner, LibraryData d)
 		{
 			NextDialog f = new NextDialog("Linked-save backup schedule", 870, 620);
