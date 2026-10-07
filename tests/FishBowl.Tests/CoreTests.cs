@@ -81,6 +81,7 @@ static class T {
     Check("system scan runs", EmulatorDiscovery.ScanSystem(tok) != null);
     SaveToolsTests.Run(root, Check);
     SessionTests.Run(root, Check);
+    GamesTests.Run(root, Check);
     Directory.Delete(root, true);
     RecognitionTests.Run(Check);
     ControllerInputTests.Run(Check);

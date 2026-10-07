@@ -21,6 +21,7 @@
     <EmbeddedResource Include="../FishBowl.png" LogicalName="FishBowl.png" />
     <EmbeddedResource Include="../FishBowl.ico" LogicalName="FishBowl.ico" />
     <Compile Include="../FishBowl.Library.cs" Link="Shared/FishBowl.Library.cs" />
+    <Compile Include="../FishBowl.Games.cs" Link="Shared/FishBowl.Games.cs" />
       <Compile Include="../FishBowl.GameTools.cs" Link="Shared/FishBowl.GameTools.cs" />
     <Compile Include="../FishBowl.Integrations.cs" Link="Shared/FishBowl.Integrations.cs" />
       <Compile Include="../FishBowl.SaveTools.cs" Link="Shared/FishBowl.SaveTools.cs" />

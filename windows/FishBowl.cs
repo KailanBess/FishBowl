@@ -20818,41 +20818,6 @@ namespace EmulatorHub
 			return list;
 		}
 	}
-	public static class GameCollections
-	{
-		public static IEnumerable<GameEntry> Entries(GameCollection collection, IEnumerable<GameEntry> games)
-		{
-			List<GameEntry> source = (games ?? Enumerable.Empty<GameEntry>()).ToList();
-			if (collection == null)
-			{
-				return Enumerable.Empty<GameEntry>();
-			}
-			if (!collection.IsSmart)
-			{
-				return source.Where((GameEntry game) => (collection.GameIds ?? new List<string>()).Contains(game.Id));
-			}
-			switch ((collection.SmartRule ?? "").Trim())
-			{
-			case "Favorites":
-				return source.Where((GameEntry game) => game.Favorite);
-			case "Pinned":
-				return source.Where((GameEntry game) => game.Pinned);
-			case "Playing":
-				return source.Where((GameEntry game) => string.Equals(game.PlayStatus, "Playing", StringComparison.OrdinalIgnoreCase));
-			case "Completed":
-				return source.Where((GameEntry game) => string.Equals(game.PlayStatus, "Completed", StringComparison.OrdinalIgnoreCase));
-			case "Recent":
-				return (from game in source
-					where !string.IsNullOrWhiteSpace(game.LastLaunched)
-					orderby game.LastLaunched descending
-					select game).Take(30);
-			case "Missing":
-				return source.Where((GameEntry game) => string.IsNullOrWhiteSpace(game.Path) || !File.Exists(game.Path));
-			default:
-				return Enumerable.Empty<GameEntry>();
-			}
-		}
-	}
 	public static class Platform
 	{
 		private static readonly string[] WindowsLaunchExtensions = new string[4] { ".exe", ".bat", ".cmd", ".lnk" };
@@ -26164,11 +26129,7 @@ namespace EmulatorHub
 
 		public static string LaunchPath(GameEntry game)
 		{
-			if (!string.IsNullOrWhiteSpace(game.LastDiscPath) && (game.Discs ?? new List<string>()).Contains(game.LastDiscPath, StringComparer.OrdinalIgnoreCase))
-			{
-				return game.LastDiscPath;
-			}
-			return game.Path;
+			return GamePlay.LaunchPath(game);
 		}
 
 		public static EmulatorProfile LaunchEmulator(LibraryData data, GameEntry game)
@@ -26196,68 +26157,22 @@ namespace EmulatorHub
 		public static PlaySession BeginSession(LibraryData data, GameEntry game, string executable, bool tracked)
 		{
 			Ensure(data);
-			PlaySession playSession = new PlaySession();
-			playSession.Id = Guid.NewGuid().ToString("N");
-			playSession.GameId = game.Id;
-			playSession.StartedAt = DateTime.UtcNow.ToString("o");
-			playSession.Uncertain = !tracked;
-			playSession.EmulatorPath = executable;
-			playSession.DiscPath = LaunchPath(game);
-			playSession.Profile = game.LaunchProfileName;
-			playSession.Note = (tracked ? "Emulator process time; game changes inside the process cannot be distinguished." : "Wrapper launch: duration unavailable; you can enter it manually.");
-			PlaySession playSession2 = playSession;
-			data.PlaySessions.Add(playSession2);
-			data.Enhancements.LastGameId = game.Id;
-			return playSession2;
+			return GamePlay.BeginSession(data, game, executable, tracked);
 		}
 
 		public static void CompleteSession(LibraryData data, GameEntry game, PlaySession session, long seconds)
 		{
-			session.EndedAt = DateTime.UtcNow.ToString("o");
-			session.Seconds = Math.Max(0L, seconds);
-			game.TotalPlaySeconds += session.Seconds;
+			GamePlay.CompleteSession(data, game, session, seconds);
 		}
 
 		public static void CorrectSession(LibraryData data, PlaySession session, long seconds, string note)
 		{
-			if (seconds < 0 || seconds > 31536000)
-			{
-				throw new ArgumentOutOfRangeException("seconds");
-			}
-			GameEntry gameEntry = data.Games.FirstOrDefault((GameEntry g) => g.Id == session.GameId);
-			if (gameEntry != null)
-			{
-				gameEntry.TotalPlaySeconds = Math.Max(0L, gameEntry.TotalPlaySeconds - session.Seconds + seconds);
-			}
-			session.Seconds = seconds;
-			session.Note = note;
-			session.Corrected = true;
-			if (session.EndedAt == null)
-			{
-				session.EndedAt = DateTime.UtcNow.ToString("o");
-			}
+			GamePlay.CorrectSession(data, session, seconds, note);
 		}
 
 		public static Dictionary<string, long> WeekTotals(LibraryData data, DateTime now)
 		{
-			Dictionary<string, long> dictionary = new Dictionary<string, long>();
-			for (int num = 6; num >= 0; num--)
-			{
-				dictionary[now.Date.AddDays(-num).ToString("yyyy-MM-dd")] = 0L;
-			}
-			foreach (PlaySession playSession in data.PlaySessions)
-			{
-				DateTime result;
-				if (DateTime.TryParse(playSession.StartedAt, out result))
-				{
-					string key = result.ToLocalTime().ToString("yyyy-MM-dd");
-					if (dictionary.ContainsKey(key))
-					{
-						dictionary[key] += playSession.Seconds;
-					}
-				}
-			}
-			return dictionary;
+			return GamePlay.WeekTotals(data, now);
 		}
 
 		public static Dictionary<string, string> SnapshotFiles(SaveSnapshot snapshot, CancellationToken token)
@@ -28551,54 +28466,27 @@ namespace EmulatorHub
 
 		public static void Ensure(LibraryData data)
 		{
-			if (data.SmartLists == null)
-			{
-				data.SmartLists = new List<SmartLibraryList>();
-			}
-			if (data.PlayQueue == null)
-			{
-				data.PlayQueue = new List<string>();
-			}
+			GameLists.Ensure(data);
 		}
 
 		public static List<GameEntry> Match(LibraryData data, SmartLibraryList rule)
 		{
-			return (from g in data.Games
-				where (string.IsNullOrWhiteSpace(rule.Search) || Hub.SearchText(g).IndexOf(rule.Search.Trim(), StringComparison.OrdinalIgnoreCase) >= 0) && (string.IsNullOrWhiteSpace(rule.Platform) || rule.Platform == "Any" || string.Equals(g.ConsoleLabel, rule.Platform, StringComparison.OrdinalIgnoreCase)) && (string.IsNullOrWhiteSpace(rule.Status) || rule.Status == "Any" || string.Equals(g.PlayStatus, rule.Status, StringComparison.OrdinalIgnoreCase)) && (!rule.FavoritesOnly || g.Favorite) && (!rule.UnplayedOnly || g.LaunchCount == 0)
-				orderby g.Title
-				select g).ToList();
+			return GameLists.Match(data, rule);
 		}
 
 		public static List<GameEntry> QueueGames(LibraryData data)
 		{
-			Ensure(data);
-			return (from id in data.PlayQueue
-				select data.Games.FirstOrDefault((GameEntry g) => g.Id == id) into g
-				where g != null
-				select g).ToList();
+			return GameLists.QueueGames(data);
 		}
 
 		public static void Enqueue(LibraryData data, GameEntry game)
 		{
-			Ensure(data);
-			if (game != null && !data.PlayQueue.Contains(game.Id))
-			{
-				data.PlayQueue.Add(game.Id);
-			}
+			GameLists.Enqueue(data, game);
 		}
 
 		public static bool MoveQueue(LibraryData data, string id, int delta)
 		{
-			Ensure(data);
-			int num = data.PlayQueue.IndexOf(id);
-			int num2 = num + delta;
-			if (num < 0 || num2 < 0 || num2 >= data.PlayQueue.Count)
-			{
-				return false;
-			}
-			data.PlayQueue.RemoveAt(num);
-			data.PlayQueue.Insert(num2, id);
-			return true;
+			return GameLists.MoveQueue(data, id, delta);
 		}
 
 		private static ListView GameList()
@@ -29037,37 +28925,12 @@ namespace EmulatorHub
 
 		public static string CsvCell(string text)
 		{
-			text = text ?? "";
-			string text2 = text.TrimStart();
-			if (text2.Length > 0 && "=+-@".IndexOf(text2[0]) >= 0)
-			{
-				text = "'" + text;
-			}
-			return "\"" + text.Replace("\"", "\"\"") + "\"";
+			return GameLists.CsvCell(text);
 		}
 
 		public static string Csv(IEnumerable<GameEntry> games)
 		{
-			StringBuilder stringBuilder = new StringBuilder("Title,Platform,Genre,Developer,Year,Progress,Favorite,Launches,Play hours,Last launched,Path,Tags\r\n");
-			foreach (GameEntry game in games)
-			{
-				stringBuilder.AppendLine(string.Join(",", new string[12]
-				{
-					game.Title,
-					game.ConsoleLabel,
-					game.Genre,
-					game.Developer,
-					game.ReleaseYear,
-					game.PlayStatus,
-					game.Favorite ? "Yes" : "No",
-					game.LaunchCount.ToString(CultureInfo.InvariantCulture),
-					((double)game.TotalPlaySeconds / 3600.0).ToString("0.00", CultureInfo.InvariantCulture),
-					game.LastLaunched,
-					game.Path,
-					string.Join("; ", game.Tags ?? new List<string>())
-				}.Select(CsvCell)));
-			}
-			return stringBuilder.ToString();
+			return GameLists.Csv(games);
 		}
 
 		public static void Export(IWin32Window owner, IEnumerable<GameEntry> games)
@@ -31486,7 +31349,7 @@ namespace EmulatorHub
 
 		public static string SearchText(GameEntry g)
 		{
-			return string.Join(" ", g.Title, g.Path, g.Genre, g.Developer, g.ReleaseYear, g.Description, g.Notes, g.ConsoleLabel, g.PlayStatus, string.Join(" ", g.Tags ?? new List<string>()), (g.Extras == null || g.Extras.Fields == null) ? "" : string.Join(" ", g.Extras.Fields.Select((KeyValuePair<string, string> p) => p.Key + " " + p.Value)));
+			return GameLibraryQuery.SearchText(g);
 		}
 
 		public static void Record(LibraryData d, string text)
@@ -31514,25 +31377,7 @@ namespace EmulatorHub
 
 		public static IEnumerable<GameEntry> NestedEntries(LibraryData d, GameCollection parent, IEnumerable<GameEntry> source)
 		{
-			HashSet<string> ids = new HashSet<string>();
-			Queue<string> queue = new Queue<string>();
-			queue.Enqueue(parent.Id);
-			while (queue.Count > 0)
-			{
-				string id = queue.Dequeue();
-				if (!ids.Add(id))
-				{
-					continue;
-				}
-				foreach (GameCollection item in d.Collections.Where((GameCollection c) => c.ParentId == id))
-				{
-					queue.Enqueue(item.Id);
-				}
-			}
-			List<GameEntry> games = source.ToList();
-			HashSet<string> wanted = new HashSet<string>(from g in d.Collections.Where((GameCollection c) => ids.Contains(c.Id)).SelectMany((GameCollection c) => GameCollections.Entries(c, games))
-				select g.Id);
-			return games.Where((GameEntry g) => wanted.Contains(g.Id));
+			return GameLibraryQuery.NestedEntries(d, parent, source);
 		}
 
 		public static void Parent(LibraryData d, GameCollection child, string parent)

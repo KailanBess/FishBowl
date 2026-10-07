@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -87,7 +87,7 @@ namespace EmulatorHub
             double coverWidth = large ? 90 : 48, coverHeight = large ? 120 : 64;
             if (library.Theme.CoverAspect == "Square") coverHeight = coverWidth; else if (library.Theme.CoverAspect == "Landscape") coverHeight = coverWidth * 0.625;
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            Control artwork = Ui.Text("â—ˆ", large ? 40 : 26, true, p.BlueBrush);
+            Control artwork = Ui.Text("◈", large ? 40 : 26, true, p.BlueBrush);
             if (File.Exists(game.ArtworkPath))
             {
                 try
@@ -99,10 +99,10 @@ namespace EmulatorHub
             }
             row.Children.Add(new Border { Width = coverWidth + 4, Height = coverHeight + 4, Background = p.SurfaceBrush, CornerRadius = new CornerRadius(6), Child = artwork });
             var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 3, MaxWidth = large ? 240 : 360 };
-            words.Children.Add(Ui.Text((game.Favorite ? "â˜… " : "") + game.Title, large ? 20 : 15, true));
+            words.Children.Add(Ui.Text((game.Favorite ? "★ " : "") + game.Title, large ? 20 : 15, true));
             var emulator = library.Emulators.FirstOrDefault(e => e.Id == (game.PreferredEmulatorId ?? game.EmulatorId));
             words.Children.Add(Ui.Text(game.ConsoleLabel ?? emulator?.Platform ?? "Native game", 12, false, p.SubtleBrush));
-            words.Children.Add(Ui.Text((File.Exists(game.Path) ? "" : "File missing Â· ") + (game.PlayStatus ?? "Not started") + " Â· " + TimeSpan.FromSeconds(game.TotalPlaySeconds).TotalHours.ToString("0.0") + " hours", 12, false, p.SubtleBrush));
+            words.Children.Add(Ui.Text((File.Exists(game.Path) ? "" : "File missing · ") + (game.PlayStatus ?? "Not started") + " · " + TimeSpan.FromSeconds(game.TotalPlaySeconds).TotalHours.ToString("0.0") + " hours", 12, false, p.SubtleBrush));
             row.Children.Add(words); return row;
         }
 
@@ -112,7 +112,7 @@ namespace EmulatorHub
             companionServer?.Update(IntegrationData.CompanionSnapshot(library));
             homeCards.Children.Clear(); couchCards.Children.Clear();
             homeCards.Children.Add(Ui.Text("Home", 24, true));
-            homeCards.Children.Add(Ui.Text(library.Games.Count + " games Â· " + library.Emulators.Count + " emulators Â· " + TimeSpan.FromSeconds(library.Games.Sum(g => g.TotalPlaySeconds)).TotalHours.ToString("0.0") + " hours played", 14, false, p.SubtleBrush));
+            homeCards.Children.Add(Ui.Text(library.Games.Count + " games · " + library.Emulators.Count + " emulators · " + TimeSpan.FromSeconds(library.Games.Sum(g => g.TotalPlaySeconds)).TotalHours.ToString("0.0") + " hours played", 14, false, p.SubtleBrush));
             homeCards.Children.Add(Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Open library", () => libraryPages.SelectedIndex = 1), Ui.Action("Profiles", ManageLibraryProfiles), Ui.Action("Appearance", ShowAppearanceHub), Ui.Action("Customize home", CustomizeLibraryHome)));
             foreach (var section in (library.Theme.HomeCardOrder ?? new List<string> { "Recently played", "Favorites" }).Concat(new[] { "Recently played", "Favorites" }).Distinct().Where(s => (s == "Recently played" || s == "Favorites") && !(library.Theme.HiddenHomeCards ?? new List<string>()).Contains(s)))
             {
@@ -165,7 +165,7 @@ namespace EmulatorHub
             var notes = Ui.Paragraphs(game.Notes, false); notes.MinHeight = 90;
             var arguments = Ui.Field(game.Arguments); var statusChoice = Ui.Combo(new[] { "Not started", "Playing", "Completed", "On hold", "Dropped" }, game.PlayStatus);
             var tags = Ui.Field(String.Join(", ", game.Tags ?? new List<string>())); var favorite = Ui.Check("Favorite", game.Favorite);
-            var emulatorEntries = new[] { "Native game / shortcut" }.Concat(library.Emulators.Select(e => e.Name + " Â· " + e.Id.Substring(0, Math.Min(6, e.Id.Length)))).ToArray();
+            var emulatorEntries = new[] { "Native game / shortcut" }.Concat(library.Emulators.Select(e => e.Name + " · " + e.Id.Substring(0, Math.Min(6, e.Id.Length)))).ToArray();
             var selected = library.Emulators.FindIndex(e => e.Id == (game.PreferredEmulatorId ?? game.EmulatorId)); var emulator = Ui.Combo(emulatorEntries, emulatorEntries[selected + 1]);
             fields.Children.Add(Ui.Caption("Title")); fields.Children.Add(title); fields.Children.Add(Ui.Hint("The library title does not rename the game file."));
             fields.Children.Add(Ui.Caption("Game file")); fields.Children.Add(Ui.WithButton(path, Ui.Action("Browse", async () => { var f = await Ui.PickFile(dialog, "Game file"); if (f != null) path.Text = f; })));
@@ -188,35 +188,53 @@ namespace EmulatorHub
         }
 
         private Task LaunchLibraryGame() { var game = SelectedLibraryGame(); return game == null ? Task.CompletedTask : LaunchGame(game); }
+        // Starts a game with its emulator (or directly for native games) and records a tracked play session.
+        // Other screens (Home, Living room, collections, play queue) launch through this method.
         private async Task LaunchGame(GameEntry game)
         {
-            if (!File.Exists(game.Path)) { await Ui.Message(this, "The game file is missing. Edit its location or use Library repair."); return; }
+            if (game == null) return;
             if (sessionTrackers.Values.Any(t => t.GameId == game.Id && !t.Finished)) { await Ui.Message(this, "This game is already running."); return; }
-            var emulator = library.Emulators.FirstOrDefault(e => e.Id == (game.PreferredEmulatorId ?? game.EmulatorId));
-            if (game.RequiresEmulatorAssignment || (emulator == null && !Platform.IsLaunchFile(game.Path)))
+            if (!GameLibraryQuery.Native(game) && (game.RequiresEmulatorAssignment || GameLibraryQuery.EmulatorFor(library, game) == null) && !(Platform.IsLaunchFile(game.Path) && !game.RequiresEmulatorAssignment))
             {
-                gameList.SelectedItem = ((IEnumerable<ListBoxItem>)gameList.ItemsSource).FirstOrDefault(r => ((GameEntry)r.Tag).Id == game.Id);
-                await EditLibraryGame(); emulator = library.Emulators.FirstOrDefault(e => e.Id == (game.PreferredEmulatorId ?? game.EmulatorId));
-                if (game.RequiresEmulatorAssignment || emulator == null) return;
+                if (!await ChooseGameEmulator(game)) return;
             }
-            var chosenBuild = (emulator?.Builds ?? new List<EmulatorBuild>()).FirstOrDefault(b => b.Id == game.PreferredBuildId);
-            if (!String.IsNullOrWhiteSpace(game.PreferredBuildId) && chosenBuild == null) throw new IOException("The selected emulator build no longer exists. Choose another build in Game setup.");
-            string program = chosenBuild?.Executable ?? emulator?.Executable ?? game.Path;
-            var launchProfile = (emulator?.LaunchProfiles ?? new List<LaunchProfile>()).FirstOrDefault(p => p.Name == game.LaunchProfileName);
-            if (!String.IsNullOrWhiteSpace(game.LaunchProfileName) && launchProfile == null) throw new IOException("The launch profile no longer exists. Choose another profile in Game setup.");
-            string template = String.Join(" ", new[] { emulator?.Arguments, launchProfile?.Arguments, game.Arguments }.Where(a => !String.IsNullOrWhiteSpace(a))).Replace("{rom}", "{game}");
-            var activeEmulator = emulator == null ? null : Json.Deserialize<EmulatorProfile>(Json.Serialize(emulator));
-            if (activeEmulator != null) activeEmulator.Executable = program;
-            string installed = activeEmulator == null ? null : InstalledGames.ResolveArguments(activeEmulator, game, template, game.Path);
-            var args = Platform.SplitArguments(installed ?? template); bool hasRom = args.Any(a => a.Contains("{game}"));
-            args = args.Select(a => a.Replace("{game}", game.Path)).ToList(); if (emulator != null && installed == null && !hasRom) args.Add(game.Path);
-            if (args.Any(a => a.Contains("{") || a.Contains("}"))) throw new IOException("Unsupported argument template. Use {game} for the game path.");
-            var info = Platform.StartInfo(program, ""); if (Directory.Exists(game.Extras?.WorkingDirectory)) info.WorkingDirectory = game.Extras.WorkingDirectory; foreach (var argument in args) info.ArgumentList.Add(argument);
+            GamePlay.LaunchPlan plan;
+            try { plan = GamePlay.Prepare(library, game); }
+            catch (IOException error) { await Ui.Message(this, game.Title + " could not start.\n\n" + error.Message); return; }
+            var info = Platform.StartInfo(plan.Program, "");
+            if (Directory.Exists(plan.WorkingDirectory)) info.WorkingDirectory = plan.WorkingDirectory;
+            foreach (var argument in plan.Arguments) info.ArgumentList.Add(argument);
             var beforeLaunch = SessionLedger.ProcessSnapshot();
-            var started = DateTime.UtcNow; var process = Process.Start(info); if (process == null) throw new IOException("The game could not be started.");
-            StartLibrarySession(game, process, beforeLaunch, started, program);
-            game.LastLaunched = started.ToString("o"); game.LaunchCount++; Store.Save(library); RefreshGameLibrary();
+            var started = DateTime.UtcNow; Process process;
+            try { process = Process.Start(info); }
+            catch (Exception error) { await Ui.Message(this, game.Title + " could not start.\n\n" + error.Message); return; }
+            if (process == null) throw new IOException("The game could not be started.");
+            GamePlay.RecordLaunch(library, game, started);
+            StartLibrarySession(game, process, beforeLaunch, started, plan.Program);
+            Store.Log("Game launched: " + game.Title + " | Program: " + plan.Program + " | Arguments: " + String.Join(" ", plan.Arguments));
+            Store.Save(library); RefreshGameLibrary();
             SetStatus("Started " + game.Title + ".");
+        }
+
+        // Like Windows: a game without a usable emulator asks for one before launching.
+        private async Task<bool> ChooseGameEmulator(GameEntry game)
+        {
+            if (library.Emulators.Count == 0) { await Ui.Message(this, "Add an emulator before launching this game."); return false; }
+            var labels = library.Emulators.Select((e, i) => (String.IsNullOrWhiteSpace(e.Name) ? Path.GetFileNameWithoutExtension(e.Executable) : e.Name)).ToList();
+            labels = labels.Select((name, i) => labels.Count(n => n == name) > 1 ? name + " (" + (i + 1) + ")" : name).ToList();
+            var dialog = new FishDialog("Preferred emulator", 460); var body = new StackPanel { Spacing = 8 };
+            var console = GameLibraryQuery.ConsoleName(game);
+            var suggested = library.Emulators.FindIndex(e => (e.Extensions ?? new List<string>()).Any(x => String.Equals(x.TrimStart('.'), Path.GetExtension(game.Path ?? "").TrimStart('.'), StringComparison.OrdinalIgnoreCase)));
+            var choice = Ui.Combo(labels, labels[Math.Max(0, suggested)]);
+            body.Children.Add(Ui.Text("Choose the emulator for " + game.Title + ".", 14)); if (!String.IsNullOrWhiteSpace(console)) body.Children.Add(Ui.Hint(console));
+            body.Children.Add(choice); bool chosen = false;
+            body.Children.Add(dialog.Footer("Use emulator", () => { chosen = true; return Task.FromResult(true); }));
+            dialog.Body = body; await dialog.Present(this);
+            if (!chosen || choice.SelectedIndex < 0) return false;
+            var selected = library.Emulators[choice.SelectedIndex];
+            game.EmulatorId = selected.Id; game.PreferredEmulatorId = selected.Id; game.PreferredBuildId = null; game.LaunchProfileName = null; game.RequiresEmulatorAssignment = false;
+            if (game.Extras != null) game.Extras.Native = false;
+            Store.Save(library); RefreshGameLibrary(); return true;
         }
 
         private async Task RemoveLibraryGame()

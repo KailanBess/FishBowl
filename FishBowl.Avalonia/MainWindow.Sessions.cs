@@ -37,9 +37,8 @@ namespace EmulatorHub
         private void StartLibrarySession(GameEntry game, Process process, List<SessionProcess> beforeLaunch, DateTime started, string program)
         {
             LibraryProfiles.Ensure(library);
-            if (library.PlaySessions == null) library.PlaySessions = new List<PlaySession>();
-            var record = new PlaySession { Id = Guid.NewGuid().ToString("N"), GameId = game.Id, StartedAt = started.ToString("o"), EmulatorPath = program, DiscPath = game.Path, Profile = library.UserTools?.ActiveId };
-            library.PlaySessions.Add(record);
+            var record = GamePlay.BeginSession(library, game, program, true);
+            record.StartedAt = started.ToString("o");
             try
             {
                 var tracker = SessionLedger.Start(Store.DataDirectory, record, process, beforeLaunch, SessionLedger.ProfileKey(library));
