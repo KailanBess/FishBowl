@@ -113,5 +113,11 @@ public static class SaveHistoryTests
         refused = false;
         try { SafeFiles.Under(folder, "../outside"); } catch (InvalidDataException) { refused = true; }
         check("SafeFiles.Under rejects escaping paths", refused);
+        if (!Platform.IsWindows)
+        {
+            string colon = Path.Combine(folder, "colon-save"); Directory.CreateDirectory(colon); File.WriteAllText(Path.Combine(colon, "Test Quest: Part 2.sav"), "c");
+            var colonSnapshot = SaveHistory.Capture(library, game, colon, "In-game saves", false, CancellationToken.None);
+            check("Linux folder snapshots keep file names with colons", File.Exists(Path.Combine(colonSnapshot.Path, "Test Quest: Part 2.sav")));
+        }
     }
 }

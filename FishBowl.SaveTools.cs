@@ -15,7 +15,7 @@ namespace EmulatorHub
     {
         public static string Under(string root, string relative)
         {
-            if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative) || relative.Contains(":"))
+            if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative) || (Platform.IsWindows && relative.Contains(":")))
             {
                 throw new InvalidDataException("Invalid relative path.");
             }
