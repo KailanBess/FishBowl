@@ -83,13 +83,23 @@ namespace EmulatorHub
 
         private async Task HandleDroppedPaths(List<string> paths)
         {
+            // Game files (types an emulator opens) and folders go to the Library; programs are added as emulators.
+            var games = paths.Where(path => File.Exists(path) && GameLibraryImport.EmulatorForFile(library, path) != null).ToList();
+            foreach (var folder in paths.Where(Directory.Exists)) games.AddRange(GameLibraryImport.FolderCandidates(library, folder, 5000));
+            if (games.Count > 0)
+            {
+                int added = AddLibraryFiles(games.Distinct());
+                SetStatus("Added " + added + (added == 1 ? " game" : " games") + " to the Library.");
+                paths = paths.Where(path => File.Exists(path) && !games.Contains(path)).ToList();
+                if (paths.Count == 0) return;
+            }
             foreach (var path in paths)
                 if (File.Exists(path) && EmulatorReference.IsLaunchFile(path))
                 {
                     if (library.Emulators.Any(e => HubPaths.Same(e.Executable, path))) { SetStatus("That emulator is already in FishBowl."); continue; }
                     await AddEmulatorWithPath(path);
                 }
-                else SetStatus("Add games inside the emulator. Drop an emulator program or launcher here to add it to FishBowl.");
+                else SetStatus("Drop game files or folders to add them to the Library, or an emulator program to add it to FishBowl.");
         }
 
         private void OpenEmulatorFolder()

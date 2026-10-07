@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -137,7 +137,7 @@ namespace EmulatorHub
             Content = percent == 100 ? (Control)shell : new LayoutTransformControl { LayoutTransform = new ScaleTransform(percent / 100.0, percent / 100.0), Child = shell };
 
             DragDrop.SetAllowDrop(this, true);
-            AddHandler(DragDrop.DragOverEvent, (sender, e) => { var files = DroppedPaths(e); e.DragEffects = files.Any(Platform.IsLaunchFile) ? DragDropEffects.Copy : DragDropEffects.None; });
+            AddHandler(DragDrop.DragOverEvent, (sender, e) => { var files = DroppedPaths(e); e.DragEffects = files.Any(f => Platform.IsLaunchFile(f) || Directory.Exists(f) || GameLibraryImport.EmulatorForFile(library, f) != null) ? DragDropEffects.Copy : DragDropEffects.None; });
             AddHandler(DragDrop.DropEvent, async (sender, e) => { var files = DroppedPaths(e); await Ui.Run(this, () => HandleDroppedPaths(files)); });
         }
         private static List<string> DroppedPaths(DragEventArgs e)
@@ -229,6 +229,7 @@ namespace EmulatorHub
                 MenuAction("Play queue...", "play", () => ShowPlayQueue(SelectedLibraryGame())),
                 MenuAction("Surprise me...", "play", ShowSurpriseMe),
                 MenuAction("Session journal and charts...", "info", () => ShowSessionJournal(null)),
+                MenuAction("Game screenshot gallery...", "image", () => ShowScreenshotGallery(SelectedLibraryGame())),
                 MenuAction("Export library CSV...", "storage", () => ExportLibraryCsv(library.Games)), new Separator(),
                 MenuAction("Library maintenance...", "check", ShowLibraryMaintenance),
                 MenuAction("Repair game paths...", "folder", RepairLibraryPaths),

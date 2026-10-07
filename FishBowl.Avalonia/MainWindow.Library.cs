@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -46,6 +46,7 @@ namespace EmulatorHub
                 MenuAction("Export library CSV...", "export", () => ExportLibraryCsv(VisibleLibraryGames())),
                 new Separator(),
                 MenuAction("Session journal and charts...", "note", () => ShowSessionJournal(null)),
+                MenuAction("Game screenshot gallery...", "image", () => ShowScreenshotGallery(SelectedLibraryGame())),
                 MenuAction("Game setup...", "settings", ShowLibraryGameTools),
                 MenuAction("Save timeline...", "save", ShowLibrarySaveTimeline),
                 MenuAction("Import Steam game...", "import", ImportSteamLibraryGame),
@@ -300,7 +301,7 @@ namespace EmulatorHub
             if (!String.IsNullOrWhiteSpace(game.SessionTrackingNote)) { var note = Ui.Hint(game.SessionTrackingNote); note.TextWrapping = TextWrapping.Wrap; gameDetails.Children.Add(note); }
 
             var path = Ui.Hint(game.Path); path.TextWrapping = TextWrapping.Wrap; gameDetails.Children.Add(path);
-            var links = Ui.Actions(Ui.Action("Play sessions", () => ShowSessionJournal(game)), Ui.Action("Open game folder", OpenSelectedGameFolder), Ui.Action("Game setup", ShowLibraryGameTools));
+            var links = Ui.Actions(Ui.Action("Play sessions", () => ShowSessionJournal(game)), Ui.Action("Screenshots", () => ShowScreenshotGallery(game)), Ui.Action("Open game folder", OpenSelectedGameFolder), Ui.Action("Game setup", ShowLibraryGameTools));
             if (File.Exists(game.ManualPath)) links.Children.Add(Ui.Action("Open manual", () => Platform.Open(game.ManualPath)));
             gameDetails.Children.Add(links);
         }
