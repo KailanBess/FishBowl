@@ -1269,4 +1269,109 @@ namespace EmulatorHub
             }
         }
     }
+
+    // Backup reminders from existing data only: an emulator is due when one of its games was played (PlaySessions)
+    // after its newest save backup and that backup is older than Theme.AutoBackupDays ("Backup reminder interval").
+    // An emulator played but never backed up is due as well; one never played through the library is not.
+    public static class BackupReminders
+    {
+        public static readonly string[] SaveCategories = { "InGameSaveFolder", "SaveStateFolder" };
+
+        public static int IntervalDays(LibraryData library) { return library.Theme == null || library.Theme.AutoBackupDays <= 0 ? 7 : library.Theme.AutoBackupDays; }
+
+        private static bool Moment(string text, out DateTime utc)
+        {
+            return DateTime.TryParse(text ?? "", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out utc);
+        }
+
+        // Emulator id to the newest backup archive (by manifest) that contains in-game saves or save states.
+        public static Dictionary<string, DateTime> LastBackups(LibraryData library, CancellationToken token)
+        {
+            var newest = new Dictionary<string, DateTime>();
+            foreach (string archive in BackupRetention.Archives(library, token))
+            {
+                token.ThrowIfCancellationRequested();
+                try
+                {
+                    BackupManifest manifest;
+                    using (ZipArchive zip = ZipFile.OpenRead(archive)) manifest = EmulatorBackups.ReadManifest(zip);
+                    var saveRoots = new HashSet<string>(manifest.Roots.Where(r => SaveCategories.Contains(r.Category)).Select(r => r.Key));
+                    DateTime created;
+                    if (string.IsNullOrWhiteSpace(manifest.EmulatorId) || !manifest.Files.Any(f => saveRoots.Contains(f.RootKey)) || !Moment(manifest.CreatedAt, out created)) continue;
+                    DateTime known;
+                    if (!newest.TryGetValue(manifest.EmulatorId, out known) || created > known) newest[manifest.EmulatorId] = created;
+                }
+                catch (Exception error)
+                {
+                    if (error is OperationCanceledException) throw;
+                    // Not a FishBowl emulator backup (scheduled snapshot exports live here too).
+                }
+            }
+            return newest;
+        }
+
+        // Emulator id to the end of the latest play session of one of its games.
+        public static Dictionary<string, DateTime> LastPlayed(LibraryData library)
+        {
+            var played = new Dictionary<string, DateTime>();
+            foreach (PlaySession session in library.PlaySessions ?? new List<PlaySession>())
+            {
+                GameEntry game = library.Games.FirstOrDefault(g => g.Id == session.GameId);
+                EmulatorProfile emulator = game == null ? null : SaveHistory.AssignedEmulator(library, game);
+                DateTime when;
+                if (emulator == null || !(Moment(session.EndedAt, out when) || Moment(session.StartedAt, out when))) continue;
+                DateTime known;
+                if (!played.TryGetValue(emulator.Id, out known) || when > known) played[emulator.Id] = when;
+            }
+            return played;
+        }
+
+        public static List<EmulatorProfile> Due(LibraryData library, Dictionary<string, DateTime> lastBackups, Dictionary<string, DateTime> lastPlayed, DateTime utcNow)
+        {
+            var due = new List<EmulatorProfile>();
+            foreach (EmulatorProfile emulator in library.Emulators)
+            {
+                DateTime played, backedUp;
+                if (emulator.Id == null || !lastPlayed.TryGetValue(emulator.Id, out played)) continue;
+                if (!lastBackups.TryGetValue(emulator.Id, out backedUp) || (played > backedUp && utcNow - backedUp >= TimeSpan.FromDays(IntervalDays(library)))) due.Add(emulator);
+            }
+            return due.OrderBy(e => e.Name ?? "", StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+
+        // The status-bar notice, or null when nothing is due.
+        public static string Notice(List<EmulatorProfile> due, Dictionary<string, DateTime> lastBackups)
+        {
+            if (due.Count == 0) return null;
+            DateTime backedUp;
+            string text = due.Count > 1 ? Names(due) + " have been played since their last save backups"
+                : lastBackups.TryGetValue(due[0].Id, out backedUp) ? due[0].Name + " has been played since its last save backup on " + backedUp.ToLocalTime().ToString("d")
+                : due[0].Name + " has been played but its saves are not backed up yet";
+            return "Backup reminder: " + text + ". Use File > Game saves > Back up due emulators now.";
+        }
+
+        private static string Names(List<EmulatorProfile> profiles)
+        {
+            var names = profiles.Select(p => p.Name ?? "Emulator").ToList();
+            if (names.Count > 3) return names[0] + ", " + names[1] + " and " + (names.Count - 2) + " more";
+            return string.Join(", ", names.Take(names.Count - 1).ToArray()) + " and " + names[names.Count - 1];
+        }
+
+        // Backs up one emulator's in-game saves and save states, verifies the archive and returns a one-line result.
+        // Running emulators are skipped; errors are returned, not thrown, so a batch continues.
+        public static string BackUp(LibraryData library, EmulatorProfile profile, CancellationToken token)
+        {
+            try
+            {
+                if (EmulatorRuntime.State(profile.Executable) == RuntimeState.Running) return profile.Name + ": skipped while it is running. Close it, then try again.";
+                BackupPlan plan = EmulatorBackups.Preview(profile, SaveCategories, token);
+                if (plan.Files.Count == 0) return profile.Name + ": no in-game saves or save states were found. Check its save folders.";
+                string archive = EmulatorBackups.Create(profile, plan, HubPaths.BackupRoot(library), token);
+                BackupIntegrity.Verify(archive, token);
+                Store.Log("Backup of " + profile.Name + ": " + archive);
+                return profile.Name + ": backed up " + plan.Files.Count + " file(s) to " + archive;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception error) { Store.Log("Backup of " + profile.Name + " failed: " + error.Message); return profile.Name + ": could not finish. " + error.Message; }
+        }
+    }
 }

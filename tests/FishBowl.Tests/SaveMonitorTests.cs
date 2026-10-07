@@ -49,6 +49,17 @@ public static class SaveMonitorTests
         File.WriteAllText(questSave, "two");
         check("a save that differs from its newest snapshot is queued", SaveMonitor.Record(library, questSave) && library.SaveReviews.Count == 1);
 
+        // Backup reminders: played after the last save backup, and that backup older than the interval.
+        library.Theme.AutoBackupDays = 7; var now = DateTime.UtcNow;
+        library.PlaySessions = new List<PlaySession> { new PlaySession { Id = "p", GameId = quest.Id, StartedAt = now.AddDays(-1).ToString("o"), EndedAt = now.AddDays(-1).ToString("o") } };
+        var played = BackupReminders.LastPlayed(library);
+        check("play sessions mark the game's emulator as played", played.ContainsKey("emu"));
+        check("played but never backed up is due", BackupReminders.Due(library, new Dictionary<string, DateTime>(), played, now).Count == 1);
+        check("recent backup is not due", BackupReminders.Due(library, new Dictionary<string, DateTime> { { "emu", now.AddDays(-2) } }, played, now).Count == 0);
+        var stale = new Dictionary<string, DateTime> { { "emu", now.AddDays(-10) } };
+        check("old backup with newer play is due", BackupReminders.Due(library, stale, played, now).Count == 1 && BackupReminders.Notice(BackupReminders.Due(library, stale, played, now), stale).StartsWith("Backup reminder: Fixture has been played", StringComparison.Ordinal));
+        check("never played is never due", BackupReminders.Due(library, stale, new Dictionary<string, DateTime>(), now).Count == 0);
+
         var tracker = new SaveChangeTracker(); var start = DateTime.UtcNow;
         tracker.Queue(questSave, start);
         check("tracker waits for writes to settle", tracker.Ready(start).Count == 0 && tracker.Ready(start.AddSeconds(1)).Count == 0 && tracker.Ready(start.AddSeconds(5)).Count == 1);

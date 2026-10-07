@@ -37,6 +37,7 @@ namespace EmulatorHub
                 MenuAction("Optional cloud backup folder...", "export", ShowCloudBackupFolder),
                 MenuAction("Backup schedule...", "refresh", ShowLinkedSaveSchedule),
                 MenuAction("Backup planner...", "storage", ShowBackupPlanner),
+                MenuAction("Back up due emulators now...", "export", BackUpDueEmulators),
                 MenuAction("Emulator backups / restore...", "export", () => ShowEmulatorManager("Backups")),
                 MenuAction("Backup verification and retention...", "check", ShowBackupVerification) } };
             menu.SubmenuOpened += delegate { prompt.IsChecked = !library.Theme.DisableInGameSaveNotifications; };
@@ -75,6 +76,33 @@ namespace EmulatorHub
             Closed += delegate { backupScheduleTimer.Stop(); if (captureCancellation != null) captureCancellation.Cancel(); };
             Closed += delegate { saveMonitorTimer.Stop(); StopSaveWatchers(); };
             ConfigureSaveMonitoring();
+            Opened += delegate { CheckBackupReminders(); };
+        }
+
+        // Shows a calm status-bar reminder when played emulators have no recent save backup.
+        private void CheckBackupReminders()
+        {
+            var copy = Json.Deserialize<LibraryData>(Json.Serialize(library));
+            Task.Run(() => { var backups = BackupReminders.LastBackups(copy, CancellationToken.None); return BackupReminders.Notice(BackupReminders.Due(copy, backups, BackupReminders.LastPlayed(copy), DateTime.UtcNow), backups); })
+                .ContinueWith(task => Ui.Post(() => { if (!task.IsFaulted && task.Result != null) SetStatus(task.Result); }));
+        }
+
+        private async Task BackUpDueEmulators()
+        {
+            if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before backing up their saves.");
+            SetStatus("Checking which emulators are due for a backup...");
+            var due = await Task.Run(() => { var backups = BackupReminders.LastBackups(library, CancellationToken.None); return BackupReminders.Due(library, backups, BackupReminders.LastPlayed(library), DateTime.UtcNow); });
+            if (due.Count == 0) { SetStatus("No emulators are due for a backup."); await Ui.Message(this, "No emulators are due for a backup.\n\nAn emulator becomes due when one of its games was played since its last save backup and that backup is more than " + BackupReminders.IntervalDays(library) + " day(s) old (FishBowl settings, backup reminder interval). One played but never backed up is due straight away."); return; }
+            if (!await Ui.Confirm(this, "Back up the in-game saves and save states of " + String.Join(", ", due.Select(e => e.Name)) + " into " + HubPaths.BackupRoot(library) + "?", "Back up due emulators")) return;
+            var results = new List<string>();
+            for (int i = 0; i < due.Count; i++)
+            {
+                var profile = due[i]; SetStatus("Backing up due emulators (" + (i + 1) + " of " + due.Count + "): " + profile.Name + "...");
+                results.Add(await Task.Run(() => BackupReminders.BackUp(library, profile, CancellationToken.None)));
+            }
+            if (results.Any(r => r.Contains(": backed up "))) { SaveHistory.EnsureData(library); library.Theme.LastBackupAt = DateTime.UtcNow.ToString("o"); library.Experience.LastSuccessfulBackup = library.Theme.LastBackupAt; Store.Save(library); }
+            SetStatus("Backup of due emulators finished.");
+            await new ResultsDialog("Back up due emulators", results).Present(this);
         }
 
         private void StopSaveWatchers()
