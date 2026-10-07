@@ -396,7 +396,9 @@ namespace EmulatorHub
             var plan = backupPlan; var destination = HubPaths.BackupRoot(library);
             await RunAsync(async () =>
             {
-                progress.Text = "Creating backup archive…"; var file = await Task.Run(() => EmulatorBackups.Create(selected, plan, destination, cancellation.Token));
+                progress.Text = "Creating and verifying backup archive…";
+                var file = await Task.Run(() => { var created = EmulatorBackups.Create(selected, plan, destination, cancellation.Token); BackupIntegrity.Verify(created, cancellation.Token); return created; });
+                SaveHistory.EnsureData(library); library.Theme.LastBackupAt = DateTime.UtcNow.ToString("o"); library.Experience.LastSuccessfulBackup = library.Theme.LastBackupAt; Store.Save(library);
                 backupText.Text += "\n\nCreated:\n" + file; progress.Text = "Backup completed.";
             });
         }

@@ -25353,49 +25353,6 @@ namespace EmulatorHub
 			return list;
 		}
 	}
-	public static class BackupIntegrity
-	{
-		public static BackupManifest Verify(string path, CancellationToken token)
-		{
-			using (ZipArchive zipArchive = ZipFile.OpenRead(path))
-			{
-				BackupManifest backupManifest = EmulatorBackups.ReadManifest(zipArchive);
-				HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-				foreach (BackupFile file in backupManifest.Files)
-				{
-					token.ThrowIfCancellationRequested();
-					if (!hashSet.Add(file.ArchivePath))
-					{
-						throw new InvalidDataException("Duplicate backup path.");
-					}
-					ZipArchiveEntry entry = zipArchive.GetEntry(file.ArchivePath);
-					if (entry == null || entry.Length != file.Size)
-					{
-						throw new InvalidDataException("Backup entry is missing or has the wrong size.");
-					}
-					using (Stream stream = entry.Open())
-					{
-						using (SHA256 sHA = SHA256.Create())
-						{
-							byte[] array = new byte[65536];
-							int inputCount;
-							while ((inputCount = stream.Read(array, 0, array.Length)) > 0)
-							{
-								token.ThrowIfCancellationRequested();
-								sHA.TransformBlock(array, 0, inputCount, array, 0);
-							}
-							sHA.TransformFinalBlock(new byte[0], 0, 0);
-							if (!BitConverter.ToString(sHA.Hash).Replace("-", "").Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
-							{
-								throw new InvalidDataException("Backup content hash mismatch.");
-							}
-						}
-					}
-				}
-				return backupManifest;
-			}
-		}
-	}
 	public class RequirementsScanResult
 	{
 		public List<RequirementFileSnapshot> Current = new List<RequirementFileSnapshot>();

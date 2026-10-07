@@ -89,8 +89,19 @@ public static class SaveHistoryTests
         int planned = SaveHistory.ExportPlanned(library, 64, CancellationToken.None, null); SaveHistory.PlannedExportDone(library);
         check("planned export writes each snapshot once", planned == library.SaveSnapshots.Count && SaveHistory.ExportPlanned(library, 64, CancellationToken.None, null) == 0 && !SaveHistory.PlannedExportDue(library, DateTime.UtcNow));
 
-        // Single-file saves (memory cards, battery saves).
         string card = Path.Combine(folder, "card.mcd"); File.WriteAllText(card, "card one");
+        // Emulator backup archive retention.
+        library.BackupFolder = Path.Combine(folder, "emulator-backups"); string backups = HubPaths.BackupRoot(library); Directory.CreateDirectory(backups);
+        for (int i = 0; i < 4; i++) { string zip = Path.Combine(backups, "Backup " + i + ".zip"); File.WriteAllText(zip, "x"); File.SetLastWriteTimeUtc(zip, DateTime.UtcNow.AddDays(-i)); }
+        library.Experience.BackupArchiveCount = 2; library.Experience.PinnedBackupPaths.Add(Path.Combine(backups, "Backup 3.zip"));
+        var archives = BackupRetention.Archives(library, CancellationToken.None);
+        var old = BackupRetention.CleanupCandidates(library, archives);
+        check("backup cleanup keeps the newest and pinned archives", archives.Count == 4 && old.Count == 1 && old[0].EndsWith("Backup 2.zip"));
+        BackupRetention.Delete(library, old);
+        refused = false; try { BackupRetention.Delete(library, new[] { card }); } catch (IOException) { refused = true; }
+        check("backup cleanup only deletes inside the backup folder", refused && BackupRetention.Archives(library, CancellationToken.None).Count == 3);
+
+        // Single-file saves (memory cards, battery saves).
         var states = SaveHistory.Capture(library, game, card, "Save states", false, CancellationToken.None);
         check("file snapshot stores a verified copy", !states.IsFolder && File.ReadAllText(states.Path) == "card one");
         check("save-state compatibility reports recorded emulator", SaveHistory.Compatibility(library, states).StartsWith("Recorded emulator version and core match", StringComparison.Ordinal));

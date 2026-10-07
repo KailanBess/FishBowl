@@ -37,7 +37,8 @@ namespace EmulatorHub
                 MenuAction("Optional cloud backup folder...", "export", ShowCloudBackupFolder),
                 MenuAction("Backup schedule...", "refresh", ShowLinkedSaveSchedule),
                 MenuAction("Backup planner...", "storage", ShowBackupPlanner),
-                MenuAction("Emulator backups / restore...", "export", () => ShowEmulatorManager("Backups")) } };
+                MenuAction("Emulator backups / restore...", "export", () => ShowEmulatorManager("Backups")),
+                MenuAction("Backup verification and retention...", "check", ShowBackupVerification) } };
             menu.SubmenuOpened += delegate { prompt.IsChecked = !library.Theme.DisableInGameSaveNotifications; };
             return menu;
         }
@@ -379,6 +380,57 @@ namespace EmulatorHub
                 Ui.Action("Open export folder", () => { var folder = SaveHistory.PlannedFolder(library); Directory.CreateDirectory(folder); Platform.Open(folder); }),
                 Ui.Action("Close", () => dialog.Close())));
             dialog.Body = body; await dialog.Present(this);
+        }
+
+        // "Backup verification and retention": verify, restore, pin and clean up emulator backup archives.
+        private async Task ShowBackupVerification()
+        {
+            SaveHistory.EnsureData(library);
+            var dialog = new FishDialog("Backup Verification and Retention", 940, 600);
+            var list = new ListBox { Background = Ui.P.SurfaceBrush, Foreground = Ui.P.InkBrush };
+            string root = HubPaths.BackupRoot(library);
+            Func<Task> reload = async () =>
+            {
+                var files = await Task.Run(() => BackupRetention.Archives(library, CancellationToken.None));
+                list.ItemsSource = files.Select(f => new ListBoxItem { Content = (library.Experience.PinnedBackupPaths.Contains(f) ? "★ " : "") + f, Tag = f }).ToList();
+            };
+            Func<string> selected = () => { var item = list.SelectedItem as ListBoxItem; if (item == null) throw new IOException("Select a backup archive."); return (string)item.Tag; };
+            var actions = Ui.Actions(
+                Ui.Action("Verify selected", async () => { var path = selected(); var manifest = await Task.Run(() => BackupIntegrity.Verify(path, CancellationToken.None)); await Ui.Message(dialog, manifest.EmulatorName + "\n" + manifest.Files.Count + " verified files\nCreated: " + manifest.CreatedAt, "Backup verified"); }),
+                Ui.Action("Preview / restore", async () =>
+                {
+                    var path = selected();
+                    var manifest = await Task.Run(() => BackupIntegrity.Verify(path, CancellationToken.None));
+                    var emulator = library.Emulators.FirstOrDefault(e => e.Id == manifest.EmulatorId);
+                    if (emulator == null) throw new IOException("This emulator profile is not registered.");
+                    EmulatorBackups.ValidateRestore(emulator, manifest);
+                    if (EmulatorRuntime.State(emulator.Executable) != RuntimeState.Stopped) throw new IOException("Close " + emulator.Name + " before restoring. FishBowl must be able to confirm it has exited.");
+                    await new ResultsDialog("Backup restore destinations", manifest.Roots.Select(r => r.Label + " -> " + r.Source).Concat(new[] { manifest.Files.Count + " files; current eligible files receive a backup first." })).Present(dialog);
+                    if (!await Ui.Confirm(dialog, "Restore this reviewed emulator backup?", "Confirm backup restore")) return;
+                    var result = await Task.Run(() => EmulatorBackups.Restore(emulator, path, root, CancellationToken.None));
+                    await Ui.Message(dialog, "Backup restored." + (String.IsNullOrWhiteSpace(result) ? "" : "\n\nThe replaced files were backed up first:\n" + result)); await reload();
+                }),
+                Ui.Action("Pin / unpin", async () => { var path = selected(); if (!library.Experience.PinnedBackupPaths.Remove(path)) library.Experience.PinnedBackupPaths.Add(path); Store.Save(library); await reload(); }),
+                Ui.Action("Retention settings", async () =>
+                {
+                    var count = await TextPromptDialog.Ask(dialog, "Backup retention", "Emulator backup archives to keep (0 keeps all)", library.Experience.BackupArchiveCount.ToString());
+                    int value; if (count == null) return; if (!int.TryParse(count, out value) || value < 0 || value > 10000) throw new IOException("Enter a number from 0 to 10000.");
+                    library.Experience.BackupArchiveCount = value; Store.Save(library);
+                }),
+                Ui.Action("Preview cleanup", async () =>
+                {
+                    var files = await Task.Run(() => BackupRetention.Archives(library, CancellationToken.None)); var candidates = BackupRetention.CleanupCandidates(library, files);
+                    await new ResultsDialog("Backup cleanup preview", candidates.Count == 0 ? new[] { "No unpinned backups exceed the configured limits." } : candidates).Present(dialog);
+                    if (candidates.Count == 0 || !await Ui.Confirm(dialog, "Delete the " + candidates.Count + " reviewed, unpinned backup files?", "Confirm cleanup")) return;
+                    await Task.Run(() => BackupRetention.Delete(library, candidates)); await reload();
+                }),
+                Ui.Action("Open backup folder", () => { Directory.CreateDirectory(root); Platform.Open(root); }),
+                Ui.Action("Refresh", reload),
+                Ui.Action("Close", () => dialog.Close()));
+            var layout = new DockPanel();
+            var hint = Ui.Hint("Archives in " + root + ". Verification re-reads every file against its recorded SHA-256. Pinned archives are kept by cleanup."); DockPanel.SetDock(hint, Dock.Top); layout.Children.Add(hint);
+            DockPanel.SetDock(actions, Dock.Bottom); layout.Children.Add(actions); layout.Children.Add(list);
+            dialog.Body = layout; await reload(); await dialog.Present(this);
         }
     }
 }

@@ -1192,4 +1192,81 @@ namespace EmulatorHub
             d.Hub.LastCaptureReport = string.Join(Environment.NewLine, result.Messages);
         }
     }
+
+    // Re-reads an emulator backup archive and checks every file against its manifest hash (moved from windows/FishBowl.cs).
+    public static class BackupIntegrity
+    {
+        public static BackupManifest Verify(string path, CancellationToken token)
+        {
+            using (ZipArchive zipArchive = ZipFile.OpenRead(path))
+            {
+                BackupManifest backupManifest = EmulatorBackups.ReadManifest(zipArchive);
+                HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (BackupFile file in backupManifest.Files)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!hashSet.Add(file.ArchivePath))
+                    {
+                        throw new InvalidDataException("Duplicate backup path.");
+                    }
+                    ZipArchiveEntry entry = zipArchive.GetEntry(file.ArchivePath);
+                    if (entry == null || entry.Length != file.Size)
+                    {
+                        throw new InvalidDataException("Backup entry is missing or has the wrong size.");
+                    }
+                    using (Stream stream = entry.Open())
+                    {
+                        using (SHA256 sHA = SHA256.Create())
+                        {
+                            byte[] array = new byte[65536];
+                            int inputCount;
+                            while ((inputCount = stream.Read(array, 0, array.Length)) > 0)
+                            {
+                                token.ThrowIfCancellationRequested();
+                                sHA.TransformBlock(array, 0, inputCount, array, 0);
+                            }
+                            sHA.TransformFinalBlock(new byte[0], 0, 0);
+                            if (!BitConverter.ToString(sHA.Hash).Replace("-", "").Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
+                            {
+                                throw new InvalidDataException("Backup content hash mismatch.");
+                            }
+                        }
+                    }
+                }
+                return backupManifest;
+            }
+        }
+    }
+
+    // Emulator backup archives and their retention (ExperienceTools.Backups in the Windows build).
+    public static class BackupRetention
+    {
+        // Every .zip under the backup folder, newest first.
+        public static List<string> Archives(LibraryData library, CancellationToken token)
+        {
+            string root = HubPaths.BackupRoot(library);
+            if (!Directory.Exists(root)) return new List<string>();
+            return SafeFiles.Tree(root, token).Where(p => p.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).OrderByDescending(File.GetLastWriteTimeUtc).ToList();
+        }
+
+        // Unpinned archives beyond the configured count (Experience.BackupArchiveCount; 0 keeps everything).
+        public static List<string> CleanupCandidates(LibraryData library, IEnumerable<string> archivesNewestFirst)
+        {
+            SaveHistory.EnsureData(library);
+            int keep = library.Experience.BackupArchiveCount;
+            if (keep <= 0) return new List<string>();
+            return archivesNewestFirst.Skip(keep).Where(p => !library.Experience.PinnedBackupPaths.Contains(p)).ToList();
+        }
+
+        public static void Delete(LibraryData library, IEnumerable<string> files)
+        {
+            string root = HubPaths.BackupRoot(library);
+            foreach (string file in files)
+            {
+                if (!SafeFiles.Within(file, root)) throw new IOException("Cleanup is limited to configured backup folders.");
+                SafeFiles.CheckLink(file);
+                File.Delete(file);
+            }
+        }
+    }
 }
