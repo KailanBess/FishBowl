@@ -80,6 +80,7 @@ static class T {
       Check("version from package manager", (Platform.ProgramVersion("/usr/bin/sleep") ?? "").Contains("coreutils"));
     Check("system scan runs", EmulatorDiscovery.ScanSystem(tok) != null);
     SaveToolsTests.Run(root, Check);
+    SaveHistoryTests.Run(root, Check);
     SessionTests.Run(root, Check);
     Directory.Delete(root, true);
     RecognitionTests.Run(Check);
