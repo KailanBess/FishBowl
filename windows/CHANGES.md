@@ -1,3 +1,12 @@
+# Windows 1.28.1 polish and recovery
+
+- Play shows actionable waiting/recovery states, disables unavailable actions and labels fullscreen exit explicitly. More opens session guidance; failed detach keeps the game in Play.
+- Share session detaches and selects the exact running window for remote hosting, then returns an embedded session to Play when sharing closes. The token service setting persists; target changes stop guest input.
+- Dropdown selection, empty and disabled states follow the active theme while native editing remains intact. Emulator filters disappear outside Emulators and toolbar height shrinks to its content.
+- Home expansions persist across restarts; existing advanced tools remain in More menus and current settings screens.
+- Idle Play avoids repeated renderer placement/clipping, slows settled/hidden process polling and pauses decorative motion during active Play. Process image lookup can use Windows limited-query access while retaining exact PID/start/window ownership checks.
+- App/source downloads include source commit metadata, checksums and upgrade/rollback instructions. Tagged draft releases require source on main and passing normal/compact text audits. Physical controllers, audio, multi-monitor rendering and two-device remote streaming still require live verification.
+
 # Windows 1.28.0 Play workspace
 
 - Added Play alongside Home, Emulators and Library. Game and emulator launches route to a persistent native window host; section changes retain running sessions.

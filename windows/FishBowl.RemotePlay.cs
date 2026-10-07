@@ -41,20 +41,24 @@ namespace EmulatorHub
         readonly Label status = new Label { AutoSize = true, MaximumSize = new Size(680, 0) };
         readonly TextBox service = new TextBox();
         RemotePlayBridge bridge;
-        public RemotePlayDialog(LibraryData library, EmulatorProfile emulator) : base("Remote couch play", 780, 520)
+        readonly RemoteWindow preferred;
+        readonly LibraryData library;
+        public RemotePlayDialog(LibraryData library, EmulatorProfile emulator) : this(library, emulator, null) { }
+        public RemotePlayDialog(LibraryData library, EmulatorProfile emulator, RemoteWindow preferredWindow) : base("Remote couch play", 780, 520)
         {
+            this.library = library; preferred = preferredWindow;
             var fields = Fields(Body);
             service.Text = library.Multiplayer == null ? "" : library.Multiplayer.RelayGatewayUrl;
             Field(fields, "Token service", service);
             Field(fields, "Game window", targets);
             Field(fields, "Shared input", allow);
-            var note = new Label { AutoSize = true, MaximumSize = new Size(680, 0), Text = "Start the game first, choose its window, then open the browser client. Choose the same game window in the sharing picker. Approve one guest in the browser and allow controls here. Only the foreground game receives the listed keyboard controls. Configure those keys in the emulator." };
+            var note = new Label { AutoSize = true, MaximumSize = new Size(680, 0), Text = "Start the game first, choose its window, then open the browser client. Share session in Play opens the selected emulator in its own window and returns it to Play when this dialog closes. Choose the same game window in the sharing picker. Approve one guest in the browser and allow controls here. Only the foreground game receives the listed keyboard controls. Configure those keys in the emulator." };
             Field(fields, "Session", note, 120);
             Field(fields, "Status", status, 70);
             Action("Refresh windows", RefreshTargets);
             Action("Open client", OpenClient);
             Action("Stop sharing", StopBridge);
-            Action("Close", Close);
+            Action(preferred == null ? "Close" : "Stop sharing and return", Close);
             allow.CheckedChanged += delegate { if (bridge != null) bridge.Allow(allow.Checked); };
             targets.SelectedIndexChanged += delegate { if (bridge != null) { StopBridge(); status.Text = "Target changed. Open a new client session."; } };
             FormClosed += delegate { StopBridge(); };
@@ -67,14 +71,19 @@ namespace EmulatorHub
             foreach (var process in Process.GetProcesses()) using (process)
             {
                 try {
-                    string program = process.MainModule.FileName;
+                    string program = PlayNative.Executable(process);
                     if (process.Id == Process.GetCurrentProcess().Id || process.MainWindowHandle == IntPtr.Zero || string.IsNullOrWhiteSpace(process.MainWindowTitle)) continue;
                     if (new[] { "explorer", "chrome", "msedge", "firefox", "ApplicationFrameHost", "dwm", "Codex", "powershell", "pwsh", "cmd" }.Contains(process.ProcessName, StringComparer.OrdinalIgnoreCase)) continue;
                     targets.Items.Add(new RemoteWindow { Pid = process.Id, Started = process.StartTime.ToUniversalTime().Ticks, Handle = process.MainWindowHandle, Title = process.MainWindowTitle, Program = program });
                 } catch { }
             }
             if (targets.Items.Count > 0) targets.SelectedIndex = 0;
-            status.Text = targets.Items.Count == 0 ? "No game window found. Start a game, then refresh." : "Choose the game window before opening the client.";
+            if (preferred != null) targets.SelectedIndex = -1;
+            if (preferred != null) for (int i = 0; i < targets.Items.Count; i++) {
+                var target = (RemoteWindow)targets.Items[i];
+                if (target.Pid == preferred.Pid && target.Started == preferred.Started && target.Handle == preferred.Handle) { targets.SelectedIndex = i; break; }
+            }
+            status.Text = preferred != null && targets.SelectedIndex < 0 ? "The selected Play window is unavailable. Refresh windows or choose a game explicitly." : targets.Items.Count == 0 ? "No game window found. Start a game, then refresh." : "Choose the game window before opening the client.";
         }
         void OpenClient()
         {
@@ -82,6 +91,9 @@ namespace EmulatorHub
                 var target = targets.SelectedItem as RemoteWindow;
                 if (target == null) throw new IOException("Choose a running game window.");
                 string address = RemotePlayTools.Service(service.Text);
+                if (!PlayNative.Matches(target.Handle, target.Pid, target.Started)) throw new IOException("This game window ended or changed. Refresh windows and choose the running session.");
+                if (library.Multiplayer == null) library.Multiplayer = new MultiplayerSettings();
+                library.Multiplayer.RelayGatewayUrl = address; Store.Save(library);
                 StopBridge(); bridge = new RemotePlayBridge(target, address); bridge.Start(); bridge.Allow(allow.Checked);
                 Process.Start(new ProcessStartInfo(bridge.Address) { UseShellExecute = true });
                 status.Text = "Client opened. Keep this session open. Stop sharing releases all guest controls.";

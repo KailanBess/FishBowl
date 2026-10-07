@@ -93,7 +93,7 @@ namespace EmulatorHub
             Uri uri;
             if (!Uri.TryCreate(url, UriKind.Absolute, out uri) || uri.Scheme != "https" || !string.IsNullOrEmpty(uri.UserInfo)) throw new IOException("Choose an HTTPS catalog address.");
             ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
-            var request = (HttpWebRequest)WebRequest.Create(uri); request.Timeout = 20000; request.ReadWriteTimeout = 20000; request.UserAgent = "FishBowl/1.28.0"; request.AllowAutoRedirect = false;
+            var request = (HttpWebRequest)WebRequest.Create(uri); request.Timeout = 20000; request.ReadWriteTimeout = 20000; request.UserAgent = "FishBowl/1.28.1"; request.AllowAutoRedirect = false;
             using (token.Register(request.Abort))
             using (var response = request.GetResponse())
             using (var stream = response.GetResponseStream())
@@ -183,7 +183,7 @@ namespace EmulatorHub
         }
         public static string CompanionSnapshot(LibraryData data)
         {
-            return Json.Serialize(new { version = "1.28.0", updated = DateTime.UtcNow.ToString("o"), emulatorCount = (data.Emulators ?? new List<EmulatorProfile>()).Count, games = (data.Games ?? new List<GameEntry>()).Where(g => g != null).Select(g => new { title = g.Title, platform = g.ConsoleLabel, favorite = g.Favorite, status = g.PlayStatus, launches = g.LaunchCount, seconds = g.TotalPlaySeconds }).ToArray(), sessions = (data.PlaySessions ?? new List<PlaySession>()).Count });
+            return Json.Serialize(new { version = "1.28.1", updated = DateTime.UtcNow.ToString("o"), emulatorCount = (data.Emulators ?? new List<EmulatorProfile>()).Count, games = (data.Games ?? new List<GameEntry>()).Where(g => g != null).Select(g => new { title = g.Title, platform = g.ConsoleLabel, favorite = g.Favorite, status = g.PlayStatus, launches = g.LaunchCount, seconds = g.TotalPlaySeconds }).ToArray(), sessions = (data.PlaySessions ?? new List<PlaySession>()).Count });
         }
     }
     // Paired read-only browser companion. Exact private-interface binding needs no HTTP URL reservation.

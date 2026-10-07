@@ -1018,6 +1018,7 @@ namespace EmulatorHub
 	public class ThemeSettings
 	{
         public List<string> HomeCardOrder { get; set; }
+        public List<string> ExpandedHomeCards { get; set; }
         public List<string> HiddenHomeCards { get; set; }
         public bool RestrainedAccents { get; set; }
         public string CoverAspect { get; set; }

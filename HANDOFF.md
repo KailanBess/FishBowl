@@ -2,19 +2,29 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-07, Windows Play workspace._
+_Last updated: 2026-10-07, Windows Play polish._
 
 ## Current state
 
 | | State |
 | --- | --- |
-| Windows | Source **1.28.0** on `fishbowl-session-remote-play`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.28.1** on `fishbowl-session-remote-play`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
-PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.28.0 work is in PR #21 on `fishbowl-session-remote-play` and targets main. Both platform implementations are included.
+PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.28.1 work is in PR #21 on `fishbowl-session-remote-play` and targets main. Both platform implementations are included. Issue #22 tracks Windows Play polish.
+
+## Windows polish 1.28.1
+
+Play adds explicit fullscreen exit, disabled unavailable controls, clearer empty/waiting/error states, session details and confirmed native detach feedback. A guided Share session action restores and preselects the exact selected window for remote hosting, then returns previously embedded sessions to Play when sharing closes. No token service or credentials are deployed. The token endpoint preference persists; changing a target stops guest input.
+
+Dropdown choice surfaces follow themes/high contrast, including empty/selected/disabled states; editable text fields keep native editing. The footer shows filters only in Emulators. Toolbar layout can shrink a row previously expanded during initial layout. Home expansions persist in optional `ThemeSettings.ExpandedHomeCards`; Linux preserves this field but does not apply Windows Home expansion behavior. Linux's package version changes only to keep paired release archives aligned.
+
+Native Play placement skips unchanged bounds, settled/hidden polling slows and decorative motion pauses during active Play. Executable lookup can use limited process-query rights; exact PID/start/window ownership checks remain mandatory. Unsupported or unverifiable windows keep external fallback. Native session guidance is covered at enlarged text sizes. The full Windows regression pass covered 31,385 checks before the final toolbar/overflow refinements; final targeted native Play coverage passes 88 checks. Schema preservation passes 202 checks; Linux semantic compilation passes. GitHub checks validate the final source commit before review.
+
+App/source packages include source commit metadata, checksums, explicit download labels and upgrade/rollback instructions. Draft tagged releases require source on main plus normal/compact overflow checks. Source-only changes remain in PR #21; no public release is published before review. See docs/PLAY-VALIDATION.md for live emulator, input, monitor and remote checks. Actual embedded Azahar rendering, audio, physical controllers, mixed-DPI monitors and two-device remote streaming remain unverified.
 
 ## Windows Play workspace 1.28.0
 
@@ -89,6 +99,8 @@ These exist as branches on the Linux maintainer's machine and will arrive as sep
 Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label Windows features that should come to Linux with `needs linux port`.
 
 ## Log
+
+- **2026-10-07 (polish 1.28.1):** refined persistent Play controls, safe detach/retry feedback, guided sharing/return, themed dropdown states, filter visibility, content-sized toolbar rows, persisted Home expansions and idle placement work. Added native/session-details/theme/schema regression coverage and clearer complete app/source release metadata and rollback guidance. Windows-only behavior is documented for Linux parity.
 
 - **2026-10-06 (compact UI 1.26.2):** introduced optional control density and color harmony preferences, smaller Windows controls/cards and consistent theme-relative colors; retained text scaling and all Home options.
 

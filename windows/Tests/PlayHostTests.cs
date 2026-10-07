@@ -135,10 +135,63 @@ class PlayHostTests
                 main.ShowInTaskbar=false; main.StartPosition=FormStartPosition.Manual; main.Location=new Point(-4000,-4000); main.Show(); Pump(150);
                 var tabs=(TabControl)Field(main,"workspaceNavigation");
                 Check(tabs.TabCount==4 && tabs.TabPages[3].Text=="Play", "main workspace includes persistent Play section");
+                var emptyPlay=(PlaySurface)Field(main,"playSurface");
+                Check(NextUi.Descendants(emptyPlay).OfType<Button>().All(b=>!b.Enabled),"empty Play disables actions that require a session: "+string.Join(", ",NextUi.Descendants(emptyPlay).OfType<Button>().Select(b=>b.Text+"="+b.Enabled))+" sessions="+emptyPlay.HasSessions);
                 typeof(MainForm).GetMethod("ShowPlay",Private).Invoke(main,new object[]{process,"Native fixture",new List<SessionProcess>()});
                 var play=(PlaySurface)Field(main,"playSurface");
                 Check(Until(delegate { return NextUi.Descendants(play).OfType<PlayWindowHost>().Any(h=>h.IsAttached); }), "main ShowPlay discovers real launched native window");
                 var host=NextUi.Descendants(play).OfType<PlayWindowHost>().Single(h=>h.IsAttached);
+                Check(!NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Show in Play").Enabled,"attached session disables unnecessary retry");
+                var footer=(Control)Field(main,"workspaceFooter");
+                foreach(int index in new[]{0,1,2,3}) {
+                    tabs.SelectedIndex=index; Pump(40);
+                    Check(footer.Controls.OfType<Label>().Single(l=>l.Text=="Filter:").Visible==(index==1),"filter caption belongs only to Emulators section "+index);
+                    if(index==1) {
+                        var toolbar=(Control)Field(main,"primaryToolbar");
+                        int content=toolbar.Controls.Cast<Control>().Where(c=>c.Visible).Select(c=>c.Bottom+c.Margin.Bottom).DefaultIfEmpty(0).Max()+toolbar.Padding.Bottom+toolbar.Margin.Vertical;
+                        Check(toolbar.Height<=content+4,"emulator toolbar avoids retained blank height after navigation");
+                    }
+                }
+                typeof(PlayWindowHost).GetField("transitioning",Private).SetValue(host,true);
+                try {
+                    Check(!play.OpenSelectedInWindow() && host.IsAttached,"failed native detach retains actual attachment and external state");
+                    Check(NextUi.Descendants(play).OfType<Label>().Any(l=>l.Text.Contains("It remains in Play")),"failed detach gives actionable feedback");
+                } finally { typeof(PlayWindowHost).GetField("transitioning",Private).SetValue(host,false); }
+                Check(play.OpenSelectedInWindow(),"retry succeeds after native transition completes");
+                NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Show in Play").PerformClick();
+                Check(Until(delegate{return host.IsAttached;}),"retry returns exact native session after detach failure");
+                using(var closeSharing=new System.Windows.Forms.Timer{Interval=50}) {
+                    bool selectedExact=false;
+                    closeSharing.Tick+=delegate {
+                        var dialog=Application.OpenForms.Cast<Form>().OfType<RemotePlayDialog>().FirstOrDefault();
+                        if(dialog==null)return;
+                        var target=NextUi.Descendants(dialog).OfType<ComboBox>().Single().SelectedItem as RemoteWindow;
+                        selectedExact=target!=null&&target.Pid==process.Id&&target.Started==start&&target.Handle==window;
+                        closeSharing.Stop(); dialog.Close();
+                    };
+                    closeSharing.Start(); NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Share session").PerformClick();
+                    Check(selectedExact,"guided sharing chooses exact detached session generation and HWND");
+                }
+                Check(Until(delegate{return host.IsAttached;}),"closing sharing restores selected game into Play");
+                foreach(int percent in new[]{150,200}) {
+                    int oldText=NextUi.TextPercent; Exception detailError=null;
+                    NextUi.TextPercent=percent;
+                    using(var closeDetails=new System.Windows.Forms.Timer{Interval=80}) {
+                        closeDetails.Tick+=delegate {
+                            var dialog=Application.OpenForms.Cast<Form>().FirstOrDefault(f=>f.Text=="Play session");
+                            if(dialog==null)return;closeDetails.Stop();
+                            try {
+                                foreach(var label in NextUi.Descendants(dialog).OfType<Label>().Where(l=>l.Visible&&!string.IsNullOrEmpty(l.Text))) {
+                                    int needed=TextRenderer.MeasureText(label.Text,label.Font,new Size(Math.Max(1,label.ClientSize.Width-label.Padding.Horizontal),int.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix).Height;
+                                    Check(label.ClientSize.Height-label.Padding.Vertical>=needed-3,"session details retain readable labels at "+percent+"%: "+label.Text);
+                                }
+                            } catch(Exception error) { detailError=error; } finally { dialog.Close(); }
+                        };
+                        closeDetails.Start();NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="More").ContextMenuStrip.Items[0].PerformClick();
+                    }
+                    NextUi.TextPercent=oldText;if(detailError!=null)throw detailError;
+                }
+
                 foreach(int index in new[]{3,0,1,2,3})
                 {
                     tabs.SelectedIndex=index; Pump(80);
@@ -150,7 +203,7 @@ class PlayHostTests
                 {
                     var full=typeof(MainForm).GetMethod("ToggleFullScreen",Private);
                     full.Invoke(main,null); Pump(120); Check(!process.HasExited && host.IsAttached, "main full-screen entry preserves native attachment");
-                    Check(NextUi.Descendants(play).OfType<Button>().Any(b=>b.Text=="Full screen"&&b.Visible), "native full screen retains visible exit action");
+                    Check(NextUi.Descendants(play).OfType<Button>().Any(b=>b.Text=="Exit full screen"&&b.Visible), "native full screen retains visible exit action");
                     full.Invoke(main,null); Pump(120); Check(!process.HasExited && host.IsAttached, "main full-screen exit preserves native attachment");
                 }
                 finally { TextFit.WorkingAreaOverride=oldOverride; }
@@ -217,6 +270,11 @@ class PlayHostTests
                 Check((GetWindowLong(monitorWindow,-16)&0x40000000)==0,"per-monitor anchored renderer remains a top-level window");
                 Check(AreDpiAwarenessContextsEqual(monitorContext,GetWindowDpiAwarenessContext(monitorWindow)),"anchored renderer retains exact original per-monitor awareness");
                 Pump(100); var clip=RegionBounds(monitorWindow); Rect viewport;GetWindowRect(host.Handle,out viewport);
+                int placements=host.PlacementUpdates;
+                var refresh=typeof(PlayWindowHost).GetMethod("RefreshPlacement",Private);
+                for(int i=0;i<10;i++) refresh.Invoke(host,null);
+                Check(host.PlacementUpdates==placements,"idle renderer does not repeat placement and clipping mutations");
+
                 Check(clip.Right-clip.Left<=viewport.Right-viewport.Left && clip.Bottom-clip.Top<=viewport.Bottom-viewport.Top,"minimum-size foreign renderer is clipped inside physical viewport");
                 host.Visible=false;Pump(100);Check(!IsWindowVisible(monitorWindow)&&!perMonitor.HasExited,"anchored renderer hides on non-Play section without exiting");
                 host.Visible=true;Pump(100);Check(IsWindowVisible(monitorWindow)&&host.IsAttached,"anchored renderer returns when Play viewport is shown");

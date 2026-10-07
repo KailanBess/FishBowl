@@ -51,6 +51,19 @@ class ThemeTests
                     Check(light == primary && deep == secondary, "matching icon uses live accent " + accent);
                 }
                 Check(backgrounds.Add(FishBowlPalette.ThemeSurface.ToArgb()), "individual surface " + name);
+                using(var choice=NextDialog.Choice(new[]{"Fixture session"},"Fixture session")) {
+                    ConsistentInputs.Style(choice); ConsistentInputs.Style(choice);
+                    Check(choice.DrawMode==DrawMode.OwnerDrawFixed && Contrast(choice.ForeColor,choice.BackColor)>=4.5,"themed dropdown and readable text "+name);
+                    using(var bitmap=new Bitmap(200,40)) using(var graphics=Graphics.FromImage(bitmap)) {
+                        var draw=typeof(ComboBox).GetMethod("OnDrawItem",Flags);
+                        foreach(var state in new[]{DrawItemState.None,DrawItemState.Selected,DrawItemState.Focus,DrawItemState.Disabled}) {
+                            choice.Enabled=state!=DrawItemState.Disabled;
+                            draw.Invoke(choice,new object[]{new DrawItemEventArgs(graphics,choice.Font,new Rectangle(0,0,200,40),0,state)});
+                            var expected=state==DrawItemState.Selected?CosmeticRuntime.Selection:choice.BackColor;
+                            if(!SystemInformation.HighContrast) Check(bitmap.GetPixel(100,35).ToArgb()==expected.ToArgb(),"dropdown state uses theme surface "+name+" / "+state);
+                        }
+                    }
+                }
             }
             foreach (string accent in AccentCatalog.Names) { Color primary, secondary; AccentCatalog.TryGet(accent, out primary, out secondary); Check(accentColors.Add(primary.ToArgb()), "individual primary accent " + accent); }
             live.Theme.Name = "unrecognized"; live.Theme.AccentColor = "unrecognized"; apply.Invoke(main, null);

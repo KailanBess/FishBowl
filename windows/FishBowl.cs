@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.28.0.0")]
+[assembly: AssemblyFileVersion("1.28.1.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.28.0.0")]
+[assembly: AssemblyVersion("1.28.1.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.28.0";
+		private const string FishBowlVersion = "1.28.1";
 
-		private const string FishBowlTitleVersion = "1.28.0";
+		private const string FishBowlTitleVersion = "1.28.1";
 
 		private Icon ownedAppIcon;
 
@@ -318,7 +318,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.28.0";
+			Text = "FishBowl 1.28.1";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -404,11 +404,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.28.0" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.28.1" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.28.0";
+						library.Theme.LastSeenBuild = "1.28.1";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -2955,6 +2955,8 @@ namespace EmulatorHub
 			{
 				playSurface.Adopt(profile.Executable, profile.Name);
                 workspaceNavigation.SelectedIndex = 3;
+            var frame = workspaceNavigation.Parent as AquariumFrame;
+            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
 				SetStatus(profile.Name + " is already running.");
 			}
 			else if (!library.Theme.ConfirmBeforeEmulatorLaunch || MessageBox.Show(this, "Open " + launchName + "? FishBowl will start the emulator normally without changing its settings.", "Open emulator", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
@@ -3394,7 +3396,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.28.0"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.28.1"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3402,7 +3404,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.28.0"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.28.1"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3410,7 +3412,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.28.0"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.28.1"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3753,7 +3755,7 @@ namespace EmulatorHub
 					base.WindowState = FormWindowState.Normal;
 					base.Bounds = TextFit.WorkingAreaOverride ?? Screen.FromControl(this).Bounds;
 					fullScreen = true;
-					SetStatus("Full-screen mode. Press F11 to return.");
+					SetStatus("Full-screen mode. Use Exit full screen in Play, or F11 when FishBowl has focus.");
 				}
 				else
 				{
@@ -3773,7 +3775,7 @@ namespace EmulatorHub
                     workspaceShell.ResumeLayout(true);
 				}
 				ResumeLayout(true);
-                if (playSurface != null) playSurface.ResumeHandleChange();
+                if (playSurface != null) { playSurface.SetFullscreen(fullScreen); playSurface.ResumeHandleChange(); }
 			}
 		}
 
@@ -4652,7 +4654,7 @@ namespace EmulatorHub
 			}
 		}
 
-		private Control BuildWorkspace(Control emulatorPanel)
+        private Control BuildWorkspace(Control emulatorPanel)
 		{
 			ExperienceData.Ensure(library);
 			workspaceNavigation = new FishBowlTabs
@@ -4677,6 +4679,7 @@ namespace EmulatorHub
             workspaceNavigation.TabPages.AddRange(new TabPage[4] { tabPage2, tabPage4, tabPage6, playPage });
             playSurface = new PlaySurface(library, ToggleFullScreen) { Dock = DockStyle.Fill };
             playPage.Controls.Add(playSurface);
+            playSurface.SessionStateChanged += delegate { var frame = workspaceNavigation.Parent as AquariumFrame; if (frame != null) { frame.PauseForPlay = workspaceNavigation.SelectedIndex == 3 && playSurface.HasSessions; frame.ApplyState(); } };
 			homeSurface = new HomeSurface(library, HomeAction);
 			tabPage2.Controls.Add(homeSurface);
 			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
@@ -4691,9 +4694,12 @@ namespace EmulatorHub
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			primaryToolbar.AutoSize = true;
+            primaryToolbar.MinimumSize = Size.Empty;
+            ((FlowLayoutPanel)primaryToolbar).AutoSizeMode = AutoSizeMode.GrowAndShrink;
 			primaryToolbar.Dock = DockStyle.Fill;
 			emulatorPanel.Dock = DockStyle.Fill;
-			tableLayoutPanel2.Controls.Add(primaryToolbar, 0, 0);
+            tableLayoutPanel2.Controls.Add(primaryToolbar, 0, 0);
+            primaryToolbar.Layout += delegate { FitPrimaryToolbar(); };
 			tableLayoutPanel2.Controls.Add(emulatorPanel, 0, 1);
 			tabPage4.Controls.Add(tableLayoutPanel2);
 			emulatorHome = new HomeSurface(library, HomeAction);
@@ -4721,6 +4727,8 @@ namespace EmulatorHub
 				{
 					UpdateWorkspaceChrome();
                     ApplyPlayFullscreenChrome();
+                    var frame = workspaceNavigation.Parent as AquariumFrame;
+                    if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
 					if (workspaceNavigation.SelectedIndex == 0)
 					{
 						homeSurface.Reload(false);
@@ -4755,6 +4763,8 @@ namespace EmulatorHub
             if (process == null || playSurface == null || IsDisposed) return;
             playSurface.Launch(process, title, beforeLaunch);
             workspaceNavigation.SelectedIndex = 3;
+            var frame = workspaceNavigation.Parent as AquariumFrame;
+            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
         }
 
         private void HomeAction(string command, GameEntry game, EmulatorProfile emulator)
@@ -4835,7 +4845,19 @@ namespace EmulatorHub
 			ConfigureSaveNotifications();
 		}
 
-		private void UpdateWorkspaceChrome()
+        private bool fittingPrimaryToolbar;
+        private void FitPrimaryToolbar()
+        {
+            if (fittingPrimaryToolbar || primaryToolbar == null) return;
+            var parent = primaryToolbar.Parent as TableLayoutPanel;
+            if (parent == null || parent.RowStyles.Count == 0 || parent.RowStyles[0].SizeType != SizeType.Absolute) return;
+            int need = primaryToolbar.Controls.Cast<Control>().Where(c => c.Visible || !primaryToolbar.Visible).Select(c => c.Bottom + c.Margin.Bottom).DefaultIfEmpty(0).Max() + primaryToolbar.Padding.Bottom + primaryToolbar.Margin.Vertical;
+            if (need <= 0 || parent.RowStyles[0].Height <= need + 2) return;
+            fittingPrimaryToolbar = true;
+            try { parent.RowStyles[0].Height = need; parent.PerformLayout(); }
+            finally { fittingPrimaryToolbar = false; }
+        }
+        private void UpdateWorkspaceChrome()
 		{
 			if (workspaceNavigation != null)
 			{
@@ -4853,6 +4875,9 @@ namespace EmulatorHub
 					workspaceFooter.ColumnStyles[0].Width = (flag ? 46 : 0);
 					workspaceFooter.ColumnStyles[1].Width = (flag ? 240 : 0);
 					filterBox.Visible = flag;
+                    var filterLabel = workspaceFooter.GetControlFromPosition(0, 0);
+                    if (filterLabel != null) filterLabel.Visible = flag;
+                    workspaceFooter.PerformLayout();
 				}
 			}
 		}
@@ -13568,7 +13593,7 @@ namespace EmulatorHub
 			});
 			base.Controls.Add(new TextBox
 			{
-				Text = "• Menu navigation uses buffered surfaces and retains unchanged Home content.\r\n• Idle events no longer repeatedly repaint every open window. Theme changes and new controls still update.\r\n• Welcome, update notes, storage prompts and startup notifications share matching headers, logos, spacing and action footers.\r\n• Startup buttons have room for their labels and icons at larger text sizes. Notification text supports scrolling and keyboard focus.\r\n• Installed 3DS games use their main content metadata when launched. Game names and available icons are retained locally.",
+				Text = "• Play keeps emulator sessions running while you browse Home, Library and Emulators.\r\n• Fullscreen has a visible Exit full screen action. Open in window confirms recovery before changing session state.\r\n• Share session selects your running game, restores its own window for sharing, then returns it to Play.\r\n• Dropdowns follow the active theme. Unrelated filters stay hidden and Home expansions survive restart.\r\n• Idle placement work and decorative motion are reduced during Play. Session details under More explains controls and recovery.\r\n• App and source packages include clear download labels, version checksums and upgrade/rollback instructions.",
 				ReadOnly = true,
 				Multiline = true,
 				BorderStyle = BorderStyle.None,
@@ -16429,7 +16454,7 @@ namespace EmulatorHub
 			if (comboBox != null)
 			{
 				comboBox.FlatStyle = FlatStyle.Standard;
-				comboBox.DrawMode = DrawMode.Normal;
+				if (comboBox.DropDownStyle != ComboBoxStyle.DropDownList) comboBox.DrawMode = DrawMode.Normal;
 			}
 			ListView list = control as ListView;
 			if (list != null && !list.OwnerDraw)
@@ -16603,7 +16628,8 @@ namespace EmulatorHub
         protected override void OnLayout(LayoutEventArgs e)
         {
             var filter = Controls.OfType<Label>().FirstOrDefault(label => label.Text == "Filter:");
-            if (filter != null && ColumnStyles.Count > 0) {
+            if (filter != null && !filter.Visible && ColumnStyles.Count > 0) ColumnStyles[0].Width = 0;
+            if (filter != null && filter.Visible && ColumnStyles.Count > 0) {
                 int need = TextRenderer.MeasureText(filter.Text, filter.Font).Width + filter.Margin.Horizontal + 12;
                 if (ColumnStyles[0].Width < need) ColumnStyles[0].Width = need;
             }
@@ -23379,6 +23405,7 @@ namespace EmulatorHub
 			this.library = library;
             ControlDensityTools.Configure(library);
 			this.action = action;
+            foreach (string card in library.Theme.ExpandedHomeCards ?? new List<string>()) expandedCards.Add(card);
 			Dock = DockStyle.Fill;
 			BackColor = FishBowlPalette.DeepSeaSurface;
 			base.AutoScaleMode = AutoScaleMode.Dpi;
@@ -23613,7 +23640,10 @@ namespace EmulatorHub
                 toggle.Text = expanded ? "Show less" : "Show all (" + content.Length + ")";
                 LayoutCards();
             };
-            toggle.Click += delegate { if (!expandedCards.Add(card.AccessibleName)) expandedCards.Remove(card.AccessibleName); apply(); };
+            toggle.Click += delegate {
+                if (!expandedCards.Add(card.AccessibleName)) expandedCards.Remove(card.AccessibleName);
+                library.Theme.ExpandedHomeCards = expandedCards.OrderBy(x => x).ToList(); Store.Save(library); apply();
+            };
             body.Controls.Add(toggle);
             apply();
         }
@@ -35859,9 +35889,10 @@ namespace EmulatorHub
 			ApplyState();
 		}
 
+		public bool PauseForPlay { get; set; }
 		public bool ShouldAnimate()
 		{
-			return FluidStyle.Bubbles && FluidStyle.Motion && !FishBowlHighlights.ReducedMotion && !SystemInformation.HighContrast && base.Visible && owner != null && owner.WindowState != FormWindowState.Minimized && Form.ActiveForm == owner;
+			return !PauseForPlay && FluidStyle.Bubbles && FluidStyle.Motion && !FishBowlHighlights.ReducedMotion && !SystemInformation.HighContrast && base.Visible && owner != null && owner.WindowState != FormWindowState.Minimized && Form.ActiveForm == owner;
 		}
 
 		public void ApplyState()
