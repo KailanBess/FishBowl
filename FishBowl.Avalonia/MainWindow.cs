@@ -72,6 +72,7 @@ namespace EmulatorHub
             ConfigureSessionTracking();
             RefreshHub();
             ConfigureGameFolderWatchers();
+            StartSaveMonitoring();
             SetStatus("Select a game in Library to play, or open an emulator.");
             // Bubble, so open menus and drop-downs handle Escape/Enter before the hub shortcuts.
             AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Bubble);
@@ -217,6 +218,7 @@ namespace EmulatorHub
                 MenuAction("Add emulator...", "add", AddEmulator),
                 MenuAction("Setup assistant / import emulator package...", "add", () => ShowEmulatorManager("Setup assistant")),
                 MenuAction("Game storage organizer...", "folder", () => ShowGameStorageOrganizer(null)),
+                BuildSavesMenu(),
                 MenuAction("Open selected emulator", "play", OpenSelectedEmulator), new Separator(),
                 MenuAction("Exit", "power", Close) } };
             var games = new MenuItem { Header = "_Library", ItemsSource = new object[] {
@@ -244,7 +246,7 @@ namespace EmulatorHub
                 MenuAction("Emulator backups / restore...", "export", () => ShowEmulatorManager("Backups")),
                 MenuAction("Setup checks...", "info", () => ShowEmulatorManager("Setup checks")),
                 MenuAction("Official setup guidance...", "info", OpenOfficialSetupGuidance),
-                MenuAction("Repair selected location...", "folder", RepairSelectedLocation) } };
+                MenuAction("Repair selected location...", "folder", RepairSelectedLocation) }.Concat(SelectedEmulatorSaveFolderItems()).ToArray() };
             var tools = new MenuItem { Header = "_Tools", ItemsSource = new object[] {
                 MenuAction("Edit selected emulator...", "edit", EditEmulator),
                 MenuAction("Edit information and links...", "info", EditEmulatorInformation),

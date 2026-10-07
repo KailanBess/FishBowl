@@ -79,7 +79,6 @@ static class T {
     if (Platform.FindOnPath("pacman") != null)
       Check("version from package manager", (Platform.ProgramVersion("/usr/bin/sleep") ?? "").Contains("coreutils"));
     Check("system scan runs", EmulatorDiscovery.ScanSystem(tok) != null);
-    SaveToolsTests.Run(root, Check);
     SaveHistoryTests.Run(root, Check);
     SaveMonitorTests.Run(root, Check);
     SessionTests.Run(root, Check);

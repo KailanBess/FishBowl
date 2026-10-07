@@ -9,81 +9,13 @@ using System.Threading;
 
 namespace EmulatorHub
 {
-    // File snapshots use the same SaveSnapshot records as the existing Windows save history.
-    // Folder archives are handled by EmulatorBackups, including its manifest and size validation.
-    public static class SaveTools
-    {
-        public const long MaximumSaveBytes = 512L * 1024 * 1024;
-        public static void ValidatePath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) throw new IOException("Choose a save file.");
-            string full = Path.GetFullPath(path);
-            for (string current = full; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
-            {
-                if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) throw new IOException("Symbolic links are not supported for save snapshots.");
-                if (Path.GetPathRoot(current) == current) break;
-            }
-            if (File.Exists(full) && new FileInfo(full).Length > MaximumSaveBytes) throw new IOException("The save file exceeds the 512 MB snapshot limit.");
-        }
-        public static string CurrentHash(string path)
-        {
-            ValidatePath(path);
-            return File.Exists(path) ? GameTools.Hash(path) : null;
-        }
-        public static SaveSnapshot Capture(GameEntry game, string source, string dataRoot)
-        {
-            if (game == null || string.IsNullOrWhiteSpace(game.Id)) throw new IOException("Choose a game.");
-            // The identifier never becomes a filesystem path supplied by a library file.
-            Guid gameId; if (!Guid.TryParse(game.Id, out gameId)) throw new IOException("The game identifier is invalid.");
-            source = Path.GetFullPath(source); ValidatePath(source); ValidatePath(dataRoot);
-            if (!File.Exists(source)) throw new IOException("Choose an existing save file.");
-            string hash = GameTools.Hash(source), id = Guid.NewGuid().ToString("N");
-            string folder = Path.Combine(dataRoot, "Saves", gameId.ToString("N"), "History", id); ValidatePath(folder); Directory.CreateDirectory(folder);
-            string target = Path.Combine(folder, Path.GetFileName(source));
-            try
-            {
-                File.Copy(source, target, false);
-                if (GameTools.Hash(source) != hash || GameTools.Hash(target) != hash) throw new IOException("The save changed while copying. Close the game and retry.");
-                var snapshot = new SaveSnapshot { Id = id, GameId = game.Id, Source = source, Path = target, Hash = hash, Bytes = new FileInfo(target).Length, Kind = "In-game save", CreatedAt = DateTime.UtcNow.ToString("o"), IsFolder = false, EmulatorId = game.PreferredEmulatorId ?? game.EmulatorId, Note = "Verified file snapshot" };
-                File.WriteAllText(Path.Combine(folder, "snapshot.json"), Json.Serialize(snapshot));
-                return snapshot;
-            }
-            catch { if (File.Exists(target)) File.Delete(target); throw; }
-        }
-        public static void Verify(SaveSnapshot snapshot)
-        {
-            if (snapshot == null || snapshot.IsFolder || !File.Exists(snapshot.Path)) throw new IOException("Choose an available file snapshot. Use emulator backups for folders.");
-            ValidatePath(snapshot.Path);
-            if (new FileInfo(snapshot.Path).Length != snapshot.Bytes || GameTools.Hash(snapshot.Path) != snapshot.Hash) throw new IOException("Snapshot verification failed; no save was changed.");
-        }
-        // Call Capture for an existing destination and persist that backup before Restore.
-        // expectedHash is the value displayed during review; null means a new destination.
-        public static void Restore(SaveSnapshot snapshot, string destination, string expectedHash)
-        {
-            Verify(snapshot); destination = Path.GetFullPath(destination); ValidatePath(destination);
-            if (GameLibraryRemoval.SamePath(destination, snapshot.Path)) throw new IOException("Choose a destination outside this snapshot.");
-            if (!Directory.Exists(Path.GetDirectoryName(destination))) throw new IOException("Choose an existing destination folder.");
-            if (CurrentHash(destination) != expectedHash) throw new IOException("The destination changed after review. Review it again.");
-            string temporary = destination + ".fishbowl-" + Guid.NewGuid().ToString("N");
-            try
-            {
-                File.Copy(snapshot.Path, temporary, false);
-                if (GameTools.Hash(temporary) != snapshot.Hash) throw new IOException("Copied save failed verification.");
-                if (CurrentHash(destination) != expectedHash) throw new IOException("The destination changed while copying.");
-                ValidatePath(destination);
-                if (File.Exists(destination)) File.Replace(temporary, destination, null); else File.Move(temporary, destination);
-            }
-            finally { if (File.Exists(temporary)) File.Delete(temporary); }
-        }
-    }
-
     // Save history shared by both builds (moved from windows/FishBowl.cs). Snapshots live in
     // <game library>/Game Saves/<game id>/<kind>/History/<snapshot id>, the same layout on Windows and Linux.
     public static class SafeFiles
     {
         public static string Under(string root, string relative)
         {
-            if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative) || relative.Contains(":"))
+            if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative) || (Platform.IsWindows && relative.Contains(":")))
             {
                 throw new InvalidDataException("Invalid relative path.");
             }
@@ -536,6 +468,150 @@ namespace EmulatorHub
             Store.Log("Save restored: " + gameEntry.Title + "; previous live save retained at " + (flag ? text2 : "no prior save"));
         }
 
+        // File name (relative path for folders) to SHA-256 for a snapshot, or for a live save when Path = Source.
+        public static Dictionary<string, string> SnapshotFiles(SaveSnapshot snapshot, CancellationToken token)
+        {
+            var files = new Dictionary<string, string>(SaveMonitor.PathComparer);
+            if (snapshot.IsFolder)
+            {
+                if (Directory.Exists(snapshot.Path))
+                    foreach (string file in SafeFiles.Tree(snapshot.Path, token))
+                        files[file.Substring(snapshot.Path.TrimEnd('\\', '/').Length + 1)] = SafeFiles.HashFile(file, token);
+            }
+            else if (File.Exists(snapshot.Path))
+                files[Path.GetFileName(snapshot.Source ?? snapshot.Path)] = SafeFiles.HashFile(snapshot.Path, token);
+            return files;
+        }
+
+        // Added/Removed/Changed lines between two snapshots (before may be null).
+        public static string[] SnapshotChanges(SaveSnapshot before, SaveSnapshot after, CancellationToken token)
+        {
+            Dictionary<string, string> old = before == null ? new Dictionary<string, string>(SaveMonitor.PathComparer) : SnapshotFiles(before, token);
+            Dictionary<string, string> next = SnapshotFiles(after, token);
+            return old.Keys.Union(next.Keys, SaveMonitor.PathComparer).OrderBy(k => k, StringComparer.Ordinal)
+                .Select(k => !old.ContainsKey(k) ? "Added: " + k : !next.ContainsKey(k) ? "Removed: " + k : old[k] != next[k] ? "Changed: " + k : null)
+                .Where(k => k != null).ToArray();
+        }
+
+        public static long SnapshotStorage(LibraryData library)
+        {
+            return library.SaveSnapshots == null ? 0L : library.SaveSnapshots.Sum(s => s.Bytes);
+        }
+
+        // The previous snapshot of the same save, for "Compare previous".
+        public static SaveSnapshot Previous(LibraryData library, SaveSnapshot after)
+        {
+            return library.SaveSnapshots.Where(s => s.GameId == after.GameId && s.Kind == after.Kind && s.Source == after.Source && string.CompareOrdinal(s.CreatedAt, after.CreatedAt) < 0).OrderByDescending(s => s.CreatedAt).FirstOrDefault();
+        }
+
+        // What a restore would add, replace or remove in the live save (shown before restoring).
+        public static string RestorePreview(SaveSnapshot snapshot, CancellationToken token)
+        {
+            Verify(snapshot, token);
+            Dictionary<string, string> incoming = SnapshotFiles(snapshot, token);
+            Dictionary<string, string> live = SnapshotFiles(new SaveSnapshot { Path = snapshot.Source, Source = snapshot.Source, IsFolder = snapshot.IsFolder }, token);
+            var text = new StringBuilder("Restore destination: " + snapshot.Source + Environment.NewLine + "Existing contents will be backed up. Emulator must be closed." + Environment.NewLine + Environment.NewLine);
+            foreach (KeyValuePair<string, string> item in incoming)
+            {
+                string current;
+                text.AppendLine((!live.TryGetValue(item.Key, out current) ? "ADD" : current == item.Value ? "UNCHANGED" : "REPLACE") + " " + item.Key);
+            }
+            foreach (string key in live.Keys.Where(k => !incoming.ContainsKey(k)))
+                text.AppendLine("REMOVE FROM LIVE (retained in rollback): " + key);
+            return text.ToString();
+        }
+
+        // Exports every snapshot as a bundle into a folder kept by a sync client (the optional cloud backup).
+        public static int ExportAll(LibraryData library, string folder, CancellationToken token, Action<string> progress)
+        {
+            EnsureData(library);
+            if (!Directory.Exists(folder)) throw new IOException("Choose an existing sync folder.");
+            int count = 0;
+            foreach (SaveSnapshot snapshot in library.SaveSnapshots.ToList())
+            {
+                token.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(snapshot.GameId) || snapshot.GameId.Any(ch => !char.IsLetterOrDigit(ch))) continue;
+                string target = Path.Combine(folder, "FishBowl Saves", snapshot.GameId);
+                Directory.CreateDirectory(target);
+                // Snapshot ids never change content, so a bundle already exported for this id is skipped.
+                if (File.Exists(Path.Combine(target, snapshot.Id + ".fishbowl-save.zip"))) continue;
+                string file = Path.Combine(target, snapshot.Id + ".fishbowl-save.zip");
+                if (progress != null) progress(file);
+                Export(library, snapshot, file, token);
+                count++;
+            }
+            library.Experience.CloudFolder = folder;
+            library.Experience.LastCloudBackup = DateTime.UtcNow.ToString("o");
+            return count;
+        }
+
+        // Folder summary for the storage dashboard (LibraryJobs.Storage in the Windows build).
+        public static string StorageSummary(string label, string folder, CancellationToken token)
+        {
+            if (!Directory.Exists(folder)) return label + "\nNot created yet\n" + folder;
+            List<string> files = SafeFiles.Tree(folder, token);
+            long bytes = 0;
+            foreach (string file in files) { token.ThrowIfCancellationRequested(); bytes += new FileInfo(file).Length; }
+            string free = "Unavailable";
+            try { free = Bytes(new DriveInfo(Path.GetPathRoot(Path.GetFullPath(folder))).AvailableFreeSpace); } catch (Exception) { }
+            return label + "\n" + folder + "\n" + files.Count + " files / " + Bytes(bytes) + " / free " + free;
+        }
+
+        public static string Bytes(long bytes)
+        {
+            return bytes < 1048576 ? Math.Max(1L, bytes / 1024) + " KB" : bytes < 1073741824 ? (bytes / 1024.0 / 1024.0).ToString("0.0") + " MB" : (bytes / 1024.0 / 1024.0 / 1024.0).ToString("0.00") + " GB";
+        }
+
+        // ----- Scheduled snapshot export (NextTools.BackupPlanner / RunScheduledBackup) -----
+
+        public static string PlannedFolder(LibraryData library) { return Path.Combine(HubPaths.BackupRoot(library), "Scheduled snapshots"); }
+
+        // Average snapshot growth over the last 30 days, projected over the given number of days.
+        public static long EstimatedGrowth(LibraryData library, int days)
+        {
+            DateTime cutoff = DateTime.UtcNow.AddDays(-30.0);
+            long recent = library.SaveSnapshots.Where(s => { DateTime created; return DateTime.TryParse(s.CreatedAt, out created) && created.ToUniversalTime() >= cutoff; }).Sum(s => s.Bytes);
+            return (long)(recent / 30.0 * Math.Max(0, days));
+        }
+
+        public static bool PlannedExportDue(LibraryData library, DateTime utcNow)
+        {
+            DateTime next;
+            return library.Enhancements != null && library.Enhancements.BackupIntervalDays > 0 && DateTime.TryParse(library.Enhancements.NextBackupAt, out next) && next.ToUniversalTime() <= utcNow;
+        }
+
+        // Exports snapshots not yet in the scheduled-export folder, within the quota (in MB). Returns the number exported.
+        public static int ExportPlanned(LibraryData library, long quotaMegabytes, CancellationToken token, Action<string> progress)
+        {
+            string folder = PlannedFolder(library);
+            Directory.CreateDirectory(folder);
+            long limit = Math.Max(1L, quotaMegabytes) * 1024 * 1024;
+            long used = Directory.GetFiles(folder, "*.zip").Sum(f => new FileInfo(f).Length);
+            int count = 0;
+            foreach (SaveSnapshot snapshot in library.SaveSnapshots.ToArray())
+            {
+                token.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(snapshot.Id) || snapshot.Id.Any(c => !char.IsLetterOrDigit(c) && c != '-' && c != '_')) throw new IOException("Snapshot ID is invalid.");
+                string target = Path.Combine(folder, snapshot.Id + ".zip");
+                if (File.Exists(target)) continue;
+                if (used + snapshot.Bytes > limit) throw new IOException("The scheduled export quota would be exceeded. Increase the quota or review old exports.");
+                if (progress != null) progress("Export " + snapshot.CreatedAt);
+                Export(library, snapshot, target, token);
+                long length = new FileInfo(target).Length;
+                if (used + length > limit) { File.Delete(target); throw new IOException("This new archive exceeds the scheduled export quota."); }
+                used += length; count++;
+            }
+            return count;
+        }
+
+        // Records a finished scheduled export and the next due time.
+        public static void PlannedExportDone(LibraryData library)
+        {
+            NextSettings settings = library.Enhancements;
+            settings.LastPlannedBackup = DateTime.Now.ToString("g");
+            settings.NextBackupAt = settings.BackupIntervalDays <= 0 ? null : DateTime.UtcNow.AddDays(settings.BackupIntervalDays).ToString("o");
+        }
+
         public static List<SaveSnapshot> CleanupCandidates(LibraryData library, GameEntry game)
         {
             EnsureData(library);
@@ -923,6 +999,7 @@ namespace EmulatorHub
         {
             SaveHistory.EnsureData(library);
             string source = OriginalGroup(library, changed);
+            if (MatchesLatestSnapshot(library, source)) return false;
             List<GameEntry> owners = library.Games.Where(g => (g.Saves ?? new List<GameSaveEntry>()).Any(s => s.Kind == "In-game saves" && string.Equals(s.Path, source, Platform.PathComparison))).ToList();
             if (owners.Count == 1 && owners[0].SaveCopyPreference == "Never ask") return false;
             string gameId = owners.Count == 1 ? owners[0].Id : null;
@@ -939,6 +1016,20 @@ namespace EmulatorHub
             if (!review.Files.Contains(source, PathComparer)) review.Files.Add(source);
             review.ChangedAt = DateTime.UtcNow.ToString("o");
             return true;
+        }
+
+        // True when a small save file already equals its newest snapshot, as right after a restore or a copy,
+        // so FishBowl does not ask to copy what it just wrote.
+        public static bool MatchesLatestSnapshot(LibraryData library, string source)
+        {
+            try
+            {
+                if (!File.Exists(source) || new FileInfo(source).Length > 64L * 1024 * 1024) return false;
+                SaveSnapshot latest = library.SaveSnapshots.Where(s => !s.IsFolder && string.Equals(s.Source, source, Platform.PathComparison)).OrderByDescending(s => s.CreatedAt, StringComparer.Ordinal).FirstOrDefault();
+                return latest != null && latest.Hash == SafeFiles.Hash(source, CancellationToken.None);
+            }
+            catch (IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
         }
 
         // A review whose game asked for "Automatic copies" and whose files are all that game's linked originals.
@@ -975,6 +1066,312 @@ namespace EmulatorHub
             int start = settings.QuietStartHour, end = settings.QuietEndHour;
             if (start < 0 || end < 0 || start == end) return false;
             return start < end ? (now.Hour >= start && now.Hour < end) : (now.Hour >= start || now.Hour < end);
+        }
+    }
+
+    // Scheduled capture of changed linked saves (moved from windows/FishBowl.cs; the schedule dialog stays per platform).
+    public class ScheduledSaveResult
+    {
+        public List<SaveSnapshot> Snapshots = new List<SaveSnapshot>();
+
+        public List<string> Messages = new List<string>();
+    }
+    public static partial class HubSaveSchedule
+    {
+        public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token)
+        {
+            return Capture(copy, token, null);
+        }
+
+        public static ScheduledSaveResult Capture(LibraryData copy, CancellationToken token, Action<string> progress)
+        {
+            ScheduledSaveResult scheduledSaveResult = new ScheduledSaveResult();
+            string managed = Path.Combine(GameStorage.Root(copy), "Game Saves");
+            try
+            {
+                string hash;
+                foreach (GameEntry g in copy.Games)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!(g.Saves ?? new List<GameSaveEntry>()).Any((GameSaveEntry link) => !string.IsNullOrWhiteSpace(link.Path) && !SafeFiles.Within(link.Path, managed)))
+                    {
+                        continue;
+                    }
+                    EmulatorProfile emulatorProfile = SaveHistory.LaunchEmulator(copy, g);
+                    if (emulatorProfile == null || !Platform.IsDirectProgram(emulatorProfile.Executable) || EmulatorRuntime.State(emulatorProfile.Executable) != RuntimeState.Stopped)
+                    {
+                        scheduledSaveResult.Messages.Add(g.Title + ": skipped; a closed executable could not be verified.");
+                        continue;
+                    }
+                    try
+                    {
+                        SaveHistory.RequireClosed(copy, new SaveSnapshot
+                        {
+                            GameId = g.Id
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
+                        continue;
+                    }
+                    GameSaveEntry[] array = (g.Saves ?? new List<GameSaveEntry>()).ToArray();
+                    foreach (GameSaveEntry link2 in array)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (string.IsNullOrWhiteSpace(link2.Path) || SafeFiles.Within(link2.Path, managed))
+                        {
+                            continue;
+                        }
+                        if (!File.Exists(link2.Path) && !Directory.Exists(link2.Path))
+                        {
+                            scheduledSaveResult.Messages.Add(g.Title + ": linked save missing.");
+                            continue;
+                        }
+                        try
+                        {
+                            hash = SafeFiles.Hash(link2.Path, token);
+                            if (copy.SaveSnapshots.Any((SaveSnapshot s) => s.GameId == g.Id && s.Source == link2.Path && s.Kind == link2.Kind && s.Hash == hash))
+                            {
+                                scheduledSaveResult.Messages.Add(g.Title + ": unchanged save skipped.");
+                                continue;
+                            }
+                            SaveSnapshot saveSnapshot = SaveHistory.Capture(copy, g, link2.Path, link2.Kind, false, token);
+                            saveSnapshot.Note = "Scheduled linked-save capture";
+                            scheduledSaveResult.Snapshots.Add(saveSnapshot);
+                            scheduledSaveResult.Messages.Add(g.Title + ": verified save captured.");
+                            if (progress != null)
+                            {
+                                progress(g.Title + ": verified save captured.");
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            scheduledSaveResult.Messages.Add(g.Title + ": " + ex.Message);
+                        }
+                    }
+                }
+                token.ThrowIfCancellationRequested();
+                return scheduledSaveResult;
+            }
+            catch (OperationCanceledException)
+            {
+                foreach (SaveSnapshot snapshot in scheduledSaveResult.Snapshots)
+                {
+                    SaveHistory.Remove(copy, snapshot);
+                }
+                throw;
+            }
+        }
+
+        public static void Apply(LibraryData d, ScheduledSaveResult result)
+        {
+            foreach (SaveSnapshot s in result.Snapshots)
+            {
+                List<SaveSnapshot> saveSnapshots = d.SaveSnapshots;
+                Func<SaveSnapshot, bool> predicate = (SaveSnapshot x) => x.Id == s.Id;
+                if (!saveSnapshots.Any(predicate))
+                {
+                    d.SaveSnapshots.Add(s);
+                    GameEntry gameEntry = d.Games.FirstOrDefault((GameEntry x) => x.Id == s.GameId);
+                    if (gameEntry != null)
+                    {
+                        GameSaves.Link(gameEntry, s.Path, s.Kind);
+                    }
+                }
+            }
+            if (result.Snapshots.Count > 0)
+            {
+                d.Experience.LastSuccessfulBackup = DateTime.UtcNow.ToString("o");
+            }
+            if (d.Hub == null) d.Hub = new HubSettings();
+            d.Hub.LastCaptureReport = string.Join(Environment.NewLine, result.Messages);
+        }
+    }
+
+    // Re-reads an emulator backup archive and checks every file against its manifest hash (moved from windows/FishBowl.cs).
+    public static class BackupIntegrity
+    {
+        public static BackupManifest Verify(string path, CancellationToken token)
+        {
+            using (ZipArchive zipArchive = ZipFile.OpenRead(path))
+            {
+                BackupManifest backupManifest = EmulatorBackups.ReadManifest(zipArchive);
+                HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (BackupFile file in backupManifest.Files)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!hashSet.Add(file.ArchivePath))
+                    {
+                        throw new InvalidDataException("Duplicate backup path.");
+                    }
+                    ZipArchiveEntry entry = zipArchive.GetEntry(file.ArchivePath);
+                    if (entry == null || entry.Length != file.Size)
+                    {
+                        throw new InvalidDataException("Backup entry is missing or has the wrong size.");
+                    }
+                    using (Stream stream = entry.Open())
+                    {
+                        using (SHA256 sHA = SHA256.Create())
+                        {
+                            byte[] array = new byte[65536];
+                            int inputCount;
+                            while ((inputCount = stream.Read(array, 0, array.Length)) > 0)
+                            {
+                                token.ThrowIfCancellationRequested();
+                                sHA.TransformBlock(array, 0, inputCount, array, 0);
+                            }
+                            sHA.TransformFinalBlock(new byte[0], 0, 0);
+                            if (!BitConverter.ToString(sHA.Hash).Replace("-", "").Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
+                            {
+                                throw new InvalidDataException("Backup content hash mismatch.");
+                            }
+                        }
+                    }
+                }
+                return backupManifest;
+            }
+        }
+    }
+
+    // Emulator backup archives and their retention (ExperienceTools.Backups in the Windows build).
+    public static class BackupRetention
+    {
+        // Every .zip under the backup folder, newest first.
+        public static List<string> Archives(LibraryData library, CancellationToken token)
+        {
+            string root = HubPaths.BackupRoot(library);
+            if (!Directory.Exists(root)) return new List<string>();
+            return SafeFiles.Tree(root, token).Where(p => p.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).OrderByDescending(File.GetLastWriteTimeUtc).ToList();
+        }
+
+        // Unpinned archives beyond the configured count (Experience.BackupArchiveCount; 0 keeps everything).
+        public static List<string> CleanupCandidates(LibraryData library, IEnumerable<string> archivesNewestFirst)
+        {
+            SaveHistory.EnsureData(library);
+            int keep = library.Experience.BackupArchiveCount;
+            if (keep <= 0) return new List<string>();
+            return archivesNewestFirst.Skip(keep).Where(p => !library.Experience.PinnedBackupPaths.Contains(p)).ToList();
+        }
+
+        public static void Delete(LibraryData library, IEnumerable<string> files)
+        {
+            string root = HubPaths.BackupRoot(library);
+            foreach (string file in files)
+            {
+                if (!SafeFiles.Within(file, root)) throw new IOException("Cleanup is limited to configured backup folders.");
+                SafeFiles.CheckLink(file);
+                File.Delete(file);
+            }
+        }
+    }
+
+    // Backup reminders from existing data only: an emulator is due when one of its games was played (PlaySessions)
+    // after its newest save backup and that backup is older than Theme.AutoBackupDays ("Backup reminder interval").
+    // An emulator played but never backed up is due as well; one never played through the library is not.
+    public static class BackupReminders
+    {
+        public static readonly string[] SaveCategories = { "InGameSaveFolder", "SaveStateFolder" };
+
+        public static int IntervalDays(LibraryData library) { return library.Theme == null || library.Theme.AutoBackupDays <= 0 ? 7 : library.Theme.AutoBackupDays; }
+
+        private static bool Moment(string text, out DateTime utc)
+        {
+            return DateTime.TryParse(text ?? "", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out utc);
+        }
+
+        // Emulator id to the newest backup archive (by manifest) that contains in-game saves or save states.
+        public static Dictionary<string, DateTime> LastBackups(LibraryData library, CancellationToken token)
+        {
+            var newest = new Dictionary<string, DateTime>();
+            foreach (string archive in BackupRetention.Archives(library, token))
+            {
+                token.ThrowIfCancellationRequested();
+                try
+                {
+                    BackupManifest manifest;
+                    using (ZipArchive zip = ZipFile.OpenRead(archive)) manifest = EmulatorBackups.ReadManifest(zip);
+                    var saveRoots = new HashSet<string>(manifest.Roots.Where(r => SaveCategories.Contains(r.Category)).Select(r => r.Key));
+                    DateTime created;
+                    if (string.IsNullOrWhiteSpace(manifest.EmulatorId) || !manifest.Files.Any(f => saveRoots.Contains(f.RootKey)) || !Moment(manifest.CreatedAt, out created)) continue;
+                    DateTime known;
+                    if (!newest.TryGetValue(manifest.EmulatorId, out known) || created > known) newest[manifest.EmulatorId] = created;
+                }
+                catch (Exception error)
+                {
+                    if (error is OperationCanceledException) throw;
+                    // Not a FishBowl emulator backup (scheduled snapshot exports live here too).
+                }
+            }
+            return newest;
+        }
+
+        // Emulator id to the end of the latest play session of one of its games.
+        public static Dictionary<string, DateTime> LastPlayed(LibraryData library)
+        {
+            var played = new Dictionary<string, DateTime>();
+            foreach (PlaySession session in library.PlaySessions ?? new List<PlaySession>())
+            {
+                GameEntry game = library.Games.FirstOrDefault(g => g.Id == session.GameId);
+                EmulatorProfile emulator = game == null ? null : SaveHistory.AssignedEmulator(library, game);
+                DateTime when;
+                if (emulator == null || !(Moment(session.EndedAt, out when) || Moment(session.StartedAt, out when))) continue;
+                DateTime known;
+                if (!played.TryGetValue(emulator.Id, out known) || when > known) played[emulator.Id] = when;
+            }
+            return played;
+        }
+
+        public static List<EmulatorProfile> Due(LibraryData library, Dictionary<string, DateTime> lastBackups, Dictionary<string, DateTime> lastPlayed, DateTime utcNow)
+        {
+            var due = new List<EmulatorProfile>();
+            foreach (EmulatorProfile emulator in library.Emulators)
+            {
+                DateTime played, backedUp;
+                if (emulator.Id == null || !lastPlayed.TryGetValue(emulator.Id, out played)) continue;
+                if (!lastBackups.TryGetValue(emulator.Id, out backedUp) || (played > backedUp && utcNow - backedUp >= TimeSpan.FromDays(IntervalDays(library)))) due.Add(emulator);
+            }
+            return due.OrderBy(e => e.Name ?? "", StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+
+        // The status-bar notice, or null when nothing is due.
+        public static string Notice(List<EmulatorProfile> due, Dictionary<string, DateTime> lastBackups)
+        {
+            if (due.Count == 0) return null;
+            DateTime backedUp;
+            string text = due.Count > 1 ? Names(due) + " have been played since their last save backups"
+                : lastBackups.TryGetValue(due[0].Id, out backedUp) ? due[0].Name + " has been played since its last save backup on " + backedUp.ToLocalTime().ToString("d")
+                : due[0].Name + " has been played but its saves are not backed up yet";
+            return "Backup reminder: " + text + ". Use File > Game saves > Back up due emulators now.";
+        }
+
+        private static string Names(List<EmulatorProfile> profiles)
+        {
+            var names = profiles.Select(p => p.Name ?? "Emulator").ToList();
+            if (names.Count > 3) return names[0] + ", " + names[1] + " and " + (names.Count - 2) + " more";
+            return string.Join(", ", names.Take(names.Count - 1).ToArray()) + " and " + names[names.Count - 1];
+        }
+
+        // Backs up one emulator's in-game saves and save states, verifies the archive and returns a one-line result.
+        // Running emulators are skipped; errors are returned, not thrown, so a batch continues.
+        public static string BackUp(LibraryData library, EmulatorProfile profile, CancellationToken token)
+        {
+            try
+            {
+                if (EmulatorRuntime.State(profile.Executable) == RuntimeState.Running) return profile.Name + ": skipped while it is running. Close it, then try again.";
+                BackupPlan plan = EmulatorBackups.Preview(profile, SaveCategories, token);
+                if (plan.Files.Count == 0) return profile.Name + ": no in-game saves or save states were found. Check its save folders.";
+                string archive = EmulatorBackups.Create(profile, plan, HubPaths.BackupRoot(library), token);
+                BackupIntegrity.Verify(archive, token);
+                Store.Log("Backup of " + profile.Name + ": " + archive);
+                return profile.Name + ": backed up " + plan.Files.Count + " file(s) to " + archive;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception error) { Store.Log("Backup of " + profile.Name + " failed: " + error.Message); return profile.Name + ": could not finish. " + error.Message; }
         }
     }
 }

@@ -2,7 +2,7 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-07, main merged into PR #25 and conflicts resolved._
+_Last updated: 2026-10-07, latest main re-merged into PR #25._
 
 ## Current state
 
@@ -114,6 +114,9 @@ Windows changes that touch the data model belong in `FishBowl.Model.cs`. Label W
 ## Log
 
 - **2026-10-07 (PR #25 merge sync):** merged latest `main` into `fishbowl-web-game-view` to resolve GitHub merge conflicts. Resolved `windows/Build.ps1` by keeping the Web browser build input (`FishBowl.Browser.cs`) and main's shared game/living-room sources (`FishBowl.Games.cs`, `FishBowl.LivingRoom.cs`) in the Windows compiler file list.
+- **2026-10-07 (Linux parity integration):** merged latest `main` into `parity/integration` to resolve pull request merge conflicts before review. The merge applied cleanly with no file-level conflict markers, and this branch now includes current `main` history plus the Linux parity changes for Library, Home, Saves and Living room.
+
+- **2026-10-07 (PR #25 merge sync refresh):** re-merged latest `main` into `fishbowl-web-game-view` after additional upstream updates and resolved the `HANDOFF.md` log conflict by keeping both branch histories.
 
 - **2026-10-07 (Linux):** started native Linux testing of the 1.26–1.28 Linux screens (see In progress on the Linux side).
 
