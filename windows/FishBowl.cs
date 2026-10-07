@@ -25597,35 +25597,17 @@ namespace EmulatorHub
 
 		public static Dictionary<string, string> SnapshotFiles(SaveSnapshot snapshot, CancellationToken token)
 		{
-			Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-			if (snapshot.IsFolder)
-			{
-				foreach (string item in SafeFiles.Tree(snapshot.Path, token))
-				{
-					dictionary[item.Substring(snapshot.Path.TrimEnd('\\', '/').Length + 1)] = SafeFiles.HashFile(item, token);
-				}
-			}
-			else if (File.Exists(snapshot.Path))
-			{
-				dictionary[Path.GetFileName(snapshot.Source ?? snapshot.Path)] = SafeFiles.HashFile(snapshot.Path, token);
-			}
-			return dictionary;
+			return SaveHistory.SnapshotFiles(snapshot, token);
 		}
 
 		public static string[] SnapshotChanges(SaveSnapshot before, SaveSnapshot after, CancellationToken token)
 		{
-			Dictionary<string, string> old = ((before == null) ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) : SnapshotFiles(before, token));
-			Dictionary<string, string> next = SnapshotFiles(after, token);
-			return (from k in old.Keys.Union(next.Keys, StringComparer.OrdinalIgnoreCase)
-				orderby k
-				select (!old.ContainsKey(k)) ? ("Added: " + k) : ((!next.ContainsKey(k)) ? ("Removed: " + k) : ((old[k] != next[k]) ? ("Changed: " + k) : null)) into k
-				where k != null
-				select k).ToArray();
+			return SaveHistory.SnapshotChanges(before, after, token);
 		}
 
 		public static long SnapshotStorage(LibraryData data)
 		{
-			return data.SaveSnapshots.Sum((SaveSnapshot s) => s.Bytes);
+			return SaveHistory.SnapshotStorage(data);
 		}
 
 		public static long EstimatedGrowth(LibraryData data, int days)
@@ -31624,26 +31606,7 @@ namespace EmulatorHub
 
 		public static string RestorePreview(SaveSnapshot s, CancellationToken token)
 		{
-			SaveHistory.Verify(s, token);
-			Dictionary<string, string> incoming = NextData.SnapshotFiles(s, token);
-			SaveSnapshot saveSnapshot = new SaveSnapshot();
-			saveSnapshot.Path = s.Source;
-			saveSnapshot.Source = s.Source;
-			saveSnapshot.IsFolder = s.IsFolder;
-			SaveSnapshot snapshot = saveSnapshot;
-			Dictionary<string, string> dictionary = NextData.SnapshotFiles(snapshot, token);
-			StringBuilder stringBuilder = new StringBuilder("Restore destination: " + s.Source + "\r\nExisting contents will be backed up. Emulator must be closed.\r\n\r\n");
-			foreach (KeyValuePair<string, string> item in incoming)
-			{
-				string value;
-				string text = ((!dictionary.TryGetValue(item.Key, out value)) ? "ADD" : ((value == item.Value) ? "UNCHANGED" : "REPLACE"));
-				stringBuilder.AppendLine(text + " " + item.Key);
-			}
-			foreach (string item2 in dictionary.Keys.Where((string key) => !incoming.ContainsKey(key)))
-			{
-				stringBuilder.AppendLine("REMOVE FROM LIVE (retained in rollback): " + item2);
-			}
-			return stringBuilder.ToString();
+			return SaveHistory.RestorePreview(s, token);
 		}
 
 		public static List<string> CloudConflicts(string root, CancellationToken token)
