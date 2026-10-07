@@ -2,20 +2,27 @@
 
 The current state of FishBowl development, for both maintainers and their coding agents. **Update this file with every change** (see [AGENTS.md](AGENTS.md)).
 
-_Last updated: 2026-10-07, Windows Play polish._
+_Last updated: 2026-10-07, Windows Web and confirmed shutdown._
 
 ## Current state
 
 | | State |
 | --- | --- |
-| Windows | Source **1.28.1** on `fishbowl-session-remote-play`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
+| Windows | Source **1.29.0** on `fishbowl-web-game-view`, pending review. Public release remains [v1.25.8](../../releases/tag/v1.25.8). |
 | Linux | Preview with Home/Library/profiles/game setup and expansion screens; native Linux desktop smoke testing remains required. |
 | Shared | Optional expansion settings in the shared model, C# 5 tools for mods/imports/catalogs/companion/file save recovery. Unknown JSON fields preserved on Linux. |
 
 ## Open pull requests
 
-PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. New 1.28.1 work is in PR #21 on `fishbowl-session-remote-play` and targets main. Both platform implementations are included. Issue #22 tracks Windows Play polish.
+PR #20 is merged at main `11a6f935a98491d7fd0118ed0ce3fcb986f8f0de`. PR #21 is merged (Windows 1.28.1). New 1.29.0 work on `fishbowl-web-game-view` targets main and issue #23; Linux testing status from PR #24 is preserved.
 
+## Windows Web and shutdown 1.29.0
+
+The 1.29.0 branch implements issue #23: an actual installed Firefox window in a fifth Web workspace, selectable Edge/Chrome adapters, dedicated browser profiles, URI/search entry, native navigation commands, fullscreen and external fallback. Browser preferences are optional shared fields; Linux preserves them and keeps its existing external-launch UI. Firefox Go opens a tab in its dedicated profile. Edge/Chrome Go closes the previous app window normally before opening the next address; the address box is an entry field, not a synchronized current-page URL. See docs/BROWSER.md for requirements and compatibility.
+
+Play hides standard native menus and saves optional per-emulator PlayView edge settings for renderer-drawn controls. Zero edges preserve the full game image; unmatched native games use session-only settings. Native menus/styles/placement are restored in external mode. Renderer/title-aware selection prefers the game over a larger manager; verified matching sibling frontend windows are hidden during game-only Play and restored on external mode, shutdown or explicit controls. Closing FishBowl asks before requesting normal game shutdown, offers Cancel and explicit keep-running behavior, and honors emulator exit/save vetoes without force termination. A slow browser offers staying open or explicit external continuation on exit.
+
+Native browser fixtures pass 27 checks; exit/game-view fixtures pass 35 checks; retained native hosting/launch checks pass 88/19. Shared schema checks pass 229 assertions and Linux semantic compilation reports no errors. Full Windows regressions passed over 31,000 checks before the final frontend-selection and dialog refinements; targeted native suites validate those refinements. Normal/compact audits report zero findings across five workspaces and 67 dialogs at 100/150/200% text size. Required GitHub checks validate the final source commit. Installed Firefox testing reached window attachment, navigation routing and workspace persistence, but graphics/compositor failures and incomplete shutdown prevented a complete rendering/shutdown smoke pass. Rendering, actual navigation handling, permissions/download dialogs, monitors and physical input remain live checks; fixture passes do not establish browser compatibility. No browser is bundled or installed and no release is published before review.
 ## Windows polish 1.28.1
 
 Play adds explicit fullscreen exit, disabled unavailable controls, clearer empty/waiting/error states, session details and confirmed native detach feedback. A guided Share session action restores and preselects the exact selected window for remote hosting, then returns previously embedded sessions to Play when sharing closes. No token service or credentials are deployed. The token endpoint preference persists; changing a target stops guest input.
@@ -163,3 +170,7 @@ Added persistent embedded emulator sessions and launch routing, fullscreen chrom
 #### CI fixture portability
 
 Launch fixture ownership expands Windows short/long executable path aliases before comparing exact paths and still validates process creation time. Tests reject future start thresholds and identical executable names in other directories. This avoids false ownership failures on runners using short TEMP paths. Native hosting and app behavior are unchanged.
+
+### 2026-10-07 — Firefox Web and game shutdown
+
+Added installed-browser Web integration and optional shared preferences, saved game-view edges, native menu restoration and confirmed graceful exit in PR #21, tracked by #23. Added native browser/exit regressions and five-workspace layout coverage. Browser and emulator renderers retain external fallback; complete native rendering verification remains required.

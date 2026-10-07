@@ -203,6 +203,7 @@ namespace EmulatorHub
 	}
 	public class EmulatorProfile
 	{
+        public PlayViewSettings PlayView { get; set; }
 #if NETCOREAPP
 		// Keep fields from newer versions when this one saves (Linux build; JavaScriptSerializer on Windows ignores this).
 		[System.Text.Json.Serialization.JsonExtensionData]
@@ -300,6 +301,28 @@ namespace EmulatorHub
 
 		public string IgnoredReleaseTag { get; set; }
 	}
+    public class BrowserPreferences
+    {
+#if NETCOREAPP
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
+        public string Engine { get; set; }
+        public string Executable { get; set; }
+        public string HomePage { get; set; }
+    }
+    public class PlayViewSettings
+    {
+#if NETCOREAPP
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement> AdditionalFields { get; set; }
+#endif
+        public bool ShowControls { get; set; }
+        public int Top { get; set; }
+        public int Bottom { get; set; }
+        public int Left { get; set; }
+        public int Right { get; set; }
+    }
 	public class ExperienceSettings
 	{
 #if NETCOREAPP
@@ -652,6 +675,7 @@ namespace EmulatorHub
 	}
 	public class LibraryData
 	{
+        public BrowserPreferences Browser { get; set; }
         public GameToolsLibrarySettings GameTools { get; set; }
         public IntegrationSettings Integrations { get; set; }
 

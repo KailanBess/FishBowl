@@ -7,9 +7,9 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 | Windows | 1.25.8 | Current release |
 | Linux | Preview | Library and expansion screens; Linux desktop testing remains required |
 
-Source version **1.28.1** adds a polished Windows Play workspace with embedded emulator windows, explicit fullscreen exit, safe detach/retry feedback and guided remote sharing. Dropdowns follow the active theme, Home expansions persist and idle window placement avoids repeated changes. It retains crash-safe session checkpoints, verified launcher handoffs, controller navigation, Home customization and the existing game, save and integration tools. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source.
+Source version **1.29.0** adds a Windows Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. Play includes game-only view adjustments and confirmation before closing running games, with normal emulator shutdown and save/exit prompts honored. It retains session recovery, controller navigation, Home customization and the existing game, save and integration tools. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source. See [Browser setup](docs/BROWSER.md) for requirements and native-window compatibility.
 
-For Windows, choose **FishBowl-1.28.1.zip** to run the app; keep its six files together. **FishBowl-1.28.1-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
+For Windows, choose **FishBowl-1.29.0.zip** to run the app; keep its six files together. **FishBowl-1.29.0-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
 
 ## Features
 

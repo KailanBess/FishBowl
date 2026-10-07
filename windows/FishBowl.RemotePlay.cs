@@ -95,7 +95,7 @@ namespace EmulatorHub
                 if (library.Multiplayer == null) library.Multiplayer = new MultiplayerSettings();
                 library.Multiplayer.RelayGatewayUrl = address; Store.Save(library);
                 StopBridge(); bridge = new RemotePlayBridge(target, address); bridge.Start(); bridge.Allow(allow.Checked);
-                Process.Start(new ProcessStartInfo(bridge.Address) { UseShellExecute = true });
+                FishBowlWeb.OpenExternal(library,bridge.Address);
                 status.Text = "Client opened. Keep this session open. Stop sharing releases all guest controls.";
             } catch (Exception ex) { StopBridge(); status.Text = ex.Message; }
         }

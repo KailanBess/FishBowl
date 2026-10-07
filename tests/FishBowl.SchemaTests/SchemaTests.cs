@@ -23,6 +23,9 @@ class SchemaTests {
   expanded.Theme=settingsCopy;
   using(var before=JsonDocument.Parse(expansion))using(var after=JsonDocument.Parse(Json.Serialize(expanded)))Preserved(before.RootElement,after.RootElement,"expansion");
   var old=Json.Deserialize<LibraryData>("{\"Version\":1,\"Games\":[],\"Emulators\":[],\"Theme\":{\"Name\":\"Forest\"}}");Check(old.Version==1&&old.Theme.Name=="Forest","old library fixture rejected");
+  const string browser=@"{""Browser"":{""Engine"":""Firefox"",""Executable"":""browser.exe"",""HomePage"":""about:blank"",""FutureBrowser"":1},""Emulators"":[{""Id"":""view"",""PlayView"":{""ShowControls"":false,""Top"":30,""Bottom"":20,""Left"":5,""Right"":7,""FutureView"":2}}]}";
+  var web=Json.Deserialize<LibraryData>(browser);Check(web.Browser.Engine=="Firefox"&&web.Emulators[0].PlayView.Top==30,"browser and game-view fields are optional typed settings");
+  using(var before=JsonDocument.Parse(browser))using(var after=JsonDocument.Parse(Json.Serialize(web)))Preserved(before.RootElement,after.RootElement,"browser");
   Console.WriteLine("PASS: "+checks+" schema preservation checks");return 0;
  }catch(Exception e){Console.WriteLine(e);return 1;}}
 }

@@ -34,9 +34,11 @@ Game titles and artwork are stored in the library without renaming game files. R
 
 Source and platform build instructions are in the accompanying Source archive and the repository README.
 
-Play opens compatible emulator windows inside FishBowl. Switching Home, Library or Emulators leaves sessions running. Full screen expands Play; Exit full screen returns to the normal window. Open in window restores the emulator window. Closing FishBowl safely detaches running emulator windows. Some elevated or renderer-managed windows require external mode. Share session selects the running game, opens its own window for sharing and returns it to Play when sharing closes. More opens session details and recovery guidance.
+Play opens compatible emulator windows inside FishBowl. Switching Home, Library or Emulators leaves sessions running. Full screen expands Play; Exit full screen returns to the normal window. Open in window restores the emulator window. Closing FishBowl asks before closing running games. Close games and exit requests normal emulator shutdown; Cancel keeps playing and Keep games running restores their windows. Save/exit prompts are honored without force termination. Game view settings in More hides standard menus and lets you save toolbar/status edge sizes per emulator. Some elevated or renderer-managed windows require external mode. Share session selects the running game, opens its own window for sharing and returns it to Play when sharing closes. More opens session details and recovery guidance.
 
-Session checkpoints recover observed playtime after restart and follow verified launcher descendants without stopping games on app close. Appearance and accessibility settings share one hub, with separate General preferences. Controller navigation covers current menus, overflow actions, dialogs and controls.
+Web uses an installed browser: Firefox by default, with Microsoft Edge or Google Chrome available in Browser settings. No browser engine executable is bundled. Enter an address or search and press Go in Web. A separate FishBowl browser profile holds cookies and logins; personal browser windows are not attached or closed. See docs/BROWSER.md in the Source archive for navigation and compatibility details.
+
+Session checkpoints recover observed playtime after restart and follow verified launcher descendants with confirmed graceful game shutdown on app close. Appearance and accessibility settings share one hub, with separate General preferences. Controller navigation covers current menus, overflow actions, dialogs and controls.
 
 Remote couch play includes a browser media client and host-approved keyboard controls. It requires a LiveKit deployment and the private token service described in remote-play/README.md in the Source archive. This package does not deploy the service or include credentials. Live streaming and emulator key mappings require a two-device test; Linux can join as a browser guest.
 "@ | Set-Content -LiteralPath (Join-Path $bundle 'README.md') -Encoding UTF8
@@ -51,7 +53,7 @@ Download **FishBowl-$version.zip** for the Windows app. Extract it, keep the six
 
 **FishBowl-$version-Source.zip** contains source code for contributors. Build instructions are in its README; it does not include compiled executables. The Linux archive is a separate executable build.
 
-This version improves Play session controls, fullscreen exit, window recovery and remote sharing; matches dropdowns to themes; hides unrelated filters; remembers Home expansions; and reduces idle window placement work. The existing navigation and UI style remain in place.
+This version adds a Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. It adds running-game exit confirmation and graceful shutdown, plus saved game-only view adjustments. The existing UI style remains in place. Browser and renderer compatibility vary; external-window fallback is available.
 
 Before upgrading, use Library > Backup and transfer > Export FishBowl settings and retain the previous app folder. Close FishBowl, extract the new app into a separate folder, and keep your existing data location. For portable mode, copy portable.flag and FishBowlData while FishBowl is closed. The installer updates the app without intentionally replacing library data. Emulator programs and game files remain separate.
 

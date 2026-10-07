@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.28.1.0")]
+[assembly: AssemblyFileVersion("1.29.0.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.28.1.0")]
+[assembly: AssemblyVersion("1.29.0.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.28.1";
+		private const string FishBowlVersion = "1.29.0";
 
-		private const string FishBowlTitleVersion = "1.28.1";
+		private const string FishBowlTitleVersion = "1.29.0";
 
 		private Icon ownedAppIcon;
 
@@ -237,6 +237,7 @@ namespace EmulatorHub
 
 		private TabControl workspaceNavigation;
         private PlaySurface playSurface;
+        private BrowserSurface browserSurface;
         private bool immersivePlayChrome;
         private float[] savedPlayRows;
 
@@ -318,7 +319,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.28.1";
+			Text = "FishBowl 1.29.0";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -404,11 +405,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.28.1" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.0" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.28.1";
+						library.Theme.LastSeenBuild = "1.29.0";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -435,6 +436,7 @@ namespace EmulatorHub
 			};
 			base.FormClosing += delegate(object sender, FormClosingEventArgs e)
 			{
+                if (closingPlaySessions) { e.Cancel=true; return; }
 				if (!e.Cancel && !restartingAfterRestore)
 				{
 					try
@@ -448,6 +450,16 @@ namespace EmulatorHub
 						MessageBox.Show(this, "Your notes could not be saved.\n\n" + ex.Message, "FishBowl");
 					}
 				}
+                if (!e.Cancel && !restartingAfterRestore && playSurface != null && e.CloseReason != CloseReason.WindowsShutDown && e.CloseReason != CloseReason.TaskManagerClosing) {
+                    closingPlaySessions=true;
+                    try { if(!playSurface.ConfirmExit(this)) { e.Cancel=true; return; } }
+                    finally { closingPlaySessions=false; }
+                }
+                if (!e.Cancel && browserSurface != null && e.CloseReason != CloseReason.WindowsShutDown && e.CloseReason != CloseReason.TaskManagerClosing) {
+                    closingPlaySessions=true;
+                    try { if(!browserSurface.ConfirmExit(this)) { e.Cancel=true;SetStatus("Finish the Web browser's save or exit prompt, then close FishBowl again.");return; } }
+                    finally { closingPlaySessions=false; }
+                }
                 if (!e.Cancel && playSurface != null && !playSurface.TryDetachAll()) {
                     e.Cancel = true;
                     MessageBox.Show(this, "A running emulator window could not be returned to its own window. Close it in the emulator, then retry closing FishBowl.", "FishBowl");
@@ -1160,9 +1172,7 @@ namespace EmulatorHub
 			{
 				throw new InvalidDataException("Enter an http or https web address in Edit information.");
 			}
-			ProcessStartInfo processStartInfo = new ProcessStartInfo(url);
-			processStartInfo.UseShellExecute = true;
-			Process.Start(processStartInfo);
+			OpenWeb(url);
 		}
 
 		private void PostUi(Action action)
@@ -1706,6 +1716,8 @@ namespace EmulatorHub
 				}
 			};
 			toolStripMenuItem3.DropDownItems.Add(selectedTools);
+            toolStripMenuItem3.DropDownItems.Add(MenuAction("Web browser...", "info", delegate { OpenWeb(null); }));
+            toolStripMenuItem3.DropDownItems.Add(MenuAction("Browser settings...", "settings", delegate { using(var dialog=new BrowserSettingsDialog(library)) dialog.ShowDialog(this); }));
 			ToolStripMenuItem toolStripMenuItem4 = new ToolStripMenuItem("Controllers");
 			toolStripMenuItem4.DropDownItems.Add(MenuAction("Controller center...", "controller", ShowControllerCenter));
 			toolStripMenuItem4.DropDownItems.Add(MenuAction("Controller profiles...", "controller", ShowControllerProfiles));
@@ -2919,6 +2931,7 @@ namespace EmulatorHub
 			}
 		}
 		private bool resizingEmulatorColumns;
+        private bool closingPlaySessions;
 
 		private ProcessStartInfo EmulatorStartInfo(EmulatorProfile profile)
 		{
@@ -3396,7 +3409,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.28.1"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.0"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3404,7 +3417,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.28.1"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.0"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3412,7 +3425,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.28.1"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.0"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3716,7 +3729,7 @@ namespace EmulatorHub
 		private void ApplyPlayFullscreenChrome()
         {
             if (workspaceShell == null) return;
-            bool immersive = fullScreen && workspaceNavigation != null && workspaceNavigation.SelectedIndex == 3;
+            bool immersive = fullScreen && workspaceNavigation != null && (workspaceNavigation.SelectedIndex == 3 || workspaceNavigation.SelectedIndex == 4);
             if (immersive && !immersivePlayChrome) {
                 savedPlayRows = new float[] { workspaceShell.RowStyles[0].Height, workspaceShell.RowStyles[1].Height, workspaceShell.RowStyles[4].Height };
                 workspaceShell.RowStyles[0].Height = 0;
@@ -3733,7 +3746,9 @@ namespace EmulatorHub
 
         private void ToggleFullScreen()
 		{
+            if(browserSurface!=null && !browserSurface.PrepareHandleChange()) { browserSurface.ResumeHandleChange();SetStatus("The browser window is busy. Retry fullscreen when it responds.");return; }
             if (playSurface != null && !playSurface.PrepareHandleChange()) {
+                if(browserSurface!=null)browserSurface.ResumeHandleChange();
                 playSurface.ResumeHandleChange();
                 SetStatus("The emulator window is busy. Retry fullscreen when it responds.");
                 return;
@@ -3776,6 +3791,7 @@ namespace EmulatorHub
 				}
 				ResumeLayout(true);
                 if (playSurface != null) { playSurface.SetFullscreen(fullScreen); playSurface.ResumeHandleChange(); }
+                if (browserSurface != null) { browserSurface.SetFullscreen(fullScreen); browserSurface.ResumeHandleChange(); }
 			}
 		}
 
@@ -4025,11 +4041,8 @@ namespace EmulatorHub
 			}
 			try
 			{
-				ProcessStartInfo processStartInfo = new ProcessStartInfo();
-				processStartInfo.FileName = result.AbsoluteUri;
-				processStartInfo.UseShellExecute = true;
-				Process.Start(processStartInfo);
-				SetStatus("Opening " + link.Name + " in your browser.");
+				OpenWeb(result.AbsoluteUri);
+				SetStatus("Opening " + link.Name + " in FishBowl.");
 			}
 			catch (Exception ex)
 			{
@@ -4663,7 +4676,7 @@ namespace EmulatorHub
 				AccessibleName = "FishBowl workspace navigation",
 				LegacyHeaders = true,
 				RoomyHeaders = true,
-                PreferredColumns = 4,
+                PreferredColumns = 5,
 				Font = new Font(DisplayFont, 12f, FontStyle.Bold)
 			};
 			TabPage tabPage = new TabPage("Home");
@@ -4676,7 +4689,9 @@ namespace EmulatorHub
 			tabPage5.BackColor = bottom;
 			TabPage tabPage6 = tabPage5;
 			var playPage = new TabPage("Play") { BackColor = bottom };
-            workspaceNavigation.TabPages.AddRange(new TabPage[4] { tabPage2, tabPage4, tabPage6, playPage });
+            var webPage = new TabPage("Web") { BackColor = bottom };
+            workspaceNavigation.TabPages.AddRange(new TabPage[5] { tabPage2, tabPage4, tabPage6, playPage, webPage });
+            browserSurface=new BrowserSurface(library,ToggleFullScreen) { Dock=DockStyle.Fill };webPage.Controls.Add(browserSurface);
             playSurface = new PlaySurface(library, ToggleFullScreen) { Dock = DockStyle.Fill };
             playPage.Controls.Add(playSurface);
             playSurface.SessionStateChanged += delegate { var frame = workspaceNavigation.Parent as AquariumFrame; if (frame != null) { frame.PauseForPlay = workspaceNavigation.SelectedIndex == 3 && playSurface.HasSessions; frame.ApplyState(); } };
@@ -4758,6 +4773,12 @@ namespace EmulatorHub
 			return new AquariumFrame(workspaceNavigation);
 		}
 
+        internal void OpenWeb(string url)
+        {
+            if(browserSurface==null || IsDisposed) return;
+            workspaceNavigation.SelectedIndex=4;
+            if(!string.IsNullOrWhiteSpace(url))browserSurface.Navigate(url);
+        }
 		internal void ShowPlay(Process process, string title, IList<SessionProcess> beforeLaunch)
         {
             if (process == null || playSurface == null || IsDisposed) return;
@@ -13593,9 +13614,10 @@ namespace EmulatorHub
 			});
 			base.Controls.Add(new TextBox
 			{
-				Text = "• Play keeps emulator sessions running while you browse Home, Library and Emulators.\r\n• Fullscreen has a visible Exit full screen action. Open in window confirms recovery before changing session state.\r\n• Share session selects your running game, restores its own window for sharing, then returns it to Play.\r\n• Dropdowns follow the active theme. Unrelated filters stay hidden and Home expansions survive restart.\r\n• Idle placement work and decorative motion are reduced during Play. Session details under More explains controls and recovery.\r\n• App and source packages include clear download labels, version checksums and upgrade/rollback instructions.",
+                Text = "• Web uses installed Firefox by default. Browser settings also offers Edge or Chrome and a separate FishBowl browsing profile.\r\n• Play keeps games running across sections. Game view settings can hide emulator toolbars and status edges.\r\n• Closing FishBowl asks before closing running games. Save prompts are honored; Cancel keeps playing.\r\n• Fullscreen has a visible exit action. Open in window restores emulator or browser controls.\r\n• Share session uses your selected running game.\r\n• App/source packages include checksums and upgrade/rollback instructions.",
 				ReadOnly = true,
 				Multiline = true,
+                ScrollBars = ScrollBars.Vertical,
 				BorderStyle = BorderStyle.None,
 				BackColor = Color.FromArgb(62, 56, 69),
 				ForeColor = Color.White,

@@ -97,6 +97,17 @@ class PlayHostTests
         try { Application.EnableVisualStyles(); Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException); Run(); Console.WriteLine("PASS: " + checks + " real cross-process Play window ownership, lifetime, navigation and full-screen checks."); return 0; }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
     }
+    static void CloseKeepingGames(MainForm main)
+    {
+        using(var responder=new System.Windows.Forms.Timer { Interval=40 }) {
+            responder.Tick+=delegate {
+                var prompt=Application.OpenForms.Cast<Form>().OfType<PlayExitDialog>().FirstOrDefault();
+                if(prompt==null) return;
+                responder.Stop(); NextUi.Descendants(prompt).OfType<Button>().Single(b=>b.Text=="Keep games running").PerformClick();
+            };
+            responder.Start();main.Close();
+        }
+    }
     static void Run()
     {
         var process = Child(); IntPtr window = Find(process.Id); long start = process.StartTime.ToUniversalTime().Ticks;
@@ -134,7 +145,7 @@ class PlayHostTests
             {
                 main.ShowInTaskbar=false; main.StartPosition=FormStartPosition.Manual; main.Location=new Point(-4000,-4000); main.Show(); Pump(150);
                 var tabs=(TabControl)Field(main,"workspaceNavigation");
-                Check(tabs.TabCount==4 && tabs.TabPages[3].Text=="Play", "main workspace includes persistent Play section");
+                Check(tabs.TabCount==5 && tabs.TabPages[3].Text=="Play", "main workspace includes persistent Play section");
                 var emptyPlay=(PlaySurface)Field(main,"playSurface");
                 Check(NextUi.Descendants(emptyPlay).OfType<Button>().All(b=>!b.Enabled),"empty Play disables actions that require a session: "+string.Join(", ",NextUi.Descendants(emptyPlay).OfType<Button>().Select(b=>b.Text+"="+b.Enabled))+" sessions="+emptyPlay.HasSessions);
                 typeof(MainForm).GetMethod("ShowPlay",Private).Invoke(main,new object[]{process,"Native fixture",new List<SessionProcess>()});
@@ -207,7 +218,7 @@ class PlayHostTests
                     full.Invoke(main,null); Pump(120); Check(!process.HasExited && host.IsAttached, "main full-screen exit preserves native attachment");
                 }
                 finally { TextFit.WorkingAreaOverride=oldOverride; }
-                main.Close(); main.Dispose(); Pump(80);
+                CloseKeepingGames(main); main.Dispose(); Pump(80);
                 Check(IsWindow(window)&&GetParent(window)==originalParent&&!process.HasExited, "closing FishBowl restores game window without stopping process");
                 Check(GetWindowLong(window,-16)==style && GetWindowLong(window,-20)==extended, "FishBowl shutdown restores original native window styles");
             }
@@ -251,7 +262,7 @@ class PlayHostTests
                     Check(play.TryDetachAll(),"verified multiple sessions detach successfully before shutdown");
                 }
                 finally { play.DetachAll();Stop(another,anotherWindow); }
-                main.Close();main.Dispose();Pump(80);
+                CloseKeepingGames(main);main.Dispose();Pump(80);
                 Check(AreDpiAwarenessContextsEqual(context,GetWindowDpiAwarenessContext(awareWindow))&&!awareProcess.HasExited,"shutdown preserves aware renderer and DPI identity");
             }
         }
@@ -302,7 +313,7 @@ class PlayHostTests
                     }
                 }
                 finally{TextFit.WorkingAreaOverride=oldOverride;}
-                main.Close();main.Dispose();Pump(80);
+                CloseKeepingGames(main);main.Dispose();Pump(80);
                 Check(GetParent(monitorWindow)==monitorParent&&!perMonitor.HasExited,"actual Main close restores anchored renderer owner without exiting");
             }
         }

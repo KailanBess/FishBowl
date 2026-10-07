@@ -21,12 +21,18 @@ class PlayLaunchTests {
  static PlayWindowHost Attached(MainForm main){Check(Until(()=>NextUi.Descendants(main).OfType<PlayWindowHost>().Any(h=>h.IsAttached)),"launch attaches a real cross-process window: "+string.Join(" | ",NextUi.Descendants((Control)Field(main,"playSurface")).OfType<Label>().Select(l=>l.Text)));return NextUi.Descendants(main).OfType<PlayWindowHost>().Single(h=>h.IsAttached);}
  static void Stop(Process process,IntPtr window){if(process.HasExited)return;if(!IsOwned(process))throw new Exception("Refusing cleanup of an unverified process");uint pid;if(window!=IntPtr.Zero&&IsWindow(window)){GetWindowThreadProcessId(window,out pid);if(pid==(uint)process.Id)PostMessage(window,0x10,IntPtr.Zero,IntPtr.Zero);}if(!process.WaitForExit(2500)){Check(IsOwned(process),"cleanup revalidates fixture identity before terminating");process.Kill();process.WaitForExit();}Pump(150);}
  [STAThread]static int Main(string[] args){if(args.Contains("--child")){Application.EnableVisualStyles();using(var child=new Form{Text="Actual launch fixture",StartPosition=FormStartPosition.Manual,Bounds=new Rectangle(-3500,-3500,640,480),FormBorderStyle=FormBorderStyle.SizableToolWindow,ShowInTaskbar=true}){child.Controls.Add(new Label{Text="Cross-process launched game",Dock=DockStyle.Fill});Application.Run(child);}return 0;}try{Application.EnableVisualStyles();Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);Run();Console.WriteLine("PASS: "+checks+" actual emulator, embedded-library, modal-game launch routing and retained-process checks.");return 0;}catch(Exception error){Console.Error.WriteLine(error);return 1;}finally{foreach(var process in owned){try{if(IsOwned(process)){process.Kill();process.WaitForExit();}}catch{}process.Dispose();}if(childExe!=null){foreach(var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(childExe))){try{if(IsOwned(process)){process.Kill();process.WaitForExit();}}catch{}process.Dispose();}}}}
+ static void CloseKeepingGames(MainForm main) {
+  using(var responder=new System.Windows.Forms.Timer{Interval=40}) {
+   responder.Tick+=delegate { var dialog=Application.OpenForms.Cast<Form>().OfType<PlayExitDialog>().FirstOrDefault();if(dialog==null)return;responder.Stop();NextUi.Descendants(dialog).OfType<Button>().Single(b=>b.Text=="Keep games running").PerformClick(); };
+   responder.Start();main.Close();
+  }
+ }
  static void Run(){
   childExe=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"FishBowlLaunchFixture-"+Guid.NewGuid().ToString("N")+".exe");File.Copy(Assembly.GetExecutingAssembly().Location,childExe);began=DateTime.UtcNow.AddSeconds(-1);
   using(var main=new MainForm(true)){
    main.ShowInTaskbar=false;main.StartPosition=FormStartPosition.Manual;main.Location=new Point(-4500,-4500);main.Show();Pump(150);
    var data=(LibraryData)Field(main,"library");NextData.Ensure(data);data.Emulators.Clear();data.Games.Clear();data.Theme.ConfirmBeforeGameLaunch=false;data.Theme.ConfirmBeforeEmulatorLaunch=false;Immersion.Ensure(data).LaunchPresentation=false;Immersion.Ensure(data).Recap=false;
-   var tabs=(TabControl)Field(main,"workspaceNavigation");Check(tabs.TabCount==4&&tabs.TabPages[3].Text=="Play","actual launch targets the fourth Play workspace");
+   var tabs=(TabControl)Field(main,"workspaceNavigation");Check(tabs.TabCount==5&&tabs.TabPages[3].Text=="Play","actual launch targets the fourth Play workspace");
    var emulator=new EmulatorProfile{Id="launch-fixture",Name="Fixture emulator",Executable=childExe,Arguments="--child",Extensions=new List<string>(),LaunchProfiles=new List<LaunchProfile>()};data.Emulators.Add(emulator);
    typeof(MainForm).GetMethod("OpenEmulator",Private).Invoke(main,new object[]{emulator,"--child","Fixture emulator"});var host=Attached(main);var process=Record(host);IntPtr window=host.GameWindow;Check(tabs.SelectedIndex==3,"OpenEmulator selects Play after starting a native executable");
    string originalPath=childExe;var shortPath=new System.Text.StringBuilder(512);uint shortLength=GetShortPathName(originalPath,shortPath,(uint)shortPath.Capacity);
@@ -40,7 +46,7 @@ Check(host.IsAttached&&((!host.IsAnchored&&GetParent(window)==host.Handle)||(hos
     timer.Tick+=delegate{timer.Stop();try{Check(!IsWindowEnabled(main.Handle),"native modal owner disables MainForm before launch");ExperienceTools.Launch(modal,data,game);launchReturned=true;}catch(Exception error){timerError=error;modal.Close();}};watchdog.Tick+=delegate{watchdog.Stop();timerError=new Exception("Modal launch did not close its owner within the bounded launch timeout");modal.Close();};watchdog.Start();timer.Start();modal.ShowDialog(main);
    }
    if(timerError!=null)throw timerError;Check(launchReturned,"successful game launch returns from the modal launch owner");Check(IsWindowEnabled(main.Handle),"successful modal launch closes owner and reenables MainForm");host=Attached(main);process=Record(host);window=host.GameWindow;Check(tabs.SelectedIndex==3&&game.LaunchCount==2,"modal native launch routes to Play and retains launch bookkeeping");
-   main.Close();main.Dispose();Check(!process.HasExited&&IsWindow(window)&&GetParent(window)==IntPtr.Zero,"closing FishBowl preserves and detaches the launched game process");Stop(process,window);
+   CloseKeepingGames(main);main.Dispose();Check(!process.HasExited&&IsWindow(window)&&GetParent(window)==IntPtr.Zero,"closing FishBowl preserves and detaches the launched game process");Stop(process,window);
   }
  }
 }

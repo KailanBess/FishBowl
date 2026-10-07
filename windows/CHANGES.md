@@ -1,3 +1,10 @@
+# Windows 1.29.0 Web and game view
+
+- Web hosts installed Firefox by default, with selectable Microsoft Edge or Google Chrome adapters. Browser settings saves engine/program/home page choices; separate FishBowl profiles hold browsing data. Personal browser windows are not adopted or closed.
+- Added address/search entry, Back/Forward/Reload, fullscreen and external-window recovery using the current UI. Firefox Go opens a tab in its dedicated profile; Edge/Chrome Go closes the previous app window normally before opening the new address. Page permissions and downloads remain managed by the browser.
+- Closing FishBowl with a running game asks first. Close games and exit requests normal shutdown; Cancel retains the game and Keep games running explicitly restores external windows. Emulator save/exit vetoes keep FishBowl open. No routine force termination is used.
+- Play hides standard native menus and offers saved per-emulator game-view edge adjustments for custom toolbars/status bars. External mode restores original menus, styles and placement.
+- Browser and view fields are optional shared data. Linux preserves them but keeps its existing external-launch UI. Actual browser/emulator rendering, input and mixed-monitor compatibility require native verification; external-window fallback is available.
 # Windows 1.28.1 polish and recovery
 
 - Play shows actionable waiting/recovery states, disables unavailable actions and labels fullscreen exit explicitly. More opens session guidance; failed detach keeps the game in Play.
