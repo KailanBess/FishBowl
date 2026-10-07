@@ -756,4 +756,225 @@ namespace EmulatorHub
             return saveSnapshot2;
         }
     }
+    public class SaveChangeTracker
+    {
+        private class Sample
+        {
+            public string Stamp;
+
+            public DateTime Since;
+        }
+
+        private readonly Dictionary<string, Sample> waiting = new Dictionary<string, Sample>(SaveMonitor.PathComparer);
+
+        private readonly Dictionary<string, string> notified = new Dictionary<string, string>(SaveMonitor.PathComparer);
+
+        public void Queue(string path, DateTime now)
+        {
+            if (waiting.Count < 500 || waiting.ContainsKey(path))
+            {
+                waiting[path] = new Sample
+                {
+                    Since = now
+                };
+            }
+        }
+
+        public List<string> Ready(DateTime now)
+        {
+            List<string> list = new List<string>();
+            string[] array = waiting.Keys.ToArray();
+            string[] array2 = array;
+            foreach (string text in array2)
+            {
+                Sample sample = waiting[text];
+                if (now - sample.Since > TimeSpan.FromMinutes(2.0))
+                {
+                    waiting.Remove(text);
+                    continue;
+                }
+                try
+                {
+                    FileInfo fileInfo = new FileInfo(text);
+                    if (!fileInfo.Exists)
+                    {
+                        waiting.Remove(text);
+                        continue;
+                    }
+                    string text2 = fileInfo.Length + ":" + fileInfo.LastWriteTimeUtc.Ticks;
+                    if (sample.Stamp != text2)
+                    {
+                        sample.Stamp = text2;
+                        sample.Since = now;
+                    }
+                    else if (!(now - sample.Since < TimeSpan.FromSeconds(3.0)))
+                    {
+                        using (new FileStream(text, FileMode.Open, FileAccess.Read, FileShare.Read))
+                        {
+                        }
+                        string value;
+                        if (!notified.TryGetValue(text, out value) || value != text2)
+                        {
+                            list.Add(text);
+                            notified[text] = text2;
+                        }
+                        waiting.Remove(text);
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    waiting.Remove(text);
+                }
+            }
+            if (notified.Count > 5000)
+            {
+                notified.Clear();
+            }
+            return list;
+        }
+
+        public void Clear()
+        {
+            waiting.Clear();
+            notified.Clear();
+        }
+    }
+
+    // Decides which changed files become "changed in-game save" reviews (the Windows MainForm rules, shared so
+    // Linux behaves the same). The UI owns the file watchers and the review dialogs.
+    public static class SaveMonitor
+    {
+        public static StringComparer PathComparer { get { return Platform.IsWindows ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal; } }
+        private static readonly string[] IgnoredExtensions = { ".tmp", ".temp", ".bak", ".log", ".lock", ".p2s", ".ppst" };
+
+        public static string ManagedRoot(LibraryData library) { return Path.Combine(GameStorage.Root(library), "Game Saves"); }
+
+        public static bool IsManaged(LibraryData library, string path)
+        {
+            string root = Path.GetFullPath(ManagedRoot(library)).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return Path.GetFullPath(path).StartsWith(root, Platform.PathComparison);
+        }
+
+        // Folders to watch, each with the games whose saves may live there. detected maps emulator id to its
+        // detected in-game save folders (EmulatorFolderDetector, run off the UI thread by the caller).
+        public static Dictionary<string, HashSet<string>> WatchRoots(LibraryData library, Dictionary<string, List<string>> detected)
+        {
+            var roots = new Dictionary<string, HashSet<string>>(PathComparer);
+            Action<string, string> add = delegate(string folder, string gameId)
+            {
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder) || IsManaged(library, folder)) return;
+                folder = Path.GetFullPath(folder);
+                HashSet<string> games;
+                if (!roots.TryGetValue(folder, out games)) { games = new HashSet<string>(); roots.Add(folder, games); }
+                if (!string.IsNullOrWhiteSpace(gameId)) games.Add(gameId);
+            };
+            foreach (GameEntry game in library.Games)
+                foreach (GameSaveEntry save in (game.Saves ?? new List<GameSaveEntry>()).Where(s => s.Kind == "In-game saves" && !string.IsNullOrWhiteSpace(s.Path)))
+                {
+                    try { if (!IsManaged(library, save.Path)) add(Directory.Exists(save.Path) ? save.Path : Path.GetDirectoryName(save.Path), game.Id); }
+                    catch (Exception error) { Store.Log("Save watch path skipped: " + error.Message); }
+                }
+            if (detected == null) return roots;
+            if (library.Games.Count > 0)
+                foreach (List<string> folders in detected.Values)
+                    foreach (string folder in folders) add(folder, null);
+            foreach (GameEntry game in library.Games)
+            {
+                string id = string.IsNullOrWhiteSpace(game.PreferredEmulatorId) ? game.EmulatorId : game.PreferredEmulatorId;
+                if (string.IsNullOrWhiteSpace(id) && library.Emulators.Count == 1) id = library.Emulators[0].Id;
+                List<string> folders;
+                if (id != null && detected.TryGetValue(id, out folders))
+                    foreach (string folder in folders) add(folder, game.Id);
+            }
+            return roots;
+        }
+
+        // Filters watcher events: temporary files, save states and FishBowl's own restore staging are ignored.
+        public static bool ShouldQueue(LibraryData library, string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || IsManaged(library, path)) return false;
+            if (Path.GetFileName(path).StartsWith(".fishbowl-", StringComparison.Ordinal) || path.Contains(Path.DirectorySeparatorChar + ".fishbowl-")) return false;
+            string extension = Path.GetExtension(path).ToLowerInvariant();
+            if (IgnoredExtensions.Contains(extension) || extension.StartsWith(".state", StringComparison.OrdinalIgnoreCase)) return false;
+            return !library.Games.Any(g => (g.Saves ?? new List<GameSaveEntry>()).Any(s => s.Kind == "Save states" && string.Equals(s.Path, path, Platform.PathComparison)));
+        }
+
+        // A change inside a linked save folder belongs to that folder (the longest linked folder wins).
+        public static string OriginalGroup(LibraryData library, string path)
+        {
+            GameSaveEntry folder = library.Games.SelectMany(g => g.Saves ?? new List<GameSaveEntry>())
+                .Where(s => s.Kind == "In-game saves" && Directory.Exists(s.Path) && SafeFiles.Within(path, s.Path) && !IsManaged(library, s.Path))
+                .OrderByDescending(s => s.Path.Length).FirstOrDefault();
+            return folder == null ? path : folder.Path;
+        }
+
+        public static List<GameEntry> Suggestions(LibraryData library, IEnumerable<string> paths)
+        {
+            return library.Games.Where(g => paths.Any(p => (!string.IsNullOrWhiteSpace(g.Title) && Path.GetFileNameWithoutExtension(p).IndexOf(g.Title, StringComparison.OrdinalIgnoreCase) >= 0)
+                || (!string.IsNullOrWhiteSpace(g.TitleId) && p.IndexOf(g.TitleId, StringComparison.OrdinalIgnoreCase) >= 0))).ToList();
+        }
+
+        // Adds a settled change to the review queue. Returns false when it was not queued (the game's preference
+        // is "Never ask", or 100 groups already wait).
+        public static bool Record(LibraryData library, string changed)
+        {
+            SaveHistory.EnsureData(library);
+            string source = OriginalGroup(library, changed);
+            List<GameEntry> owners = library.Games.Where(g => (g.Saves ?? new List<GameSaveEntry>()).Any(s => s.Kind == "In-game saves" && string.Equals(s.Path, source, Platform.PathComparison))).ToList();
+            if (owners.Count == 1 && owners[0].SaveCopyPreference == "Never ask") return false;
+            string gameId = owners.Count == 1 ? owners[0].Id : null;
+            List<GameEntry> suggested = Suggestions(library, new[] { source });
+            string key = gameId ?? (suggested.Count == 1 ? "suggested:" + suggested[0].Id : source);
+            SaveReviewItem review = library.SaveReviews.FirstOrDefault(r => r.GameId == gameId && r.Path == key);
+            if (review == null)
+            {
+                if (library.SaveReviews.Count >= 100) return false;
+                review = new SaveReviewItem { Path = key, GameId = gameId, ChangedAt = DateTime.UtcNow.ToString("o"), Files = new List<string>() };
+                library.SaveReviews.Add(review);
+            }
+            if (review.Files == null) review.Files = new List<string>();
+            if (!review.Files.Contains(source, PathComparer)) review.Files.Add(source);
+            review.ChangedAt = DateTime.UtcNow.ToString("o");
+            return true;
+        }
+
+        // A review whose game asked for "Automatic copies" and whose files are all that game's linked originals.
+        public static SaveReviewItem AutomaticCandidate(LibraryData library)
+        {
+            SaveHistory.EnsureData(library);
+            return library.SaveReviews.FirstOrDefault(r =>
+            {
+                if (r.GameId == null || r.Files == null) return false;
+                GameEntry game = library.Games.FirstOrDefault(g => g.Id == r.GameId);
+                return game != null && game.SaveCopyPreference == "Automatic copies" && r.Files.All(f => (game.Saves ?? new List<GameSaveEntry>()).Any(s => s.Kind == "In-game saves" && string.Equals(s.Path, f, Platform.PathComparison)));
+            });
+        }
+
+        // Copies a reviewed group into the game's history and links each source (the "Copy snapshots" action).
+        public static List<SaveSnapshot> CopyGroup(LibraryData library, GameEntry game, IEnumerable<string> sources, CancellationToken token)
+        {
+            var copies = new List<SaveSnapshot>();
+            foreach (string path in sources)
+            {
+                token.ThrowIfCancellationRequested();
+                copies.Add(SaveHistory.Capture(library, game, path, "In-game saves", true, token));
+                GameSaves.Link(game, path, "In-game saves");
+            }
+            return copies;
+        }
+
+        // Quiet hours and snooze (ExperienceData.Quiet in the Windows build).
+        public static bool Quiet(ExperienceSettings settings, DateTime now)
+        {
+            if (settings == null) return false;
+            DateTime until;
+            if (DateTime.TryParse(settings.SnoozeUntil, out until) && now.ToUniversalTime() < until.ToUniversalTime()) return true;
+            int start = settings.QuietStartHour, end = settings.QuietEndHour;
+            if (start < 0 || end < 0 || start == end) return false;
+            return start < end ? (now.Hour >= start && now.Hour < end) : (now.Hour >= start || now.Hour < end);
+        }
+    }
 }

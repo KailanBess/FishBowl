@@ -21,6 +21,7 @@
       <Compile Include="../../FishBowl.SaveTools.cs" Link="Shared/FishBowl.SaveTools.cs" />
       <Compile Include="SaveToolsTests.cs" />
     <Compile Include="SaveHistoryTests.cs" />
+    <Compile Include="SaveMonitorTests.cs" />
       <Compile Include="../../FishBowl.Sessions.cs" Link="Shared/FishBowl.Sessions.cs" />
     <Compile Include="../../FishBowl.Avalonia/LinuxJoystick.cs" Link="Platform/LinuxJoystick.cs" />
     <Compile Include="ControllerInputTests.cs" />
