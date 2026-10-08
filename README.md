@@ -65,14 +65,16 @@ Download the complete app ZIP or `FishBowl Setup.exe` from the [latest release](
 
 ### Linux
 
-Building requires the [.NET 10 SDK](https://dotnet.microsoft.com/download). The installed program is self-contained and does not need .NET.
+Download `FishBowl-<version>-x86_64.AppImage` from the [latest release](../../releases/latest), make it executable (`chmod +x FishBowl-*.AppImage`, or your file manager's "Allow executing as program") and run it. It works on most x86_64 distributions without installing anything.
+
+To build and install from source instead: building requires the [.NET 10 SDK](https://dotnet.microsoft.com/download). The installed program is self-contained and does not need .NET.
 
 ```sh
 linux/install-linux.sh     # installs to ~/.local/lib/fishbowl and adds a menu entry and the fishbowl command
 linux/uninstall-linux.sh   # removes the program; your library is kept
 ```
 
-To run from source without installing: `dotnet run --project FishBowl.Avalonia`.
+To run from source without installing: `dotnet run --project FishBowl.Avalonia`. To build an AppImage yourself: `linux/build-appimage.sh`.
 
 ## Where FishBowl keeps your data
 
