@@ -9,3 +9,8 @@ Terminal=false
 Categories=Game;Emulator;
 Keywords=emulator;retro;games;
 StartupWMClass=FishBowl
+Actions=LivingRoom;
+
+[Desktop Action LivingRoom]
+Name=Living Room
+Exec="@EXEC@" --living-room

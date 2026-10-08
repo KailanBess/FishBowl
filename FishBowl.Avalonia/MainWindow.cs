@@ -89,6 +89,8 @@ namespace EmulatorHub
                 if (library.Theme.ShowStartupAssistant) await ShowFirstRunGuide();
                 if (library.Theme.ShowGameStorageAssistant) await ShowGameStoragePrompt();
                 if (Environment.GetCommandLineArgs().Skip(1).Any(a => a == "--living-room")) OpenLivingRoom();
+                await HandleExternalLaunch(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                await HandlePendingForwardedArguments();
             };
             Closing += (sender, e) =>
             {
@@ -136,6 +138,7 @@ namespace EmulatorHub
             Grid.SetRow(footer, 4); shell.Children.Add(footer);
 
             int percent = Math.Max(75, Math.Min(140, library.Theme.UiScalePercent == 0 ? 100 : library.Theme.UiScalePercent));
+            Ui.Scale = percent / 100.0;
             Content = percent == 100 ? (Control)shell : new LayoutTransformControl { LayoutTransform = new ScaleTransform(percent / 100.0, percent / 100.0), Child = shell };
 
             DragDrop.SetAllowDrop(this, true);
@@ -258,7 +261,7 @@ namespace EmulatorHub
                 MenuAction("FishBowl settings...", "settings", ShowSettings),
                 MenuAction("Enable portable mode", "storage", EnablePortableMode),
                 MenuAction("Open FishBowl activity log", "info", () => { if (!File.Exists(Store.LogFileName)) Store.Log("Activity log opened."); Platform.OpenTextFile(Store.LogFileName); }),
-                MenuAction("Diagnostics report...", "info", ShowDiagnostics) } };
+                MenuAction("Diagnostics report...", "info", ShowDiagnostics) }.Concat(LinuxToolItems()).ToArray() };
             var view = new MenuItem { Header = "_View", ItemsSource = new object[] {
                 MenuAction("Refresh emulators", "refresh", () => { reloadProgramMetadata = true; RefreshHub(); }),
                 MenuAction("Appearance...", "settings", ShowAppearanceHub),
@@ -296,7 +299,7 @@ namespace EmulatorHub
             Button controllerSettings = null;
             if (Platform.ControllerSettingsLabel != null) { controllerSettings = Ui.Action(Platform.ControllerSettingsLabel, Platform.OpenControllerSettings); }
             controllersText = AddInfoTab("Controls", "controller", new[] { Link("Controller guide", r => r.ControllerGuide) }, controllerSettings);
-            infoTabs.Items.Add(Tab("Folders", "folder", new ScrollViewer { Content = folderPanel, Padding = new Thickness(10), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }));
+            infoTabs.Items.Add(Tab("Folders", "folder", new ScrollViewer { Content = new Border { Child = folderPanel, Margin = new Thickness(10) }, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }));
             helpText = AddInfoTab("Help", "help", new[] { Link("Troubleshooting", r => r.Troubleshooting) }, null);
             notesBox = Ui.Paragraphs("", false); notesBox.Watermark = "Your notes about this emulator";
             notesBox.TextChanged += delegate { if (loadingInformation) return; notesDirty = true; notesState.Text = "Saving..."; notesTimer.Stop(); notesTimer.Start(); };
@@ -677,7 +680,8 @@ namespace EmulatorHub
         private readonly Border tile, marker, highlight; private readonly Ellipse dot; private readonly TextBlock statusText, name;
         private readonly List<TextBlock> texts = new List<TextBlock>();
         private string statusValue; private bool selected, hovered;
-        public static ColumnDefinitions Columns() { return new ColumnDefinitions("36*,18*,29*,17*"); }
+        // Status gets enough share for "Status unknown" at 1024 px; the name column never collapses below its icon and a few letters.
+        public static ColumnDefinitions Columns() { var columns = new ColumnDefinitions("32*,24*,28*,16*"); columns[0].MinWidth = 120; return columns; }
 
         public EmulatorRow(ThemeSettings theme, Palette palette, EmulatorProfile profile, Bitmap image, int index, string status)
         {
@@ -740,10 +744,12 @@ namespace EmulatorHub
             Background = new SolidColorBrush(selected ? Palette.Alpha(alpha, p.Blue) : theme.AlternateRowShading && index % 2 != 0 ? Palette.Alpha(20, p.Surface) : Colors.Transparent);
             BorderBrush = selected ? new SolidColorBrush(Palette.Rgb(207, 168, 255)) : Brushes.Transparent;
             marker.IsVisible = selected;
-            var ink = selected ? Colors.White : p.Ink;
+            // White on the selection wash, except where the wash is light (light themes): there the theme's dark ink stays readable.
+            var selectedInk = Palette.ReadableInk(Palette.Composite(Palette.Alpha(alpha, p.Blue), p.Bottom)) == Colors.White ? Colors.White : p.Ink;
+            var ink = selected ? selectedInk : p.Ink;
             foreach (var text in texts) text.Foreground = new SolidColorBrush(ink);
             dot.Fill = new SolidColorBrush(DotColor());
-            statusText.Foreground = new SolidColorBrush(selected ? Colors.White : DotColor());
+            statusText.Foreground = new SolidColorBrush(selected ? selectedInk : DotColor());
             if (highlight != null)
             {
                 highlight.IsVisible = theme.EnableMotion && (selected || hovered);
@@ -763,7 +769,7 @@ namespace EmulatorHub
             var initials = String.Concat(words.Take(2).Select(w => w.Substring(0, 1).ToUpperInvariant()));
             Width = Height = 34; CornerRadius = new CornerRadius(7);
             Background = new SolidColorBrush(Palette.Alpha(42, color)); BorderBrush = new SolidColorBrush(Palette.Alpha(150, color)); BorderThickness = new Thickness(1.5);
-            Child = new TextBlock { Text = initials.Length == 0 ? "?" : initials, FontSize = 15, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Palette.Rgb(242, 232, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            Child = new TextBlock { Text = initials.Length == 0 ? "?" : initials, FontSize = 15, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Palette.Current.IsDark ? Palette.Rgb(242, 232, 255) : Palette.Current.Ink), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         }
     }
 }

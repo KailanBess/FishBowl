@@ -8,19 +8,19 @@ _Last updated: 2026-10-08, browser viewport fitting._
 
 | Area | State |
 | --- | --- |
-| Windows | Source **1.29.4**, browser fitting on branch `fishbowl-browser-auto-fit`. PR #25 is merged; source includes main through `771e409`. |
+| Windows | Source **1.29.4**, browser fitting on branch `fishbowl-browser-auto-fit`. PR #25 is merged; source includes main through `5b96312`. |
 | Linux | Library/Home/living-room and save/backup parity merged through PRs #28–#30. Round 2 in progress (see Linux work). |
 | Shared | C# 5 game, library, session, save and living-room helpers. Optional Browser/PlayView fields survive Linux saves; Linux browsing remains external. |
 | Issues | [Issue #34](https://github.com/KailanBess/FishBowl/issues/34) tracks automatic browser fitting. Issues #23/#27/#31/#32 are implemented through merged PR #25. |
 
 ## Open pull requests
 
-- Browser viewport fitting, branch `fishbowl-browser-auto-fit`, targets `main`. PR #25 and #33 are merged. Paired version metadata is 1.29.4 because the Build workflow reads its expected Windows package version from the Linux project; Linux UI and active parity work are otherwise unchanged.
+- [#36: Browser viewport fitting](https://github.com/KailanBess/FishBowl/pull/36), branch `fishbowl-browser-auto-fit`, targets `main`. PR #25 and #33 are merged. Paired version metadata is 1.29.4 because the Build workflow reads its expected Windows package version from the Linux project; Linux UI and active parity work are otherwise unchanged.
 
 Required checks must pass before merging. Distribute executables through Releases or passing workflow artifacts.
 ## Linux work
 
-**In progress (round 2):** branches `parity/profiles-2` (profiles, launch profiles with Proton/GameMode/MangoHud/Gamescope, controller profiles, multiplayer, settings, themes), `parity/integrations-2` (Flatpak permissions and updates, AppImage updates, Add to Steam, EmuDeck/RetroDECK, AUR package) and `parity/qa-2` (every Linux screen and dialog checked and fixed). **Windows-side agents: please avoid changing `FishBowl.Avalonia/` until these merge;** Windows work and shared-model additions are fine.
+**Round 2:** PR #37 merged QA and integration changes; PR #38 retains profiles work. Remaining branches `parity/profiles-2` (profiles, launch profiles with Proton/GameMode/MangoHud/Gamescope, controller profiles, multiplayer, settings, themes), `parity/integrations-2` (Flatpak permissions and updates, AppImage updates, Add to Steam, EmuDeck/RetroDECK, AUR package) and `parity/qa-2` (every Linux screen and dialog checked and fixed). **Windows-side agents: please avoid changing `FishBowl.Avalonia/` until these merge;** Windows work and shared-model additions are fine.
 
 **Round 1 (#28–#30):** shared `FishBowl.Games.cs` (library queries, collections, lists, import, launch/sessions via `GamePlay`), `FishBowl.SaveTools.cs` (save history; Windows keeps its emulator rules through partial-method hooks; both apps use `Game Saves/<id>/<kind>/History`) and `FishBowl.LivingRoom.cs` (Immersion logic and living-room navigation; Windows `Immersion` calls it). Linux controllers use evdev, falling back to `/dev/input/js*`.
 
@@ -46,9 +46,11 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-10-08:** reviewed all open GitHub issues. Issue #34 has an implemented browser fitting fix with successful Build and Text overflow audit checks. Resolved the PR #36 handoff conflict against merged Linux QA/AppImage work, preserving notes from both maintainers. Fresh integration checks must pass before merging the fix and closing #34. PR #38 remains separate Linux feature work.
+
 - **2026-10-08:** Windows 1.29.4 addresses issue #34. Browser viewports verify native geometry and restore browser-native movement, resizing and maximization to the Web area. Open in window starts fitted over Web, then respects user adjustments; Return to Web resumes fitting. Unsupported attachment receives an initial external fit. Browser fixtures cover automatic fit, native geometry reset, app move/resize, idle placement stability and external positioning. Updated the Linux version only to satisfy the paired CI package contract; Linux parity implementations are untouched. Based on merged main through #25/#33.
 
-- **2026-10-08 (Linux):** summarized Linux parity round 1 and started round 2 (see Linux work). The Build workflow now takes the expected package version from `FishBowl.Avalonia.csproj` instead of a hardcoded number (it failed on main because it still expected 1.29.2).
+- **2026-10-08 (Linux):** summarized Linux parity round 1 and started round 2 (see Linux work). The Build workflow now takes the expected package version from `FishBowl.Avalonia.csproj` instead of a hardcoded number (it failed on main because it still expected 1.29.2). Releases now include a Linux AppImage (`linux/build-appimage.sh`, run by the release workflow) with `SHA256SUMS-linux.txt`; v1.29.3 was released with one.
 
 - **2026-10-08:** Windows 1.29.3 addresses issue #32. Play defaults to owned renderer viewports so tab layout does not propagate through a foreign child window. Process ownership retains a verified lifetime handle, unchanged viewport clips are reused, renderer discovery stops rescanning stable windows after startup, and decorative motion pauses on every section while a game runs. Close games and exit waits in a responsive FishBowl dialog, acknowledges strictly recognized English plain exit confirmations, presents save/unknown prompts inside the dialog, and completes FishBowl closure when the tracked processes exit. Veto/cancel retains the game; no ordinary game process is force terminated. Added native shutdown and active-navigation fixtures. Linux has matching version metadata only; saved data is unchanged. Native emulator rendering and Qt accessibility remain compatibility checks.
 

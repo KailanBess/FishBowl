@@ -27,6 +27,8 @@ namespace EmulatorHub
         private readonly StackPanel homeCards = new StackPanel { Spacing = 14 };
         private readonly Dictionary<string, Process> gameProcesses = new Dictionary<string, Process>();
         private bool rebuildingGames;
+        // Game covers by path and decoded width; separate from imageCache, which RefreshHub prunes to emulator images.
+        private readonly Dictionary<string, Task<Bitmap>> coverCache = new Dictionary<string, Task<Bitmap>>();
         private TabControl libraryPages;
         private const int HomePage = 0, LibraryPage = 1, EmulatorsPage = 2;
 
@@ -55,10 +57,12 @@ namespace EmulatorHub
                 MenuAction("Repair game paths...", "repair", RepairLibraryPaths),
                 MenuAction("Artwork cleanup...", "image", CleanupLibraryArtwork),
                 MenuAction("Profiles...", "settings", ManageLibraryProfiles),
-                MenuAction("Remote couch play...", "controller", ShowRemoteCouchPlay) } };
+                MenuAction("Remote couch play...", "controller", ShowRemoteCouchPlay) }.Concat(LinuxLibraryItems()).ToArray() };
             var toolbar = Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Add folder", AddLibraryFolder), Ui.Action("Play", LaunchLibraryGame), Ui.Action("Edit game", EditLibraryGame), Ui.Action("Remove", RemoveLibraryGame), more);
             DockPanel.SetDock(toolbar, Dock.Top); panel.Children.Add(toolbar);
 
+            // Both boxes are field initializers, created before the theme was applied: recolour them for the active palette.
+            foreach (var box in new[] { gameSearch, gameTags }) { box.Background = p.SurfaceBrush; box.Foreground = p.InkBrush; }
             gameSearch.Watermark = "Search title, platform, tags or notes";
             gameSearch.TextChanged += delegate { RefreshGameLibrary(); };
             gameTags.Watermark = "Tags"; gameTags.Text = library.Experience.LibraryFilter ?? ""; gameTags.Width = 130;
@@ -97,9 +101,11 @@ namespace EmulatorHub
             gameList.ContextRequested += (sender, e) => { if (SelectedLibraryGame() == null) e.Handled = true; };
             body.Children.Add(gameList);
             var splitter = new GridSplitter { Background = p.TopBrush, ResizeDirection = GridResizeDirection.Columns }; Grid.SetColumn(splitter, 1); body.Children.Add(splitter);
-            var details = new ScrollViewer { Content = gameDetails, Padding = new Thickness(12, 0, 6, 0), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetColumn(details, 2); body.Children.Add(details); panel.Children.Add(body);
+            gameDetails.Margin = new Thickness(12, 0, 6, 0); // Margin, not ScrollViewer.Padding: Avalonia measures the content without the padding, cutting off wrapped text.
+            var details = new ScrollViewer { Content = gameDetails, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetColumn(details, 2); body.Children.Add(details); panel.Children.Add(body);
 
-            var home = new ScrollViewer { Content = homeCards, Padding = new Thickness(18), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            homeCards.Margin = new Thickness(18);
+            var home = new ScrollViewer { Content = homeCards, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             var couch = new ScrollViewer { Content = LivingRoomPage() };
             libraryPages.ItemsSource = new[] { new TabItem { Header = "Home", Content = home }, new TabItem { Header = "Library", Content = panel }, new TabItem { Header = "Emulators", Content = emulators }, new TabItem { Header = "Living room", Content = couch } };
             libraryPages.SelectionChanged += (sender, e) => { if (e.Source != libraryPages) return; UpdateSectionChrome(); RefreshHomeCards(); };
@@ -115,6 +121,9 @@ namespace EmulatorHub
             bool emulators = libraryPages != null && libraryPages.SelectedIndex == EmulatorsPage;
             if (footerFilterLabel != null) footerFilterLabel.IsVisible = emulators;
             filterBox.IsVisible = emulators;
+            // Collapse the filter column too, so the status text starts at the left edge in Home and Library.
+            var footer = filterBox.Parent as Grid;
+            if (footer != null) footer.ColumnDefinitions[1].Width = new GridLength(emulators ? 240 : 0);
         }
 
         private static void SetChoices(ComboBox box, IEnumerable<string> items, string selected)
@@ -187,18 +196,33 @@ namespace EmulatorHub
             var frame = new Border { Width = size.Width, Height = size.Height, Background = p.SurfaceBrush, CornerRadius = new CornerRadius(6), ClipToBounds = true };
             if (!String.IsNullOrWhiteSpace(game.ArtworkPath) && File.Exists(game.ArtworkPath))
             {
-                try
+                // Decode at (about twice) the shown size and off the UI thread: full-size art for hundreds of games
+                // would otherwise take gigabytes of memory and block startup and every Library refresh.
+                int pixels = (int)Math.Ceiling(width * 2 / 64.0) * 64; var path = game.ArtworkPath; var key = path + "|" + pixels;
+                Task<Bitmap> decode;
+                if (!coverCache.TryGetValue(key, out decode))
                 {
-                    if (!imageCache.TryGetValue(game.ArtworkPath, out var bitmap)) { bitmap = new Bitmap(game.ArtworkPath); imageCache[game.ArtworkPath] = bitmap; }
-                    frame.Child = new Image { Source = bitmap, Stretch = Stretch.UniformToFill };
-                    return frame;
+                    decode = Task.Run(() => { using (var stream = File.OpenRead(path)) return Bitmap.DecodeToWidth(stream, pixels, BitmapInterpolationMode.HighQuality); });
+                    coverCache[key] = decode;
                 }
-                catch (Exception error) { Store.Log("Cover unavailable: " + error.Message); }
+                var image = new Image { Stretch = Stretch.UniformToFill }; frame.Child = image;
+                if (decode.Status == TaskStatus.RanToCompletion) image.Source = decode.Result;
+                else decode.ContinueWith(t => Ui.Post(() =>
+                {
+                    if (t.Status == TaskStatus.RanToCompletion) { image.Source = t.Result; return; }
+                    coverCache.Remove(key); Store.Log("Cover unavailable: " + (t.Exception == null ? "cancelled" : t.Exception.GetBaseException().Message));
+                    CoverPlaceholder(frame, game, width);
+                }));
+                return frame;
             }
+            CoverPlaceholder(frame, game, width);
+            return frame;
+        }
+        private void CoverPlaceholder(Border frame, GameEntry game, double width)
+        {
             var words = (game.Title ?? "?").Split(new[] { ' ', '-', '_', ':' }, StringSplitOptions.RemoveEmptyEntries).Where(w => Char.IsLetterOrDigit(w[0])).Take(2).Select(w => Char.ToUpperInvariant(w[0]));
             frame.Background = new SolidColorBrush(Palette.Blend(p.Surface, 18));
             frame.Child = new TextBlock { Text = new string(words.ToArray()), FontSize = Math.Max(14, width / 3), FontWeight = FontWeight.Bold, Foreground = p.BlueBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            return frame;
         }
 
         private string GameSubtitle(GameEntry game)
@@ -390,7 +414,7 @@ namespace EmulatorHub
 
         private async Task EditLibraryGame()
         {
-            var game = SelectedLibraryGame(); if (game == null) return;
+            var game = SelectedLibraryGame(); if (game == null) { SetStatus("Select a game first."); return; }
             var dialog = new FishDialog("Edit game", 680, 760); var fields = new StackPanel { Spacing = 6 };
             var title = Ui.Field(game.Title); var path = Ui.Field(game.Path); var cover = Ui.Field(game.ArtworkPath);
             var notes = Ui.Paragraphs(game.Notes, false); notes.MinHeight = 90;
@@ -444,7 +468,7 @@ namespace EmulatorHub
 
         // ----- Launching ----------------------------------------------------------------------------------------------
 
-        private Task LaunchLibraryGame() { var game = SelectedLibraryGame(); return game == null ? Task.CompletedTask : LaunchGame(game); }
+        private Task LaunchLibraryGame() { var game = SelectedLibraryGame(); if (game == null) SetStatus("Select a game first."); return game == null ? Task.CompletedTask : LaunchGame(game); }
 
         // Starts a game with its emulator (or directly for native games) and records a tracked play session.
         // Other screens (Home, Living room, collections, play queue) launch through this method.
@@ -506,7 +530,7 @@ namespace EmulatorHub
 
         private async Task RemoveLibraryGame()
         {
-            var games = SelectedLibraryGames(); if (games.Count == 0) return;
+            var games = SelectedLibraryGames(); if (games.Count == 0) { SetStatus("Select a game first."); return; }
             if (games.Any(game => sessionTrackers.Values.Any(t => t.GameId == game.Id && !t.Finished))) { await Ui.Message(this, "Close the running game before removing it from the library."); return; }
             var what = games.Count == 1 ? games[0].Title : games.Count + " games";
             if (!await Ui.Confirm(this, "Remove " + what + " from FishBowl? Game files and saves stay where they are. Use Undo removal to restore " + (games.Count == 1 ? "it." : "them."))) return;
