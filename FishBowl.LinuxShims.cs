@@ -152,13 +152,4 @@ namespace EmulatorHub.Imaging
     }
 }
 
-namespace EmulatorHub
-{
-    // The Windows app's profile tools are not ported yet; Linux has no guest mode, so recognition always applies.
-    // Remove this when UserTools becomes shared.
-    public static class UserTools
-    {
-        public static bool Guest { get { return false; } }
-    }
-}
 #endif

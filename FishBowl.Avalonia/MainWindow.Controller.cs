@@ -104,7 +104,7 @@ namespace EmulatorHub
             body.Children.Add(Ui.Hint("Choose themes, text, Home cards, and controller navigation using the current FishBowl settings."));
             body.Children.Add(Ui.Actions(Ui.Action("Themes and text", () => ShowSettings(dialog), true), Ui.Action("Home cards", () => CustomizeLibraryHome(dialog))));
             var enabled = Ui.Check("Enable controller navigation", library.UserTools?.Controller == true);
-            enabled.IsCheckedChanged += delegate { LibraryProfiles.Ensure(library).Controller = enabled.IsChecked == true; Store.Save(library); };
+            enabled.IsCheckedChanged += delegate { UserTools.Ensure(library).Controller = enabled.IsChecked == true; Store.Save(library); };
             var state = Ui.Hint(controllerDevice.Status); var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) }; timer.Tick += delegate { state.Text = controllerDevice.Status; };
             body.Children.Add(enabled); body.Children.Add(state);
             body.Children.Add(Ui.Hint("Use the left stick or directional pad to move, A to select, B to go back, shoulders to switch tabs and Start to open the menu. In the Living-room Library, X marks a favorite and Y opens the focus view; the controller works there even when navigation is off. Navigation pauses while another app is active. Linux reads game controllers through the kernel's input devices; no packages or permissions are changed."));

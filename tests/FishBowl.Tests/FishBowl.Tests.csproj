@@ -29,5 +29,7 @@
     <Compile Include="ControllerInputTests.cs" />
     <Compile Include="SessionTests.cs" />
     <Compile Include="GamesTests.cs" />
+    <Compile Include="../../FishBowl.Profiles.cs" Link="Shared/FishBowl.Profiles.cs" />
+    <Compile Include="ProfilesTests.cs" />
   </ItemGroup>
 </Project>

@@ -138,7 +138,7 @@ namespace EmulatorHub
         private async Task Restore()
         {
             var game = RequireGame(); var snapshot = RequireSnapshot();
-            if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before restoring a save.");
+            if (UserTools.ActiveLaunches > 0) throw new IOException("Close launched games before restoring a save.");
             if (String.IsNullOrWhiteSpace(snapshot.Source))
             {
                 string target = snapshot.IsFolder ? await Ui.PickFolder(this, "Choose the local emulator save folder to restore into", await Task.Run(() => EmulatorFolder()))

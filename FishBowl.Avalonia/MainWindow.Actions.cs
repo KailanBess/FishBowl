@@ -298,7 +298,7 @@ namespace EmulatorHub
         {
             var file = await Ui.PickFile(this, "Import FishBowl settings", "JSON files|*.json");
             if (file == null) return;
-            if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before importing settings.");
+            if (UserTools.ActiveLaunches > 0) throw new IOException("Close launched games before importing settings.");
             var imported = Json.Deserialize<LibraryData>(File.ReadAllText(file));
             if (imported == null || imported.Emulators == null) throw new InvalidDataException("That file does not contain FishBowl emulator settings.");
             if (!await Ui.Confirm(this, "Replace your FishBowl settings with this backup?")) return;

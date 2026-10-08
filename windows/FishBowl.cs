@@ -17310,64 +17310,6 @@ namespace EmulatorHub
 
 		public string Detail { get; set; }
 	}
-	public class MultiplayerCapability
-	{
-		public string NativeOnline { get; set; }
-
-		public string LocalPlay { get; set; }
-
-		public string RemoteCouchPlay { get; set; }
-
-		public string Notes { get; set; }
-	}
-	public static class MultiplayerSupport
-	{
-		public static MultiplayerCapability For(EmulatorProfile profile)
-		{
-			string name = EmulatorCatalog.Find((profile == null) ? "Custom" : profile.Preset).Name;
-			MultiplayerCapability multiplayerCapability = new MultiplayerCapability();
-			multiplayerCapability.NativeOnline = "Check the emulator's own multiplayer or netplay settings.";
-			multiplayerCapability.LocalPlay = "Configure additional controllers inside the emulator.";
-			multiplayerCapability.RemoteCouchPlay = "Browser window streaming and approved keyboard/gamepad-to-keyboard controls use the configured LiveKit token service. Start the game first; configure matching keys in the emulator.";
-			multiplayerCapability.Notes = "FishBowl never changes the emulator's multiplayer settings.";
-			MultiplayerCapability multiplayerCapability2 = multiplayerCapability;
-			switch (name)
-			{
-			case "Dolphin":
-				multiplayerCapability2.NativeOnline = "Dolphin includes NetPlay for supported GameCube and Wii games.";
-				multiplayerCapability2.LocalPlay = "Dolphin supports multiple GameCube controllers and Wii Remotes.";
-				break;
-			case "RetroArch":
-				multiplayerCapability2.NativeOnline = "RetroArch supports netplay for compatible cores and matching content.";
-				multiplayerCapability2.LocalPlay = "RetroArch supports multiple local players when the loaded core does.";
-				break;
-			case "PPSSPP":
-				multiplayerCapability2.NativeOnline = "PPSSPP supports its own multiplayer modes for compatible games.";
-				multiplayerCapability2.LocalPlay = "Configure local controller mappings in PPSSPP.";
-				break;
-			case "Azahar Plus":
-				multiplayerCapability2.NativeOnline = "Azahar Plus may offer multiplayer features depending on its build and the game.";
-				multiplayerCapability2.LocalPlay = "Configure additional controllers inside Azahar Plus.";
-				break;
-			}
-			return multiplayerCapability2;
-		}
-
-		public static List<string> Readiness(EmulatorProfile profile, MultiplayerSettings settings)
-		{
-			List<string> list = new List<string>();
-			if (profile == null)
-			{
-				list.Add("Choose an emulator before starting a session.");
-				return list;
-			}
-			list.Add(File.Exists(profile.Executable) ? "Ready: emulator program found." : "Needs attention: emulator program is missing.");
-			list.Add((EmulatorRuntime.State(profile.Executable) == RuntimeState.Running) ? "Ready: emulator is running." : "Info: emulator is not running yet; FishBowl can open it for a session.");
-			list.Add("Check controller mappings and game compatibility inside " + profile.Name + ".");
-			list.Add(string.IsNullOrWhiteSpace((settings == null) ? null : settings.RelayGatewayUrl) ? "Remote couch play is not connected to a LiveKit token service." : "A LiveKit Cloud token service is configured.");
-			return list;
-		}
-	}
 	public static class HubHealth
 	{
 		public static List<HubNotice> Notices(LibraryData library)
@@ -28701,284 +28643,25 @@ namespace EmulatorHub
 			root.Invalidate(true);
 		}
 	}
-	public static class UserTools
+	public static partial class UserTools
 	{
-		public static int ActiveLaunches;
-
-		public static readonly ConcurrentDictionary<string, byte> ActiveSessions = new ConcurrentDictionary<string, byte>();
-
-		private static readonly string[] BulkFields = new string[7] { "PreferredEmulatorId", "EmulatorId", "PlayStatus", "Favorite", "Pinned", "Tags", "ArtworkPath" };
-
-		public static bool Guest { get; private set; }
-
-		public static T Copy<T>(T value)
-		{
-			return Json.Deserialize<T>(Json.Serialize(value));
-		}
-
-		public static UserToolSettings Ensure(LibraryData d)
+		static partial void PrepareLibrary(LibraryData d)
 		{
 			ExperienceData.Ensure(d);
-			if (d.UserTools == null)
-			{
-				d.UserTools = new UserToolSettings();
-			}
-			UserToolSettings userTools = d.UserTools;
-			if (userTools.Users == null)
-			{
-				userTools.Users = new List<BowlUser>();
-			}
-			if (userTools.Undo == null)
-			{
-				userTools.Undo = new List<BulkUndoRecord>();
-			}
-			if (userTools.Users.Count == 0)
-			{
-				BowlUser bowlUser = Capture(d, "Default");
-				userTools.Users.Add(bowlUser);
-				userTools.ActiveId = bowlUser.Id;
-			}
-			return userTools;
 		}
 
-		public static BowlUser Capture(LibraryData d, string name)
+		static partial void AfterSwitch(LibraryData d)
 		{
-			UserToolSettings userToolSettings = d.UserTools ?? new UserToolSettings();
-			BowlUser bowlUser = new BowlUser();
-			bowlUser.Id = Guid.NewGuid().ToString("N");
-			bowlUser.Name = name;
-			bowlUser.Games = d.Games.Select((GameEntry g) => new PersonalGame
-			{
-				Id = g.Id,
-				Favorite = g.Favorite,
-				Pinned = g.Pinned,
-				PlayStatus = g.PlayStatus,
-				PersonalRating = g.PersonalRating,
-				TotalPlaySeconds = g.TotalPlaySeconds,
-				LaunchCount = g.LaunchCount,
-				LastLaunched = g.LastLaunched
-			}).ToList();
-			bowlUser.Theme = Copy(d.Theme);
-			bowlUser.Cosmetics = Copy(d.Cosmetics);
-			bowlUser.Enhancements = Copy(d.Enhancements);
-			bowlUser.Experience = Copy(d.Experience);
-			bowlUser.Sessions = Copy(d.PlaySessions);
-			bowlUser.Queue = Copy(d.PlayQueue);
-			bowlUser.Lists = Copy(d.SmartLists);
-			bowlUser.WeeklyMinutes = userToolSettings.WeeklyMinutes;
-			bowlUser.BreakMinutes = userToolSettings.BreakMinutes;
-			bowlUser.Controller = userToolSettings.Controller;
-			bowlUser.Views = Copy(userToolSettings.Views);
-			bowlUser.Navigation = Copy(userToolSettings.Navigation);
-			bowlUser.SaveRoutes = Copy(userToolSettings.SaveRoutes);
-			return bowlUser;
-		}
-
-		public static void SaveActive(LibraryData d)
-		{
-			UserToolSettings s = Ensure(d);
-			BowlUser bowlUser = s.Users.FirstOrDefault((BowlUser x) => x.Id == s.ActiveId);
-			if (bowlUser != null)
-			{
-				BowlUser bowlUser2 = Capture(d, bowlUser.Name);
-				bowlUser2.Id = bowlUser.Id;
-				s.Users[s.Users.IndexOf(bowlUser)] = bowlUser2;
-			}
-		}
-
-		public static BowlUser Create(LibraryData d, string name)
-		{
-			UserToolSettings userToolSettings = Ensure(d);
-			name = (name ?? "").Trim();
-			if (name.Length == 0 || name.Length > 60 || userToolSettings.Users.Any((BowlUser existing) => string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase)))
-			{
-				throw new IOException("Use a unique profile name of 1–60 characters.");
-			}
-			BowlUser bowlUser = Capture(d, name);
-			bowlUser.Games = new List<PersonalGame>();
-			bowlUser.Sessions = new List<PlaySession>();
-			bowlUser.Queue = new List<string>();
-			bowlUser.Lists = new List<SmartLibraryList>();
-			bowlUser.WeeklyMinutes = 0;
-			bowlUser.BreakMinutes = 0;
-			bowlUser.Navigation = null;
-			bowlUser.Views = null;
-			bowlUser.SaveRoutes = new List<SaveRouting>();
-			userToolSettings.Users.Add(bowlUser);
-			return bowlUser;
-		}
-
-		public static void Switch(LibraryData d, string id)
-		{
-			if (Guest || ActiveLaunches > 0 || WorkGate.Busy > 0)
-			{
-				throw new IOException("Finish launched emulator sessions before changing profiles.");
-			}
-			UserToolSettings userToolSettings = Ensure(d);
-			BowlUser bowlUser = userToolSettings.Users.FirstOrDefault((BowlUser x) => x.Id == id);
-			if (bowlUser == null)
-			{
-				throw new IOException("Profile unavailable.");
-			}
-			if (id == userToolSettings.ActiveId)
-			{
-				return;
-			}
-			SaveActive(d);
-			bowlUser = userToolSettings.Users.First((BowlUser x) => x.Id == id);
-			Dictionary<string, PersonalGame> dictionary = (from p in bowlUser.Games ?? new List<PersonalGame>()
-				group p by p.Id).ToDictionary((IGrouping<string, PersonalGame> group) => group.Key, (IGrouping<string, PersonalGame> group) => group.First());
-			foreach (GameEntry game in d.Games)
-			{
-				PersonalGame value;
-				dictionary.TryGetValue(game.Id, out value);
-				game.Favorite = value != null && value.Favorite;
-				game.Pinned = value != null && value.Pinned;
-				game.PlayStatus = ((value == null) ? "Not started" : value.PlayStatus);
-				game.PersonalRating = ((value != null) ? value.PersonalRating : 0);
-				game.TotalPlaySeconds = ((value == null) ? 0 : value.TotalPlaySeconds);
-				game.LaunchCount = ((value != null) ? value.LaunchCount : 0);
-				game.LastLaunched = ((value == null) ? null : value.LastLaunched);
-			}
-			d.Theme = Copy(bowlUser.Theme);
-			d.Cosmetics = Copy(bowlUser.Cosmetics);
-			d.Enhancements = Copy(bowlUser.Enhancements);
-			d.Experience = Copy(bowlUser.Experience);
-			d.PlaySessions = Copy(bowlUser.Sessions) ?? new List<PlaySession>();
-			d.PlayQueue = Copy(bowlUser.Queue) ?? new List<string>();
-			d.SmartLists = Copy(bowlUser.Lists) ?? new List<SmartLibraryList>();
-			userToolSettings.WeeklyMinutes = bowlUser.WeeklyMinutes;
-			userToolSettings.BreakMinutes = bowlUser.BreakMinutes;
-			userToolSettings.Controller = bowlUser.Controller;
-			userToolSettings.Navigation = Copy(bowlUser.Navigation);
-			userToolSettings.Views = Copy(bowlUser.Views);
-			userToolSettings.SaveRoutes = Copy(bowlUser.SaveRoutes);
-			userToolSettings.ActiveId = id;
 			ExperienceData.Ensure(d);
 			NextData.Ensure(d);
 		}
 
-		private static List<GameEntry> BulkSnapshot(List<GameEntry> games)
+		static partial void BackgroundBusy(ref bool busy)
 		{
-			return games.Select((GameEntry g) => new GameEntry
+			if (WorkGate.Busy > 0)
 			{
-				Id = g.Id,
-				PreferredEmulatorId = g.PreferredEmulatorId,
-				EmulatorId = g.EmulatorId,
-				PlayStatus = g.PlayStatus,
-				Favorite = g.Favorite,
-				Pinned = g.Pinned,
-				Tags = ((g.Tags == null) ? null : new List<string>(g.Tags)),
-				ArtworkPath = g.ArtworkPath
-			}).ToList();
-		}
-
-		public static BulkUndoRecord BeforeBulk(LibraryData d, List<GameEntry> games)
-		{
-			BulkUndoRecord bulkUndoRecord = new BulkUndoRecord();
-			bulkUndoRecord.At = DateTime.Now.ToString("g");
-			bulkUndoRecord.UserId = Ensure(d).ActiveId;
-			bulkUndoRecord.Before = BulkSnapshot(games);
-			bulkUndoRecord.CollectionsBefore = Copy(d.Collections);
-			return bulkUndoRecord;
-		}
-
-		public static void AfterBulk(LibraryData d, BulkUndoRecord r, List<GameEntry> games)
-		{
-			r.After = BulkSnapshot(games);
-			r.CollectionsAfter = Copy(d.Collections);
-			UserToolSettings userToolSettings = Ensure(d);
-			userToolSettings.Undo.Add(r);
-			while (userToolSettings.Undo.Count > 10)
-			{
-				userToolSettings.Undo.RemoveAt(0);
+				busy = true;
 			}
-		}
-
-		private static bool Equal(object a, object b)
-		{
-			return Json.Serialize(a) == Json.Serialize(b);
-		}
-
-		public static string UndoBulk(LibraryData d)
-		{
-			UserToolSettings s = Ensure(d);
-			BulkUndoRecord bulkUndoRecord = s.Undo.LastOrDefault((BulkUndoRecord x) => x.UserId == s.ActiveId);
-			if (bulkUndoRecord == null)
-			{
-				return "No bulk edits to undo for this profile.";
-			}
-			List<Action> list2 = new List<Action>();
-			int num = 0;
-			foreach (GameEntry before in bulkUndoRecord.Before)
-			{
-				List<GameEntry> after = bulkUndoRecord.After;
-				Func<GameEntry, bool> predicate = (GameEntry x) => x.Id == before.Id;
-				GameEntry gameEntry = after.FirstOrDefault(predicate);
-				GameEntry gameEntry2 = d.Games.FirstOrDefault((GameEntry x) => x.Id == before.Id);
-				if (gameEntry2 == null || gameEntry == null)
-				{
-					num++;
-					continue;
-				}
-				string[] bulkFields = BulkFields;
-				foreach (string name in bulkFields)
-				{
-					PropertyInfo property = typeof(GameEntry).GetProperty(name);
-					object value2 = property.GetValue(before, null);
-					object value3 = property.GetValue(gameEntry, null);
-					if (Equal(value2, value3))
-					{
-						continue;
-					}
-					if (!Equal(property.GetValue(gameEntry2, null), value3))
-					{
-						num++;
-						continue;
-					}
-					GameEntry target = gameEntry2;
-					PropertyInfo prop = property;
-					object value = value2;
-					list2.Add(delegate
-					{
-						prop.SetValue(target, value, null);
-					});
-				}
-			}
-			foreach (GameCollection a in bulkUndoRecord.CollectionsAfter ?? new List<GameCollection>())
-			{
-				GameCollection gameCollection = (bulkUndoRecord.CollectionsBefore ?? new List<GameCollection>()).FirstOrDefault((GameCollection x) => x.Id == a.Id);
-				GameCollection gameCollection2 = d.Collections.FirstOrDefault((GameCollection x) => x.Id == a.Id);
-				List<string> list3 = (a.GameIds ?? new List<string>()).Except((gameCollection == null) ? new List<string>() : (gameCollection.GameIds ?? new List<string>())).ToList();
-				if (list3.Count > 0 && (gameCollection2 == null || !Equal(gameCollection2.GameIds, a.GameIds)))
-				{
-					num++;
-					continue;
-				}
-				foreach (string item in list3)
-				{
-					if (gameCollection2 != null && gameCollection2.GameIds != null)
-					{
-						List<string> list = gameCollection2.GameIds;
-						string key = item;
-						list2.Add(delegate
-						{
-							list.Remove(key);
-						});
-					}
-				}
-			}
-			if (num > 0)
-			{
-				return "Undo stopped: " + num + " fields changed again or games were removed. No changes made.";
-			}
-			foreach (Action item2 in list2)
-			{
-				item2();
-			}
-			s.Undo.Remove(bulkUndoRecord);
-			Store.Save(d);
-			return "Undid bulk edit from " + bulkUndoRecord.At + ". Unrelated edits were preserved.";
 		}
 
 		public static string Diagnose(LibraryData d, GameEntry g)
@@ -29015,20 +28698,6 @@ namespace EmulatorHub
 			return stringBuilder.ToString();
 		}
 
-		public static long WeekSeconds(LibraryData d, DateTime utc)
-		{
-			long num = 0L;
-			foreach (PlaySession item in d.PlaySessions ?? new List<PlaySession>())
-			{
-				DateTime result;
-				if (DateTime.TryParse(item.StartedAt, null, DateTimeStyles.RoundtripKind, out result) && !(result.ToUniversalTime() < utc.AddDays(-7.0)) && !(result.ToUniversalTime() > utc))
-				{
-					num += Math.Max(0L, item.Seconds);
-				}
-			}
-			return num;
-		}
-
 		public static string Html(IEnumerable<GameEntry> games, bool paths, bool history)
 		{
 			return Html(games, paths, history, false);
@@ -29041,39 +28710,7 @@ namespace EmulatorHub
 
 		public static string Html(IEnumerable<GameEntry> games, bool paths, bool history, bool artwork, CancellationToken token)
 		{
-			StringBuilder stringBuilder = new StringBuilder("<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width'><title>FishBowl catalog</title><style>body{font:16px system-ui;background:#182332;color:#eef3fa;margin:24px}main{max-width:900px;margin:auto}article{background:#253348;border-radius:12px;padding:16px;margin:12px 0}h2{margin-top:0}p{overflow-wrap:anywhere}input{font:inherit;padding:12px;width:90%;background:#fff;color:#172334}small{color:#c8d6e6}</style><main><h1>Game catalog</h1><label>Filter games <input id='filter' type='search'></label>");
-			foreach (GameEntry item in games.OrderBy((GameEntry x) => x.Title))
-			{
-				token.ThrowIfCancellationRequested();
-				if (stringBuilder.Length > 52428800)
-				{
-					throw new IOException("Catalog exceeds 50 MB. Export fewer games or turn off artwork.");
-				}
-				stringBuilder.Append("<article>");
-				if (artwork)
-				{
-					string text = CatalogArt(item.ArtworkPath);
-					if (text != null)
-					{
-						stringBuilder.Append("<img alt='' width='128' height='128' style='object-fit:contain;float:right' src='data:image/png;base64," + text + "'>");
-					}
-				}
-				stringBuilder.Append("<h2>" + Escape(item.Title) + "</h2><p>" + Escape(item.Genre) + " · " + Escape(item.ConsoleLabel) + "</p><p>" + Escape(item.Description) + "</p><small>" + Escape(string.Join(", ", item.Tags ?? new List<string>())) + "</small>");
-				if (item.Extras != null && Hub.Https(item.Extras.MetadataSource))
-				{
-					stringBuilder.Append("<p><a href=\"" + Escape(item.Extras.MetadataSource) + "\">Metadata source and licensing</a></p>");
-				}
-				if (paths)
-				{
-					stringBuilder.Append("<p>File: " + Escape(item.Path) + "</p>");
-				}
-				if (history)
-				{
-					stringBuilder.Append("<p>" + Escape(item.PlayStatus) + " · " + item.LaunchCount + " launches · " + item.TotalPlaySeconds / 60 + " minutes · Last played: " + Escape(item.LastLaunched) + "</p>");
-				}
-				stringBuilder.Append("</article>");
-			}
-			return stringBuilder.Append("</main><script>document.getElementById('filter').addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('article').forEach(function(a){a.hidden=a.textContent.toLowerCase().indexOf(q)<0;});});</script></html>").ToString();
+			return Html(games, paths, history, artwork ? new Func<string, string>(CatalogArt) : null, token);
 		}
 
 		private static string CatalogArt(string path)
@@ -29110,13 +28747,6 @@ namespace EmulatorHub
 			{
 				return null;
 			}
-		}
-
-		public static string Escape(string s)
-		{
-			return (s ?? "").Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;")
-				.Replace("\"", "&quot;")
-				.Replace("'", "&#39;");
 		}
 
 		public static void Report(IWin32Window owner, string title, string text)
@@ -29512,31 +29142,6 @@ namespace EmulatorHub
 					((IDisposable)f).Dispose();
 				}
 			}
-		}
-
-		public static LibraryData BeginGuest(LibraryData d)
-		{
-			if (Guest || ActiveLaunches > 0 || WorkGate.Busy > 0)
-			{
-				throw new IOException("Finish emulator sessions before entering guest mode.");
-			}
-			LibraryData result = Copy(d);
-			Guest = true;
-			return result;
-		}
-
-		public static void EndGuest(LibraryData d, LibraryData snapshot)
-		{
-			if (ActiveLaunches > 0)
-			{
-				throw new IOException("Close the guest's launched emulator before leaving guest mode.");
-			}
-			PropertyInfo[] properties = typeof(LibraryData).GetProperties();
-			foreach (PropertyInfo propertyInfo in properties)
-			{
-				propertyInfo.SetValue(d, propertyInfo.GetValue(snapshot, null), null);
-			}
-			Guest = false;
 		}
 
 		private static void GuestBrowser(IWin32Window owner, LibraryData d)
@@ -32203,145 +31808,23 @@ namespace EmulatorHub
 
 		public static string Fingerprint(GameEntry g)
 		{
-			using (SHA256 sHA = SHA256.Create())
-			{
-				return BitConverter.ToString(sHA.ComputeHash(Encoding.UTF8.GetBytes(Json.Serialize(g)))).Replace("-", "");
-			}
+			return ProfileTransfer.Fingerprint(g);
 		}
 
 		public static TransferPackage ExportPackage(LibraryData d)
 		{
-			UserTools.SaveActive(d);
-			TransferPackage transferPackage = new TransferPackage();
-			transferPackage.Schema = 1;
-			transferPackage.At = DateTime.UtcNow.ToString("o");
-			transferPackage.Profile = UserTools.Copy(UserTools.Ensure(d).Users.First((BowlUser u) => u.Id == d.UserTools.ActiveId));
-			transferPackage.Games = UserTools.Copy(d.Games);
-			return transferPackage;
+			return ProfileTransfer.ExportPackage(d);
 		}
 
 		public static List<TransferChange> TransferPlan(LibraryData d, TransferPackage p)
 		{
-			if (p == null || p.Schema != 1 || p.Games == null)
-			{
-				throw new IOException("Unsupported transfer package.");
-			}
-			if (p.Games.Count > 100000 || p.Games.Any((GameEntry g) => g == null || string.IsNullOrWhiteSpace(g.Id) || string.IsNullOrWhiteSpace(g.Title)) || (from g in p.Games
-				group g by g.Id).Any((IGrouping<string, GameEntry> g) => g.Count() > 1))
-			{
-				throw new IOException("Transfer contains invalid or duplicate game records.");
-			}
-			List<TransferChange> list = new List<TransferChange>();
-			Dictionary<string, GameEntry> dictionary = d.Games.ToDictionary((GameEntry g) => g.Id);
-			HashSet<string> hashSet = new HashSet<string>(from g in d.Games
-				where !string.IsNullOrWhiteSpace(g.Path)
-				select g.Path, StringComparer.OrdinalIgnoreCase);
-			foreach (GameEntry game in p.Games)
-			{
-				GameEntry value;
-				dictionary.TryGetValue(game.Id, out value);
-				if (value == null)
-				{
-					if (!string.IsNullOrWhiteSpace(game.Path) && !hashSet.Add(game.Path))
-					{
-						list.Add(new TransferChange
-						{
-							Incoming = game,
-							Status = "Duplicate path — keep local"
-						});
-					}
-					else
-					{
-						list.Add(new TransferChange
-						{
-							Incoming = game,
-							Status = "Add"
-						});
-					}
-					continue;
-				}
-				string text = Fingerprint(game);
-				string text2 = Fingerprint(value);
-				string value2;
-				Ensure(d).SyncHashes.TryGetValue(game.Id, out value2);
-				if (!(text == text2))
-				{
-					list.Add(new TransferChange
-					{
-						Incoming = game,
-						Existing = value,
-						ReviewedHash = text2,
-						Status = ((value2 != null && text2 == value2) ? "Update" : "Conflict — choose explicitly")
-					});
-				}
-			}
-			return list;
+			return ProfileTransfer.Plan(d, p);
 		}
 
 		public static void ApplyTransfer(LibraryData d, IEnumerable<TransferChange> chosen)
 		{
 			Idle(d);
-			List<TransferChange> list = chosen.ToList();
-			HashSet<string> hashSet = new HashSet<string>(from g in d.Games
-				where !string.IsNullOrWhiteSpace(g.Path)
-				select g.Path, StringComparer.OrdinalIgnoreCase);
-			foreach (TransferChange item in list.Where((TransferChange c) => c.Existing == null))
-			{
-				if (!string.IsNullOrWhiteSpace(item.Incoming.Path) && !hashSet.Add(item.Incoming.Path))
-				{
-					throw new IOException("A new entry's path is already present. Start a fresh synchronization preview.");
-				}
-			}
-			if (list.Any((TransferChange c) => c.Status.StartsWith("Duplicate")))
-			{
-				throw new IOException("Duplicate paths cannot be imported as new entries.");
-			}
-			foreach (TransferChange c2 in list)
-			{
-				List<GameEntry> games = d.Games;
-				Func<GameEntry, bool> predicate = (GameEntry g) => g.Id == c2.Incoming.Id;
-				GameEntry gameEntry = games.FirstOrDefault(predicate);
-				if ((c2.Existing == null && gameEntry != null) || (c2.Existing != null && (gameEntry == null || Fingerprint(gameEntry) != c2.ReviewedHash)))
-				{
-					throw new IOException("The Library changed during review; start another preview.");
-				}
-			}
-			foreach (TransferChange item2 in list)
-			{
-				GameEntry gameEntry2 = UserTools.Copy(item2.Incoming);
-				if (item2.Existing == null)
-				{
-					d.Games.Add(gameEntry2);
-				}
-				else
-				{
-					gameEntry2.Arguments = item2.Existing.Arguments;
-					gameEntry2.LaunchProfileName = item2.Existing.LaunchProfileName;
-					if (gameEntry2.Extras == null)
-					{
-						gameEntry2.Extras = UserTools.Copy(item2.Existing.Extras);
-					}
-					else
-					{
-						gameEntry2.Extras.Native = Native(item2.Existing);
-						gameEntry2.Extras.WorkingDirectory = ((item2.Existing.Extras == null) ? null : item2.Existing.Extras.WorkingDirectory);
-					}
-					gameEntry2.ArtworkPath = (File.Exists(gameEntry2.ArtworkPath) ? gameEntry2.ArtworkPath : item2.Existing.ArtworkPath);
-					gameEntry2.ManualPath = item2.Existing.ManualPath;
-					gameEntry2.Path = item2.Existing.Path;
-					gameEntry2.EmulatorId = item2.Existing.EmulatorId;
-					gameEntry2.PreferredEmulatorId = item2.Existing.PreferredEmulatorId;
-					gameEntry2.PreferredBuildId = item2.Existing.PreferredBuildId;
-					gameEntry2.Saves = item2.Existing.Saves;
-					gameEntry2.Discs = item2.Existing.Discs;
-					gameEntry2.LastDiscPath = item2.Existing.LastDiscPath;
-					gameEntry2.TotalPlaySeconds = item2.Existing.TotalPlaySeconds;
-					gameEntry2.LaunchCount = item2.Existing.LaunchCount;
-					gameEntry2.LastLaunched = item2.Existing.LastLaunched;
-					d.Games[d.Games.IndexOf(item2.Existing)] = gameEntry2;
-				}
-				Ensure(d).SyncHashes[gameEntry2.Id] = Fingerprint(gameEntry2);
-			}
+			ProfileTransfer.Apply(d, chosen);
 		}
 
 		public static void Transfer(IWin32Window owner, LibraryData d)
@@ -32818,31 +32301,6 @@ namespace EmulatorHub
 		{
 			return Title;
 		}
-	}
-	public class TransferChange
-	{
-		public GameEntry Incoming;
-
-		public GameEntry Existing;
-
-		public string Status;
-
-		public string ReviewedHash;
-
-		public override string ToString()
-		{
-			return Status + ": " + Incoming.Title;
-		}
-	}
-	public class TransferPackage
-	{
-		public int Schema { get; set; }
-
-		public string At { get; set; }
-
-		public BowlUser Profile { get; set; }
-
-		public List<GameEntry> Games { get; set; }
 	}
 	public class LivingRoomLibrary : NextDialog
 	{

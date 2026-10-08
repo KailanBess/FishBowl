@@ -22,28 +22,28 @@ namespace EmulatorHub
         {
             try
             {
-                LibraryProfiles.Ensure(library);
+                UserTools.Ensure(library);
                 var recovered = SessionLedger.Recover(Store.DataDirectory, library);
-                if (recovered.Count > 0) { LibraryProfiles.SaveActive(library); Store.Save(library); }
+                if (recovered.Count > 0) { UserTools.SaveActive(library); Store.Save(library); }
                 foreach (var tracker in recovered)
                 {
                     if (tracker.Finished) { SessionLedger.Commit(tracker); tracker.Dispose(); }
                     else sessionTrackers[tracker.SessionId] = tracker;
                 }
-                LibraryProfiles.ActiveLaunches = sessionTrackers.Count;
+                UserTools.ActiveLaunches = sessionTrackers.Count;
             }
             catch (Exception error) { Store.Log("Session recovery deferred: " + error.Message); pendingWarnings.Add("Play-session recovery could not finish. Its journal was retained.\n\n" + error.Message); }
         }
         private void StartLibrarySession(GameEntry game, Process process, List<SessionProcess> beforeLaunch, DateTime started, string program)
         {
-            LibraryProfiles.Ensure(library);
+            UserTools.Ensure(library);
             var record = GamePlay.BeginSession(library, game, program, true);
             record.StartedAt = started.ToString("o");
             try
             {
                 var tracker = SessionLedger.Start(Store.DataDirectory, record, process, beforeLaunch, SessionLedger.ProfileKey(library));
                 sessionTrackers[tracker.SessionId] = tracker; gameProcesses[game.Id] = process;
-                LibraryProfiles.ActiveLaunches = sessionTrackers.Count;
+                UserTools.ActiveLaunches = sessionTrackers.Count;
                 game.SessionTrackingNote = "Tracks the verified launched process and descendants. Saved checkpoints exclude time FishBowl was closed.";
             }
             catch (Exception error)
@@ -71,12 +71,12 @@ namespace EmulatorHub
                 var completed = sessionTrackers.Values.Where(t => t.Finished).ToArray();
                 if (forceSave || completed.Length > 0 || Environment.TickCount64 - lastSessionSave >= 5000)
                 {
-                    LibraryProfiles.SaveActive(library); Store.Save(library); lastSessionSave = Environment.TickCount64;
+                    UserTools.SaveActive(library); Store.Save(library); lastSessionSave = Environment.TickCount64;
                     foreach (var tracker in completed)
                     {
                         SessionLedger.Commit(tracker); sessionTrackers.Remove(tracker.SessionId); gameProcesses.Remove(tracker.GameId); OfferSessionRecap(tracker); tracker.Dispose();
                     }
-                    LibraryProfiles.ActiveLaunches = sessionTrackers.Count;
+                    UserTools.ActiveLaunches = sessionTrackers.Count;
                     if (completed.Length > 0) { RefreshGameLibrary(); if (livingRoom != null) livingRoom.RefreshGames(); }
                 }
                 lastSessionError = null;
@@ -92,9 +92,9 @@ namespace EmulatorHub
             try
             {
                 foreach (var tracker in sessionTrackers.Values) { tracker.Poll(); SessionLedger.Apply(library, tracker, tracker.Finished); }
-                LibraryProfiles.SaveActive(library); Store.Save(library);
+                UserTools.SaveActive(library); Store.Save(library);
                 foreach (var tracker in sessionTrackers.Values) { if (tracker.Finished) SessionLedger.Commit(tracker); tracker.Dispose(); }
-                sessionTrackers.Clear(); gameProcesses.Clear(); LibraryProfiles.ActiveLaunches = 0;
+                sessionTrackers.Clear(); gameProcesses.Clear(); UserTools.ActiveLaunches = 0;
             }
             catch { sessionTimer.Start(); throw; }
         }
