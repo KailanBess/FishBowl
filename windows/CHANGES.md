@@ -1,3 +1,10 @@
+# Windows 1.29.4 browser sizing
+
+- Browser windows fit the Web viewport automatically and follow FishBowl movement, resizing and fullscreen. Browser-native geometry changes and maximization are corrected without manual adjustment.
+- Open in window starts the verified browser at the Web viewport's size and position. Users can move or resize that external window afterward; Return to Web restores automatic fitting.
+- Unsupported attachment gets an initial fitted external-window fallback. Existing process ownership, profile separation and browser-session lifetime remain intact.
+- Added native window geometry and external-positioning fixtures. Live Firefox/Edge/Chrome and mixed-monitor behavior remain compatibility checks.
+
 # Windows 1.29.3 active-game switching and shutdown
 
 - Play keeps renderers in owned viewports, reuses clipping geometry and verified process handles, and reduces repeated renderer discovery. Decorative motion stays paused when switching to other sections with a game running.

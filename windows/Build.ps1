@@ -13,5 +13,5 @@ try {
   & $compiler /nologo /target:winexe /win32icon:FishBowl.ico /resource:FishBowl.png,FishBowl.png /resource:FishBowl.ico,FishBowl.ico '/out:FishBowl Setup.exe' 'FishBowl.Setup.cs'
   if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
  }
- Write-Output 'FishBowl 1.29.3 built.'
+ Write-Output 'FishBowl 1.29.4 built.'
 } finally { Pop-Location }

@@ -27,6 +27,8 @@ namespace EmulatorHub
         [DllImport("user32.dll")] internal static extern bool IsWindow(IntPtr window);
         [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr window);
         [DllImport("user32.dll")] internal static extern bool IsWindowEnabled(IntPtr window);
+        [DllImport("user32.dll")] internal static extern bool IsZoomed(IntPtr window);
+        [DllImport("user32.dll")] internal static extern bool IsIconic(IntPtr window);
         [DllImport("user32.dll")] internal static extern IntPtr GetMenu(IntPtr window);
         [DllImport("user32.dll")] internal static extern bool SetMenu(IntPtr window, IntPtr menu);
         [DllImport("user32.dll")] internal static extern bool DrawMenuBar(IntPtr window);
@@ -177,6 +179,7 @@ namespace EmulatorHub
         public bool IsAttached { get { return attached && IsHandleCreated && OwnsWindow && (anchored ? anchorOwner!=null && anchorOwner.IsHandleCreated && PlayNative.GetWindow(window,4)==anchorOwner.Handle : PlayNative.GetParent(window)==Handle); } }
         public bool IsAnchored { get { return IsAttached && anchored; } }
         public bool PreserveRendererWindow { get; set; }
+        public bool MaintainViewportBounds { get; set; }
         public IntPtr GameWindow { get { return window; } }
         public PlayWindowHost() { Dock = DockStyle.Fill; BackColor = FishBowlPalette.ThemeBottom; TabStop = true; }
         public void ConfigureView(PlayViewSettings settings)
@@ -400,7 +403,14 @@ namespace EmulatorHub
                         {
                             int width = Math.Max(1, client.Right-client.Left), height = Math.Max(1, client.Bottom-client.Top);
                             var viewport = new Rectangle(client.Left, client.Top, width, height);
-                            if (placementValid && !windowHidden && viewport == lastViewport && PlayNative.IsWindowVisible(window)) return;
+                            bool matches=true;
+                            if(MaintainViewportBounds) {
+                                if(PlayNative.IsZoomed(window) || PlayNative.IsIconic(window)) { PlayNative.ShowWindowAsync(window,9);placementValid=false;return; }
+                                PlayNative.Rect actual;
+                                matches=PlayNative.GetWindowRect(window,out actual) && actual.Left==client.Left-inset.Left && actual.Top==client.Top-inset.Top &&
+                                    actual.Right-actual.Left==width+inset.Horizontal && actual.Bottom-actual.Top==height+inset.Vertical;
+                            }
+                            if (placementValid && matches && !windowHidden && viewport == lastViewport && PlayNative.IsWindowVisible(window)) return;
                             if (!clipValid || clipSize != viewport.Size || clipInsets != inset) {
                             IntPtr clip = PlayNative.CreateRectRgn(inset.Left, inset.Top, inset.Left+width, inset.Top+height);
                             if (clip == IntPtr.Zero) { PlayNative.ShowWindowAsync(window, 0); return; }
