@@ -296,7 +296,7 @@ namespace EmulatorHub
             Button controllerSettings = null;
             if (Platform.ControllerSettingsLabel != null) { controllerSettings = Ui.Action(Platform.ControllerSettingsLabel, Platform.OpenControllerSettings); }
             controllersText = AddInfoTab("Controls", "controller", new[] { Link("Controller guide", r => r.ControllerGuide) }, controllerSettings);
-            infoTabs.Items.Add(Tab("Folders", "folder", new ScrollViewer { Content = folderPanel, Padding = new Thickness(10), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }));
+            infoTabs.Items.Add(Tab("Folders", "folder", new ScrollViewer { Content = new Border { Child = folderPanel, Margin = new Thickness(10) }, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }));
             helpText = AddInfoTab("Help", "help", new[] { Link("Troubleshooting", r => r.Troubleshooting) }, null);
             notesBox = Ui.Paragraphs("", false); notesBox.Watermark = "Your notes about this emulator";
             notesBox.TextChanged += delegate { if (loadingInformation) return; notesDirty = true; notesState.Text = "Saving..."; notesTimer.Stop(); notesTimer.Start(); };

@@ -97,9 +97,11 @@ namespace EmulatorHub
             gameList.ContextRequested += (sender, e) => { if (SelectedLibraryGame() == null) e.Handled = true; };
             body.Children.Add(gameList);
             var splitter = new GridSplitter { Background = p.TopBrush, ResizeDirection = GridResizeDirection.Columns }; Grid.SetColumn(splitter, 1); body.Children.Add(splitter);
-            var details = new ScrollViewer { Content = gameDetails, Padding = new Thickness(12, 0, 6, 0), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetColumn(details, 2); body.Children.Add(details); panel.Children.Add(body);
+            gameDetails.Margin = new Thickness(12, 0, 6, 0); // Margin, not ScrollViewer.Padding: Avalonia measures the content without the padding, cutting off wrapped text.
+            var details = new ScrollViewer { Content = gameDetails, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; Grid.SetColumn(details, 2); body.Children.Add(details); panel.Children.Add(body);
 
-            var home = new ScrollViewer { Content = homeCards, Padding = new Thickness(18), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            homeCards.Margin = new Thickness(18);
+            var home = new ScrollViewer { Content = homeCards, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             var couch = new ScrollViewer { Content = LivingRoomPage() };
             libraryPages.ItemsSource = new[] { new TabItem { Header = "Home", Content = home }, new TabItem { Header = "Library", Content = panel }, new TabItem { Header = "Emulators", Content = emulators }, new TabItem { Header = "Living room", Content = couch } };
             libraryPages.SelectionChanged += (sender, e) => { if (e.Source != libraryPages) return; UpdateSectionChrome(); RefreshHomeCards(); };
@@ -115,6 +117,9 @@ namespace EmulatorHub
             bool emulators = libraryPages != null && libraryPages.SelectedIndex == EmulatorsPage;
             if (footerFilterLabel != null) footerFilterLabel.IsVisible = emulators;
             filterBox.IsVisible = emulators;
+            // Collapse the filter column too, so the status text starts at the left edge in Home and Library.
+            var footer = filterBox.Parent as Grid;
+            if (footer != null) footer.ColumnDefinitions[1].Width = new GridLength(emulators ? 240 : 0);
         }
 
         private static void SetChoices(ComboBox box, IEnumerable<string> items, string selected)
@@ -390,7 +395,7 @@ namespace EmulatorHub
 
         private async Task EditLibraryGame()
         {
-            var game = SelectedLibraryGame(); if (game == null) return;
+            var game = SelectedLibraryGame(); if (game == null) { SetStatus("Select a game first."); return; }
             var dialog = new FishDialog("Edit game", 680, 760); var fields = new StackPanel { Spacing = 6 };
             var title = Ui.Field(game.Title); var path = Ui.Field(game.Path); var cover = Ui.Field(game.ArtworkPath);
             var notes = Ui.Paragraphs(game.Notes, false); notes.MinHeight = 90;
@@ -444,7 +449,7 @@ namespace EmulatorHub
 
         // ----- Launching ----------------------------------------------------------------------------------------------
 
-        private Task LaunchLibraryGame() { var game = SelectedLibraryGame(); return game == null ? Task.CompletedTask : LaunchGame(game); }
+        private Task LaunchLibraryGame() { var game = SelectedLibraryGame(); if (game == null) SetStatus("Select a game first."); return game == null ? Task.CompletedTask : LaunchGame(game); }
 
         // Starts a game with its emulator (or directly for native games) and records a tracked play session.
         // Other screens (Home, Living room, collections, play queue) launch through this method.
@@ -506,7 +511,7 @@ namespace EmulatorHub
 
         private async Task RemoveLibraryGame()
         {
-            var games = SelectedLibraryGames(); if (games.Count == 0) return;
+            var games = SelectedLibraryGames(); if (games.Count == 0) { SetStatus("Select a game first."); return; }
             if (games.Any(game => sessionTrackers.Values.Any(t => t.GameId == game.Id && !t.Finished))) { await Ui.Message(this, "Close the running game before removing it from the library."); return; }
             var what = games.Count == 1 ? games[0].Title : games.Count + " games";
             if (!await Ui.Confirm(this, "Remove " + what + " from FishBowl? Game files and saves stay where they are. Use Undo removal to restore " + (games.Count == 1 ? "it." : "them."))) return;
