@@ -5,6 +5,12 @@ class BrowserTests {
  static bool Until(Func<bool> done){var watch=Stopwatch.StartNew();while(!done()&&watch.ElapsedMilliseconds<10000)Pump(25);return done();}
  static readonly BindingFlags Private=BindingFlags.Instance|BindingFlags.NonPublic;
  static T Field<T>(object value,string name){return (T)value.GetType().GetField(name,Private).GetValue(value);}
+ [StructLayout(LayoutKind.Sequential)]struct Rect{public int Left,Top,Right,Bottom;}
+ [DllImport("user32.dll")]static extern bool GetWindowRect(IntPtr window,out Rect bounds);
+ [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags);
+ [DllImport("user32.dll")]static extern bool ShowWindowAsync(IntPtr window,int command);
+ [DllImport("user32.dll")]static extern bool IsZoomed(IntPtr window);
+ static bool Fits(IntPtr window,PlayWindowHost host){Rect actual,expected;return GetWindowRect(window,out actual)&&GetWindowRect(host.Handle,out expected)&&actual.Left==expected.Left&&actual.Top==expected.Top&&actual.Right==expected.Right&&actual.Bottom==expected.Bottom;}
  [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern IntPtr SendMessage(IntPtr window,uint message,IntPtr wParam,ref CopyData data);
  [StructLayout(LayoutKind.Sequential)]struct CopyData {public IntPtr Tag;public int Length;public IntPtr Data;}
  class BrowserFixture:Form {
@@ -42,6 +48,18 @@ class BrowserTests {
    tabs.SelectedIndex=4;browser.Navigate("about:blank");
    var host=NextUi.Descendants(browser).OfType<PlayWindowHost>().Single();Check(Until(delegate{return host.IsAttached;}),"owned browser renderer attaches inside Web: "+string.Join(" | ",NextUi.Descendants(browser).OfType<Label>().Select(l=>l.Text)));
    Check(browser.HasRunningBrowser,"browser process is verified and tracked");Check(host.IsAnchored,"browser keeps its original renderer context in a borderless owned viewport");
+   Check(host.MaintainViewportBounds&&Until(delegate{return Fits(host.GameWindow,host);}),"browser defaults to the exact Web viewport without manual adjustment");
+   if(!realFirefox) {
+    IntPtr fitted=host.GameWindow;
+    SetWindowPos(fitted,IntPtr.Zero,-3000,-2900,700,500,0x4014);
+    Check(Until(delegate{return Fits(fitted,host);}),"browser-native moves and resizes are corrected by the regular placement check");
+    ShowWindowAsync(fitted,3);Pump(100);
+    Check(Until(delegate{return !IsZoomed(fitted)&&Fits(fitted,host);}),"browser maximization is restored to the Web viewport automatically");
+    main.Location=new Point(-3900,-3900);main.Size=new Size(main.Width+90,main.Height+30);
+    Check(Until(delegate{return Fits(fitted,host);}),"browser follows FishBowl movement and resizing");
+    int placements=host.PlacementUpdates;Pump(2300);
+    Check(host.PlacementUpdates==placements,"unchanged browser bounds do not cause repeated native placement");
+   }
    foreach(int page in new[]{0,1,2,3,4}){tabs.SelectedIndex=page;Pump(80);Check(browser.HasRunningBrowser&&host.IsAttached,"browser remains running across workspace "+page);}
    if(!realFirefox){foreach(string command in new[]{"Back","Forward","Reload"}){NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text==command).PerformClick();Pump(60);}Check(File.ReadAllLines(Path.Combine(profile,"commands.txt")).SequenceEqual(new[]{"1","2","3"}),"native navigation messages reach only the hosted browser window");}
    IntPtr navigationWindow=host.GameWindow;
@@ -51,6 +69,8 @@ class BrowserTests {
    if(!realFirefox)Check(File.ReadAllText(Path.Combine(profile,"navigation.txt"))==FishBowlWeb.Address("pokemon x")&&host.GameWindow==navigationWindow,"search updates the same embedded browser");
    if(!realFirefox){var known=Field<List<SessionProcess>>(browser,"known");Check(known.Count(p=>p.EndedUtcTicks==0)==1,"repeated Go creates no second launch process");}
    NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Open in window").PerformClick();Pump(100);Check(!host.IsAttached&&browser.HasRunningBrowser,"external mode retains browser process");
+   Check(Until(delegate{return Fits(navigationWindow,host);}),"external browser starts sized and positioned over the Web viewport");
+   if(!realFirefox){SetWindowPos(navigationWindow,IntPtr.Zero,-3100,-3000,730,510,0x4014);Pump(2200);Rect moved;GetWindowRect(navigationWindow,out moved);Check(moved.Left==-3100&&moved.Top==-3000&&moved.Right-moved.Left==730,"external positioning stays under user control after the default fit");}
    var returnButton=NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Return to Web");Check(returnButton.Enabled,"external window button offers an enabled return action");returnButton.PerformClick();Check(Until(delegate{return host.IsAttached&&host.GameWindow==navigationWindow;}),"same verified browser returns inside FishBowl");
    IntPtr originalWindow=host.GameWindow;NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Full screen").PerformClick();Pump(150);Check(host.IsAnchored&&host.GameWindow==originalWindow,"fullscreen keeps the same browser renderer in the owned viewport");NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Exit full screen").PerformClick();Pump(150);Check(host.IsAnchored&&host.GameWindow==originalWindow,"fullscreen exit restores the same hosted browser");
    Check(browser.RequestClose(),"dedicated browser closes normally");Check(!browser.HasRunningBrowser,"closed browser is released without affecting personal browser instances");main.Close();

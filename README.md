@@ -7,9 +7,9 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 | Windows | 1.25.8 | Current release |
 | Linux | Preview | Library and expansion screens; Linux desktop testing remains required |
 
-Source version **1.29.3** adds a Windows Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. Play includes game-only view adjustments and confirmation before closing running games, with normal emulator shutdown, recognized plain exit confirmations handled after FishBowl approval, and save/unknown prompts available inside FishBowl. Active-game section switching uses owned renderers and cached placement. It retains session recovery, controller navigation, Home customization and the existing game, save and integration tools. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source. See [Browser setup](docs/BROWSER.md) for requirements and native-window compatibility.
+Source version **1.29.4** adds a Windows Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. Browser windows fit the Web viewport automatically; Open in window starts at that size and position. Play includes game-only view adjustments and confirmation before closing running games, with normal emulator shutdown, recognized plain exit confirmations handled after FishBowl approval, and save/unknown prompts available inside FishBowl. Active-game section switching uses owned renderers and cached placement. It retains session recovery, controller navigation, Home customization and the existing game, save and integration tools. The public release is 1.29.3; newer source changes require review and CI before release. Download complete app and source bundles from the latest passing Build workflow, or build from source. See [Browser setup](docs/BROWSER.md) for requirements and native-window compatibility.
 
-For Windows, choose **FishBowl-1.29.3.zip** to run the app; keep its six files together. **FishBowl-1.29.3-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
+For Windows, choose **FishBowl-1.29.4.zip** to run the app; keep its six files together. **FishBowl-1.29.4-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
 
 ## Features
 
@@ -126,7 +126,7 @@ Extensions are declarative JSON manifests of kind `Metadata`, `Importer` or `Emu
 
 The companion starts explicitly on localhost or a selected private network address. Its random pairing address grants read-only title and play-history access while it is running. Closing it stops the server. It does not serve game files, save contents, local paths or credentials.
 
-Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (for example, `v1.29.3` for source version 1.29.3). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
+Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (for example, `v1.29.4` for source version 1.29.4). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
 
 ## Repository layout
 
