@@ -29,5 +29,10 @@
     <Compile Include="ControllerInputTests.cs" />
     <Compile Include="SessionTests.cs" />
     <Compile Include="GamesTests.cs" />
+    <!-- Linux integrations (Flatpak, updates, Steam, EmuDeck/RetroDECK, controllers): Linux-only files. -->
+    <Compile Include="../../FishBowl.Avalonia/Linux/*.cs" LinkBase="Platform/Linux" />
+    <Compile Include="LinuxIntegrationTests.cs" />
+    <Compile Include="../../FishBowl.Avalonia/SingleInstance.cs" Link="Platform/SingleInstance.cs" />
+    <Compile Include="SingleInstanceTests.cs" />
   </ItemGroup>
 </Project>

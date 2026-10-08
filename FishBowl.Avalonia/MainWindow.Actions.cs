@@ -57,7 +57,7 @@ namespace EmulatorHub
 
         private async Task EditEmulator()
         {
-            var current = CurrentEmulator(); if (current == null) return;
+            var current = CurrentEmulator(); if (current == null) { SetStatus("Select an emulator first."); return; }
             var previousExecutable = current.Executable; var previousVersion = current.ManualVersion;
             var dialog = new EmulatorDialog(current);
             await dialog.Present(this);
@@ -75,7 +75,7 @@ namespace EmulatorHub
 
         private async Task RemoveEmulator()
         {
-            var current = CurrentEmulator(); if (current == null) return;
+            var current = CurrentEmulator(); if (current == null) { SetStatus("Select an emulator first."); return; }
             if (!await Ui.Confirm(this, "Remove " + current.Name + " from FishBowl?\n\nIts emulator program, games, and saves will stay where they are.")) return;
             GameLibraryRemoval.RemoveEmulator(library, current.Id); selectedEmulatorId = null;
             Store.Save(library); RefreshHub(); ConfigureGameFolderWatchers(); RefreshGameLibrary(); SetStatus("Emulator removed from FishBowl. Use Undo removal in Library to restore it.");
@@ -104,7 +104,7 @@ namespace EmulatorHub
 
         private void OpenEmulatorFolder()
         {
-            var profile = CurrentEmulator(); if (profile == null) return;
+            var profile = CurrentEmulator(); if (profile == null) { SetStatus("Select an emulator first."); return; }
             var flatpak = Platform.FlatpakId(profile.Executable);
             var folder = flatpak != null ? Path.Combine(Platform.Home, ".var", "app", flatpak) : Path.GetDirectoryName(profile.Executable);
             if (!Directory.Exists(folder)) folder = Path.GetDirectoryName(profile.Executable);
@@ -113,13 +113,13 @@ namespace EmulatorHub
 
         private async Task ToggleEmulatorFavorite()
         {
-            var profile = CurrentEmulator(); if (profile == null) return;
+            var profile = CurrentEmulator(); if (profile == null) { SetStatus("Select an emulator first."); return; }
             SaveProfileNotes(); profile.Favorite = !profile.Favorite; Store.Save(library); RefreshHub();
             await Task.CompletedTask;
         }
         private async Task EditEmulatorInformation()
         {
-            var profile = CurrentEmulator(); if (profile == null) return;
+            var profile = CurrentEmulator(); if (profile == null) { SetStatus("Select an emulator first."); return; }
             SaveProfileNotes();
             var dialog = new EmulatorInformationDialog(profile);
             await dialog.Present(this);
@@ -147,7 +147,7 @@ namespace EmulatorHub
 
         private async Task RepairSelectedLocation()
         {
-            var profile = CurrentEmulator(); if (profile == null) return;
+            var profile = CurrentEmulator(); if (profile == null) { SetStatus("Select an emulator first."); return; }
             var file = await Ui.PickFile(this, "Locate " + profile.Name + "'s emulator program", Platform.ProgramFilter, HubPaths.EmulatorRoot(library));
             if (file == null) return;
             BuildRegistry.Repair(profile, file); Store.Save(library); reloadProgramMetadata = true; RefreshHub(); SetStatus("Program location repaired for " + profile.Name + ".");
