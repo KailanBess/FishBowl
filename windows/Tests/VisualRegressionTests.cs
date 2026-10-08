@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
@@ -23,7 +23,7 @@ class VisualRegressionTests
         {
             Show(main);
             var tabs = (TabControl)typeof(MainForm).GetField("workspaceNavigation", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
-            Check(tabs.TabPages.Cast<TabPage>().Select(page=>page.Text).SequenceEqual(new[]{"Home","Emulators","Library","Play"}),"Four primary workspaces preserve original page order and append Play");
+            Check(tabs.TabPages.Cast<TabPage>().Select(page=>page.Text).SequenceEqual(new[]{"Home","Emulators","Library","Play","Web"}),"Five primary workspaces preserve original page order and append Web");
             Check(tabs.SizeMode == TabSizeMode.Fixed && Enumerable.Range(0,tabs.TabCount).All(index=>tabs.GetTabRect(index).Width >= TextRenderer.MeasureText(tabs.TabPages[index].Text,tabs.Font).Width+20),"All workspace headers including Play retain readable width");
             var home = (HomeSurface)typeof(MainForm).GetField("homeSurface", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
             for (int i = 0; i < 60; i++)

@@ -29,7 +29,7 @@ class SmoothUiTests
             Check(invalidations==0,"Unchanged idle theme pass never invalidates the main window");
             Check(Buffered(main),"Main window painting is buffered");
             var tabs=(FishBowlTabs)typeof(MainForm).GetField("workspaceNavigation",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main);
-            Check(tabs.TabCount==4&&tabs.TabPages[3].Text=="Play","Play is the fourth primary workspace");
+            Check(tabs.TabCount==5&&tabs.TabPages[3].Text=="Play","Play is the fourth primary workspace");
             Control[] playControls=tabs.TabPages[3].Controls.Cast<Control>().ToArray();IntPtr playHandle=tabs.TabPages[3].Handle;
             int tabInvalidations=0; tabs.Invalidated+=delegate { tabInvalidations++; };
             for(int i=0;i<100;i++) tabs.LegacyHeaders=true;
@@ -64,7 +64,7 @@ class SmoothUiTests
             data.Theme.Name=theme; data.Enhancements.TextPercent=percent; Store.Save(data);
             using(var main=new MainForm(true)) {
                 Show(main);var navigation=(TabControl)typeof(MainForm).GetField("workspaceNavigation",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main);
-                Check(navigation.TabCount==4&&Enumerable.Range(0,navigation.TabCount).All(index=>navigation.GetTabRect(index).Width>=TextRenderer.MeasureText(navigation.TabPages[index].Text,navigation.Font).Width+20),"Four workspace headers fit "+theme+" at "+percent+"% text");
+                Check(navigation.TabCount==5&&Enumerable.Range(0,navigation.TabCount).All(index=>navigation.GetTabRect(index).Width>=TextRenderer.MeasureText(navigation.TabPages[index].Text,navigation.Font).Width+20),"Five workspace headers fit "+theme+" at "+percent+"% text");
                 navigation.SelectedIndex=3;Application.DoEvents();Capture(main,Path.Combine(dir,"play-"+theme.Replace(" ","-")+"-"+percent+".png"));main.Close();
             }
             Form[] prompts={new StartupAssistantDialog(),new GameStoragePromptDialog(),new RequirementsStoragePromptDialog(),new WhatsNewDialog("1.25.4"),new ResultsDialog("FishBowl Notifications",new[]{"READY  Pokemon X","Installed title launches successfully.","A longer notification row for wrapping and scroll layout."})};

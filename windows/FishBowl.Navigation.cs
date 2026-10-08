@@ -39,6 +39,7 @@ namespace EmulatorHub {
      fields.SetColumn(check,0);fields.SetColumnSpan(check,2);fields.RowStyles[row].SizeType=SizeType.AutoSize;check.AccessibleName=check.Text;
     }
     var days=NextDialog.Number(Math.Max(0,data.Theme.AutoBackupDays),0,365);NextDialog.Field(fields,"Backup reminder interval (days)",days);
+    NextDialog.Field(fields,"Web browser",ExperienceUi.Button("Browser settings",delegate{using(var browser=new BrowserSettingsDialog(data))browser.ShowDialog(dialog);}));
     dialog.Action("Save",delegate{data.BackupFolder=backup.Text.Trim();data.Theme.StartupAssistantPreferenceSet=true;data.Theme.ShowStartupAssistant=startup.Checked;data.Theme.StartMaximized=maximize.Checked;data.Theme.AutoSyncGameFolders=sync.Checked;data.Theme.ConfirmBeforeGameLaunch=confirm.Checked;data.Theme.GameStorageAssistantPreferenceSet=true;data.Theme.ShowGameStorageAssistant=storage.Checked;data.Theme.AutoBackupDays=(int)days.Value;Store.Save(data);refresh();dialog.Close();});
     dialog.Action("Cancel",dialog.Close);dialog.ShowDialog(owner);
    }

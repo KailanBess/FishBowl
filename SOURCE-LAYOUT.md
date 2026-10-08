@@ -4,11 +4,12 @@ FishBowl has two front ends that share their data model and emulator logic.
 
 ## Windows (`windows/`)
 
-The Windows application, source version **1.28.0**, is built from:
+The Windows application is built from:
 
 - `windows/FishBowl.cs`, `windows/FishBowl.InputPainting.cs` and `windows/FishBowl.TextFit.cs`: the WinForms application
 - `FishBowl.Model.cs` and `FishBowl.GameRecognition.cs` (repository root): the shared data model and game identification
 - `windows/FishBowl.Navigation.cs`, `windows/FishBowl.Sessions.cs` and `windows/FishBowl.RemotePlay.cs`: unified appearance/controller navigation, session UI tracking and the local browser/input bridge
+- `windows/FishBowl.Browser.cs`: installed Firefox/Edge/Chrome discovery, dedicated profiles, Web navigation and exact-owned browser window lifetime
 - `windows/Play.cs`: exact-process native child/owned-window hosting, persistent Play sessions and safe detach/restore
 - `remote-play/client/`: embedded browser media client and the pinned LiveKit SDK, including its license
 
@@ -22,6 +23,9 @@ The Avalonia application links these root files:
 | --- | --- |
 | `FishBowl.Model.cs` | Every class saved in `library.json`. Also compiled by the Windows build. |
 | `FishBowl.GameRecognition.cs` | Game identification (titles, title IDs, icons) and installed-game lookup. Also compiled by the Windows build. |
+| `FishBowl.Library.cs`, `FishBowl.Games.cs` | Library edits, filters, collections, queue and game launching. Compiled by both platforms. |
+| `FishBowl.SaveTools.cs`, `FishBowl.LivingRoom.cs`, `FishBowl.Sessions.cs` | Save recovery, living-room behavior and verified session journals. Compiled by both platforms. |
+| `FishBowl.GameTools.cs`, `FishBowl.Integrations.cs` | Shared import/mod/media/catalog/companion helpers. Compiled by both platforms. |
 | `FishBowl.LinuxShims.cs` | Linux stand-ins for the few Windows-only types the shared files use (`System.Drawing` images; `UserTools.Guest`). Linux only. |
 | `FishBowl.Core.cs` | Presets, folder routing, discovery, imports, release checks, backups and setup checks. |
 | `FishBowl.Platform.cs` | Windows/Linux differences: launching, process detection, versions, Flatpak and `.desktop` handling. |

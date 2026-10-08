@@ -27,6 +27,20 @@ namespace EmulatorHub
         [DllImport("user32.dll")] internal static extern bool IsWindow(IntPtr window);
         [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr window);
         [DllImport("user32.dll")] internal static extern bool IsWindowEnabled(IntPtr window);
+        [DllImport("user32.dll")] internal static extern IntPtr GetMenu(IntPtr window);
+        [DllImport("user32.dll")] internal static extern bool SetMenu(IntPtr window, IntPtr menu);
+        [DllImport("user32.dll")] internal static extern bool DrawMenuBar(IntPtr window);
+        [DllImport("user32.dll")] internal static extern uint GetDpiForWindow(IntPtr window);
+        [DllImport("user32.dll")] internal static extern bool PostMessage(IntPtr window, uint message, IntPtr wparam, IntPtr lparam);
+        [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr window,System.Text.StringBuilder text,int capacity);
+        [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr window,System.Text.StringBuilder text,int capacity);
+        internal static string WindowCaption(IntPtr window) { var value=new System.Text.StringBuilder(2048);GetWindowText(window,value,value.Capacity);return value.ToString(); }
+        internal static string NormalizeCaption(string text) { return new string((text??"").Normalize(System.Text.NormalizationForm.FormD).Where(c=>char.IsLetterOrDigit(c)).Select(char.ToLowerInvariant).ToArray()); }
+        internal static int Rank(IntPtr window,string title) {
+            var name=new System.Text.StringBuilder(256);GetClassName(window,name,name.Capacity);string kind=name.ToString();
+            if(kind.IndexOf("RenderWindow",StringComparison.OrdinalIgnoreCase)>=0 || kind.IndexOf("DolphinRender",StringComparison.OrdinalIgnoreCase)>=0 || kind.IndexOf("QWindowOwnDC",StringComparison.OrdinalIgnoreCase)>=0 || kind=="SDL_app" || kind=="GLFW30") return 2;
+            string preferred=NormalizeCaption(title);return preferred.Length>2&&NormalizeCaption(WindowCaption(window)).Contains(preferred)?1:0;
+        }
         [DllImport("user32.dll")] internal static extern int GetWindowRgn(IntPtr window, IntPtr region);
         [DllImport("user32.dll")] internal static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
         [DllImport("gdi32.dll")] internal static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
@@ -42,6 +56,16 @@ namespace EmulatorHub
         [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
         [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
         [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool QueryFullProcessImageName(IntPtr process, uint flags, System.Text.StringBuilder path, ref uint length);
+        [DllImport("kernel32.dll",CharSet=CharSet.Unicode)]static extern uint GetLongPathName(string path,System.Text.StringBuilder result,uint capacity);
+        internal static bool SameExecutable(string first,string second) {
+            if(string.IsNullOrWhiteSpace(first)||string.IsNullOrWhiteSpace(second))return false;
+            try { return CanonicalPath(first).Equals(CanonicalPath(second),StringComparison.OrdinalIgnoreCase); }
+            catch(ArgumentException){return false;}catch(NotSupportedException){return false;}catch(PathTooLongException){return false;}
+        }
+        static string CanonicalPath(string path) {
+            string full=Path.GetFullPath(path);var result=new System.Text.StringBuilder(32768);uint length=GetLongPathName(full,result,(uint)result.Capacity);
+            return length>0&&length<result.Capacity?Path.GetFullPath(result.ToString()):full;
+        }
         internal static string Executable(Process process) {
             try { var module=process.MainModule; if(module!=null && !string.IsNullOrWhiteSpace(module.FileName)) return Path.GetFullPath(module.FileName); } catch (System.ComponentModel.Win32Exception) { } catch (InvalidOperationException) { }
             IntPtr handle=OpenProcess(0x1000, false, process.Id);
@@ -90,10 +114,20 @@ namespace EmulatorHub
             catch (InvalidOperationException) { return false; }
             catch (System.ComponentModel.Win32Exception) { return false; }
         }
+        internal static bool IsAlive(SessionProcess identity)
+        {
+            if(identity == null || identity.Pid == Process.GetCurrentProcess().Id) return false;
+            try { using(var process=Process.GetProcessById(identity.Pid)) return !process.HasExited && process.StartTime.ToUniversalTime().Ticks==identity.StartedUtcTicks; }
+            catch(ArgumentException) { return false; }
+            catch(InvalidOperationException) { return false; }
+            catch(System.ComponentModel.Win32Exception) { return true; } // Access denial must not silently permit exit.
+        }
         internal static IntPtr Find(IEnumerable<SessionProcess> identities)
+        { return Find(identities,null); }
+        internal static IntPtr Find(IEnumerable<SessionProcess> identities,string title)
         {
             var known = identities.GroupBy(p => p.Pid).ToDictionary(g => g.Key, g => g.Last().StartedUtcTicks);
-            IntPtr best = IntPtr.Zero; long area = 0;
+            IntPtr best = IntPtr.Zero; long area = 0;int rank=-1;
             EnumWindows(delegate(IntPtr window, IntPtr unused)
             {
                 uint pid; GetWindowThreadProcessId(window, out pid);
@@ -103,7 +137,8 @@ namespace EmulatorHub
                     GetClientRect(window, out bounds) && Matches(window, (int)pid, started))
                 {
                     long size = (long)(bounds.Right - bounds.Left) * (bounds.Bottom - bounds.Top);
-                    if (size > area && size >= 4096) { area = size; best = window; }
+                    int priority=Rank(window,title);
+                    if (size >= 4096 && (priority>rank || priority==rank && size>area)) { area = size; best = window;rank=priority; }
                 }
                 return true;
             }, IntPtr.Zero);
@@ -114,12 +149,18 @@ namespace EmulatorHub
     public class PlayWindowHost : Panel
     {
         IntPtr window, originalParent, originalRegion;
+        IntPtr originalMenu;
+        bool menuAltered;
+        PlayViewSettings view = new PlayViewSettings();
         int pid;
         long started, originalStyle, originalExStyle;
+        Process identityProcess;
         PlayNative.Placement originalPlacement;
         PlayNative.Rect originalBounds;
         bool attached, disposing, transitioning, embedding, anchored, altered;
-        bool placementValid, windowHidden;
+        bool placementValid, windowHidden, clipValid;
+        Size clipSize;
+        Padding clipInsets;
         Rectangle lastViewport;
         public int PlacementUpdates { get; private set; }
         public string LastError { get; private set; }
@@ -127,28 +168,73 @@ namespace EmulatorHub
         readonly string ownership = "FishBowl.Play." + Guid.NewGuid().ToString("N");
         readonly IntPtr ownershipValue = new IntPtr(1);
         IntPtr desiredDpi;
-        bool OwnsWindow { get { return PlayNative.Matches(window,pid,started) && PlayNative.GetProp(window,ownership)==ownershipValue; } }
+        bool OwnsWindow { get {
+            uint actual;
+            if(identityProcess==null || !PlayNative.IsWindow(window) || PlayNative.GetProp(window,ownership)!=ownershipValue) return false;
+            PlayNative.GetWindowThreadProcessId(window,out actual);
+            try { return actual==pid && !identityProcess.HasExited; } catch(InvalidOperationException) { return false; }
+        } }
         public bool IsAttached { get { return attached && IsHandleCreated && OwnsWindow && (anchored ? anchorOwner!=null && anchorOwner.IsHandleCreated && PlayNative.GetWindow(window,4)==anchorOwner.Handle : PlayNative.GetParent(window)==Handle); } }
         public bool IsAnchored { get { return IsAttached && anchored; } }
+        public bool PreserveRendererWindow { get; set; }
         public IntPtr GameWindow { get { return window; } }
         public PlayWindowHost() { Dock = DockStyle.Fill; BackColor = FishBowlPalette.ThemeBottom; TabStop = true; }
+        public void ConfigureView(PlayViewSettings settings)
+        {
+            view=settings ?? new PlayViewSettings(); placementValid=false;
+            if(IsAttached) {
+                if(originalMenu!=IntPtr.Zero) { if(PrepareHandleChange())Embed(); }
+                else ResizeGame();
+            }
+        }
+        void ApplyMenu()
+        {
+            if(!OwnsWindow || originalMenu==IntPtr.Zero) return;
+            if(PlayNative.SetMenu(window,view.ShowControls ? originalMenu : IntPtr.Zero)) {
+                menuAltered=!view.ShowControls; PlayNative.DrawMenuBar(window);
+            }
+        }
+        Padding Insets()
+        {
+            if(view.ShowControls) return Padding.Empty;
+            uint dpi=96; try { uint current=PlayNative.GetDpiForWindow(window); if(current>0) dpi=current; } catch(EntryPointNotFoundException) { }
+            return new Padding((int)(Math.Max(0,Math.Min(400,view.Left))*dpi/96), (int)(Math.Max(0,Math.Min(400,view.Top))*dpi/96),
+                (int)(Math.Max(0,Math.Min(400,view.Right))*dpi/96), (int)(Math.Max(0,Math.Min(400,view.Bottom))*dpi/96));
+        }
         public bool AttachWindow(IntPtr candidate, int processId, long processStarted)
+        {
+            return AttachWindow(candidate, processId, processStarted, IntPtr.Zero);
+        }
+        internal bool AttachExitPrompt(IntPtr candidate, int processId, long processStarted, IntPtr root)
+        {
+            if (!PlayShutdown.OwnedPrompt(candidate, processId, processStarted, root)) return false;
+            return AttachWindow(candidate, processId, processStarted, root);
+        }
+        bool AttachWindow(IntPtr candidate, int processId, long processStarted, IntPtr promptRoot)
         {
             LastError = null;
             if (disposing || !PlayNative.Matches(candidate, processId, processStarted)) { LastError = "The game window changed or the process ended. Choose Show in Play to retry."; return false; }
             if (PlayNative.IsHungAppWindow(candidate)) { LastError = "The emulator is busy. Wait for it to respond, then choose Show in Play."; return false; }
             if (window == candidate && IsAttached) return true;
             IntPtr owner=PlayNative.GetWindow(candidate,4);
-            if ((PlayNative.GetLong(candidate,PlayNative.Style)&PlayNative.Child)!=0 || owner!=IntPtr.Zero) return false;
+            if ((PlayNative.GetLong(candidate,PlayNative.Style)&PlayNative.Child)!=0 || owner!=IntPtr.Zero && promptRoot==IntPtr.Zero) return false;
             if (!TryDetach()) return false;
             window = candidate; pid = processId; started = processStarted;
             originalParent = PlayNative.GetParent(window);
             originalStyle = PlayNative.GetLong(window, PlayNative.Style);
             originalExStyle = PlayNative.GetLong(window, PlayNative.ExStyle);
+            originalMenu = PlayNative.GetMenu(window); menuAltered=false;
             PlayNative.GetWindowRect(window,out originalBounds);
             originalPlacement = new PlayNative.Placement { Length = Marshal.SizeOf(typeof(PlayNative.Placement)) };
             if (!PlayNative.GetWindowPlacement(window, ref originalPlacement)) { window = IntPtr.Zero; return false; }
             if (!PlayNative.SetProp(window, ownership, ownershipValue)) { window=IntPtr.Zero; return false; }
+            try {
+                identityProcess=Process.GetProcessById(pid);
+                if(identityProcess.Handle==IntPtr.Zero || identityProcess.StartTime.ToUniversalTime().Ticks!=started) throw new InvalidOperationException();
+            } catch(Exception) {
+                PlayNative.RemoveProp(window,ownership);window=IntPtr.Zero;
+                if(identityProcess!=null)identityProcess.Dispose();identityProcess=null;return false;
+            }
             originalRegion = PlayNative.CreateRectRgn(0, 0, 0, 0);
             if (originalRegion != IntPtr.Zero && PlayNative.GetWindowRgn(window, originalRegion) == 0)
             { PlayNative.DeleteObject(originalRegion); originalRegion = IntPtr.Zero; }
@@ -187,9 +273,10 @@ namespace EmulatorHub
             {
                 IntPtr target = Handle;
                 if(desiredDpi==IntPtr.Zero) throw new InvalidOperationException();
-                if(!PlayNative.AreDpiAwarenessContextsEqual(PlayNative.GetWindowDpiAwarenessContext(target),desiredDpi)) return EmbedAnchored();
+                if(PreserveRendererWindow || view.ShowControls && originalMenu!=IntPtr.Zero || !PlayNative.AreDpiAwarenessContextsEqual(PlayNative.GetWindowDpiAwarenessContext(target),desiredDpi)) return EmbedAnchored();
                 anchored=false;
                 altered=true;
+                ApplyMenu();
                 long childStyle = (originalStyle & ~(PlayNative.Popup | PlayNative.Caption | PlayNative.ThickFrame)) | PlayNative.Child;
                 if (!PlayNative.PutLong(window, PlayNative.Style, childStyle) || !PlayNative.PutLong(window, PlayNative.ExStyle, originalExStyle & ~0x00040008L)) throw new InvalidOperationException();
                 PlayNative.SetLastError(0); PlayNative.SetParent(window, target);
@@ -216,6 +303,7 @@ namespace EmulatorHub
                 owner.VisibleChanged+=OwnerChanged;owner.EnabledChanged+=OwnerChanged;
             }
             anchored=true;altered=true;
+            ApplyMenu();
             long style=(originalStyle & ~(PlayNative.Child|PlayNative.Caption|PlayNative.ThickFrame))|PlayNative.Popup;
             if(!PlayNative.PutLong(window,PlayNative.Style,style)||!PlayNative.PutLong(window,PlayNative.ExStyle,originalExStyle&~0x00040008L)||!PlayNative.PutLong(window,-8,owner.Handle.ToInt64())) throw new InvalidOperationException();
             if(PlayNative.GetWindow(window,4)!=owner.Handle || !PlayNative.AreDpiAwarenessContextsEqual(PlayNative.GetWindowDpiAwarenessContext(window),desiredDpi)) throw new InvalidOperationException();
@@ -258,6 +346,9 @@ namespace EmulatorHub
                     }
                     PlayNative.PutLong(window, PlayNative.Style, originalStyle);
                     PlayNative.PutLong(window, PlayNative.ExStyle, originalExStyle);
+                    if(menuAltered && !PlayNative.SetMenu(window,originalMenu)) return false;
+                    if(menuAltered) PlayNative.DrawMenuBar(window);
+                    menuAltered=false;
                     if(PlayNative.GetParent(window)!=parent) return false;
                     if (!RestoreRegion()) return false;
                     var placement=originalPlacement; placement.Flags|=4;
@@ -266,14 +357,16 @@ namespace EmulatorHub
                     if(originalPlacement.Show==1 || originalPlacement.Show==9)
                         PlayNative.SetWindowPos(window,IntPtr.Zero,originalBounds.Left,originalBounds.Top,originalBounds.Right-originalBounds.Left,originalBounds.Bottom-originalBounds.Top,0x4034);
                     else PlayNative.SetWindowPos(window,IntPtr.Zero,0,0,0,0,0x4037);
+                    if(forget && (originalStyle & 0x10000000L)!=0) PlayNative.ShowWindowAsync(window,originalPlacement.Show==0 ? 1 : originalPlacement.Show);
                 }
                 if(forget && window!=IntPtr.Zero && OwnsWindow) PlayNative.RemoveProp(window,ownership);
-                attached = false;anchored=false;altered=false;placementValid=false;windowHidden=false;UnbindOwner();
+                attached = false;anchored=false;altered=false;placementValid=false;clipValid=false;windowHidden=false;UnbindOwner();
                 if (forget)
                 {
                     window = IntPtr.Zero;
                     if (originalRegion != IntPtr.Zero) PlayNative.DeleteObject(originalRegion);
                     originalRegion = IntPtr.Zero;
+                    if(identityProcess!=null)identityProcess.Dispose();identityProcess=null;
                 }
                 return true;
             }
@@ -294,6 +387,7 @@ namespace EmulatorHub
         {
             if (IsAttached)
             {
+                Padding inset=Insets();
                 PlayNative.Rect client;
                 if(anchored)
                 {
@@ -307,11 +401,14 @@ namespace EmulatorHub
                             int width = Math.Max(1, client.Right-client.Left), height = Math.Max(1, client.Bottom-client.Top);
                             var viewport = new Rectangle(client.Left, client.Top, width, height);
                             if (placementValid && !windowHidden && viewport == lastViewport && PlayNative.IsWindowVisible(window)) return;
-                            IntPtr clip = PlayNative.CreateRectRgn(0, 0, width, height);
+                            if (!clipValid || clipSize != viewport.Size || clipInsets != inset) {
+                            IntPtr clip = PlayNative.CreateRectRgn(inset.Left, inset.Top, inset.Left+width, inset.Top+height);
                             if (clip == IntPtr.Zero) { PlayNative.ShowWindowAsync(window, 0); return; }
                             if (PlayNative.SetWindowRgn(window, clip, false) == 0)
                             { PlayNative.DeleteObject(clip); PlayNative.ShowWindowAsync(window, 0); return; }
-                            if (PlayNative.SetWindowPos(window,IntPtr.Zero,client.Left,client.Top,width,height,0x4074)) {
+                            clipValid=true; clipSize=viewport.Size; clipInsets=inset;
+                            }
+                            if (PlayNative.SetWindowPos(window,IntPtr.Zero,client.Left-inset.Left,client.Top-inset.Top,width+inset.Horizontal,height+inset.Vertical,0x4074)) {
                                 lastViewport = viewport; placementValid = true; windowHidden = false; PlacementUpdates++;
                             }
                         }
@@ -321,7 +418,7 @@ namespace EmulatorHub
                 else if(PlayNative.GetClientRect(Handle,out client)) {
                     var viewport = new Rectangle(0, 0, Math.Max(1,client.Right-client.Left), Math.Max(1,client.Bottom-client.Top));
                     if (placementValid && viewport == lastViewport) return;
-                    if (PlayNative.SetWindowPos(window, IntPtr.Zero, 0, 0, viewport.Width, viewport.Height,0x4074)) {
+                    if (PlayNative.SetWindowPos(window, IntPtr.Zero, -inset.Left, -inset.Top, viewport.Width+inset.Horizontal, viewport.Height+inset.Vertical,0x4074)) {
                         lastViewport = viewport; placementValid = true; PlacementUpdates++;
                     }
                 }
@@ -347,6 +444,20 @@ namespace EmulatorHub
         }
     }
 
+    public sealed class PlayExitDialog : NextDialog
+    {
+        public PlayExitDialog(IEnumerable<string> games) : base("Close FishBowl?",720,460)
+        {
+            var fields=NextDialog.Fields(Body);
+            NextDialog.Field(fields,"Running games",new TextBox { Text=string.Join(Environment.NewLine,games ?? new[]{"Running game"}),ReadOnly=true,Multiline=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill },140);
+            NextDialog.Field(fields,"",ExperienceUi.Label("Are you sure you want to close FishBowl and its running games? Save your progress first. Emulator save or exit prompts will be shown before FishBowl closes.",120),140);
+            Action("Close games and exit",delegate { DialogResult=DialogResult.OK; Close(); });
+            Action("Keep games running",delegate { DialogResult=DialogResult.Yes; Close(); });
+            Action("Cancel",delegate { DialogResult=DialogResult.Cancel; Close(); });
+            CancelButton=Actions.Controls.OfType<Button>().Last(); AcceptButton=Actions.Controls.OfType<Button>().Last();
+        }
+    }
+
     public sealed class PlaySurface : UserControl
     {
         sealed class MixedStage : Panel
@@ -361,15 +472,30 @@ namespace EmulatorHub
         }
         sealed class Session : IDisposable
         {
+            internal sealed class Frontend { internal IntPtr Window;internal int Pid;internal long Started;internal PlayNative.Placement Placement; }
+            internal readonly List<Frontend> Frontends=new List<Frontend>();
+            internal readonly string FrontendMarker="FishBowl.Frontend."+Guid.NewGuid().ToString("N");
             internal string Title, Notice;
+            internal EmulatorProfile ViewProfile;
+            internal PlayViewSettings View = new PlayViewSettings();
             internal readonly List<SessionProcess> Known = new List<SessionProcess>();
             internal readonly Dictionary<string, Process> Handles = new Dictionary<string, Process>();
             internal HashSet<string> Before;
             internal PlayWindowHost Host;
+            internal RemotePlayDialog Sharing;
             internal bool External;
             internal DateTime Added = DateTime.UtcNow;
             public override string ToString() { return Title; }
-            public void Dispose() { Host.Dispose(); foreach (Process process in Handles.Values) process.Dispose(); }
+            internal bool RestoreFrontends() {
+                foreach(var item in Frontends.ToArray()) {
+                    if(PlayNative.Matches(item.Window,item.Pid,item.Started)&&PlayNative.GetProp(item.Window,FrontendMarker)==new IntPtr(1)) {
+                        var placement=item.Placement;if(!PlayNative.SetWindowPlacement(item.Window,ref placement))return false;
+                        PlayNative.ShowWindowAsync(item.Window,placement.Show==0?1:placement.Show);PlayNative.RemoveProp(item.Window,FrontendMarker);
+                    }
+                    Frontends.Remove(item);
+                }return true;
+            }
+            public void Dispose() { if(Sharing!=null)Sharing.Close();RestoreFrontends();Host.Dispose(); foreach (Process process in Handles.Values) process.Dispose(); }
         }
         readonly LibraryData library;
         readonly Action fullscreen;
@@ -395,12 +521,13 @@ namespace EmulatorHub
             choice = NextDialog.Choice(new string[0], null); choice.Width = 220; choice.AccessibleName = "Running games";
             toolbar.Controls.Add(choice);
             fullscreenButton = ExperienceUi.Button("Full screen", delegate { if (fullscreen != null) fullscreen(); });
-            externalButton = ExperienceUi.Button("Open in window", delegate { OpenSelectedInWindow(); });
+            externalButton = ExperienceUi.Button("Open in window", delegate { var selected=Selected();if(selected!=null&&selected.External)RetrySelected();else OpenSelectedInWindow(); });
             retryButton = ExperienceUi.Button("Show in Play", RetrySelected);
             shareButton = ExperienceUi.Button("Share session", ShareSelected);
             moreButton = ExperienceUi.Button("More", delegate { });
             var menu = new ContextMenuStrip(); NavigationController.Register(menu);
             menu.Items.Add("Session details", null, delegate { SessionDetails(); });
+            menu.Items.Add("Game view settings", null, delegate { GameViewSettings(); });
             moreButton.ContextMenuStrip = menu;
             moreButton.Click += delegate { menu.Show(moreButton, new Point(0, moreButton.Height)); };
             moreButton.Disposed += delegate { menu.Dispose(); };
@@ -423,7 +550,7 @@ namespace EmulatorHub
         }
         public bool OpenSelectedInWindow() {
             var selected = Selected(); if (selected == null) return false;
-            if (!selected.Host.TryDetach()) {
+            if (!selected.RestoreFrontends() || !selected.Host.TryDetach()) {
                 selected.Notice = "The emulator window is busy. It remains in Play. Wait for it to respond, then retry.";
                 Store.Log("Play detach failed for " + selected.Title); RefreshStatus(); return false;
             }
@@ -431,23 +558,31 @@ namespace EmulatorHub
         }
         void RetrySelected() {
             var selected = Selected(); if (selected == null) return;
-            selected.External = false; selected.Notice = null; selected.Added = DateTime.UtcNow; timer.Start(); RefreshStatus();
+            selected.External = false; selected.Notice = null; selected.Added = DateTime.UtcNow;timer.Interval=150; timer.Start();
+            IntPtr window=PlayNative.Find(selected.Known,selected.Title);
+            var identity=selected.Known.FirstOrDefault(p=>PlayNative.Matches(window,p.Pid,p.StartedUtcTicks));
+            if(identity!=null)selected.Host.AttachWindow(window,identity.Pid,identity.StartedUtcTicks);
+            HideFrontend(selected);ShowSelected();RefreshStatus();
         }
+        public void ShareSession() { ShareSelected(); }
         void ShareSelected() {
             var selected = Selected(); if (selected == null) return;
+            if(selected.Sharing!=null&&!selected.Sharing.IsDisposed){selected.Sharing.BringToFront();return;}
             IntPtr window = selected.Host.GameWindow;
-            if (window == IntPtr.Zero) window = PlayNative.Find(selected.Known);
+            if (window == IntPtr.Zero) window = PlayNative.Find(selected.Known,selected.Title);
             uint pid; PlayNative.GetWindowThreadProcessId(window, out pid);
             var identity = selected.Known.FirstOrDefault(p => p.Pid == pid && PlayNative.Matches(window, p.Pid, p.StartedUtcTicks));
             if (identity == null) { selected.Notice = "No responding game window is available. Wait for the emulator, then retry."; RefreshStatus(); return; }
-            bool wasExternal = selected.External;
-            if (!OpenSelectedInWindow()) return;
-            try {
-                using (var dialog = new RemotePlayDialog(library, null, new RemoteWindow { Pid = identity.Pid, Started = identity.StartedUtcTicks, Handle = window, Title = selected.Title }))
-                    dialog.ShowDialog(FindForm());
-            } finally {
-                if (!wasExternal && sessions.Contains(selected)) { choice.SelectedItem = selected; RetrySelected(); }
+            if(!selected.External&&!selected.Host.IsAnchored) {
+                if(!selected.Host.PrepareHandleChange()){selected.Notice="The game window is busy. Wait for it to respond, then retry sharing.";RefreshStatus();return;}
+                selected.Host.PreserveRendererWindow=true;selected.Host.ResumeHandleChange();
+                if(!selected.Host.IsAttached){selected.Notice="The game window could not be prepared for sharing. Choose Show in Play to retry.";RefreshStatus();return;}
             }
+            // A modeless dialog leaves the owner enabled, so anchored renderers stay visible in Play.
+            var dialog=new RemotePlayDialog(library,null,new RemoteWindow{Pid=identity.Pid,Started=identity.StartedUtcTicks,Handle=window,Title=selected.Title});
+            selected.Sharing=dialog;
+            dialog.FormClosed+=delegate {selected.Sharing=null;dialog.Dispose();};
+            dialog.Show(FindForm());
         }
         void SessionDetails() {
             var selected = Selected(); if (selected == null) return;
@@ -455,10 +590,60 @@ namespace EmulatorHub
                 var fields = NextDialog.Fields(dialog.Body);
                 NextDialog.Field(fields, "Game", new Label { Text = selected.Title, AutoSize = true }, 60);
                 NextDialog.Field(fields, "Status", new Label { Text = status.Text, AutoSize = true }, 100);
-                NextDialog.Field(fields, "Controls", new Label { Text = "Switching menus keeps the game running. Use the fullscreen button to return from fullscreen while game controls have focus. Closing FishBowl restores the emulator window.", AutoSize = true }, 110);
+                NextDialog.Field(fields, "Controls", new Label { Text = "Switching menus keeps the game running. Use the fullscreen button to return from fullscreen while game controls have focus. Closing FishBowl asks before closing running games. Emulator save prompts remain available.", AutoSize = true }, 110);
                 NextDialog.Field(fields, "Recovery", new Label { Text = "If the renderer is busy or unsupported, open it in its own window. Show in Play retries the same verified session. Details are recorded in the activity log.", AutoSize = true }, 100);
                 dialog.Action("Close", dialog.Close); dialog.ShowDialog(FindForm());
             }
+        }
+        void GameViewSettings()
+        {
+            var selected=Selected(); if(selected==null) return;
+            using(var dialog=new NextDialog("Game view settings",760,620)) {
+                var fields=NextDialog.Fields(dialog.Body);
+                var controls=new CheckBox { Text="Show emulator controls in Play", Checked=selected.View.ShowControls, AutoSize=true };
+                NextDialog.Field(fields,"View",controls);
+                var top=NextDialog.Number(Math.Max(0,Math.Min(400,selected.View.Top)),0,400);
+                var bottom=NextDialog.Number(Math.Max(0,Math.Min(400,selected.View.Bottom)),0,400);
+                var left=NextDialog.Number(Math.Max(0,Math.Min(400,selected.View.Left)),0,400);
+                var right=NextDialog.Number(Math.Max(0,Math.Min(400,selected.View.Right)),0,400);
+                NextDialog.Field(fields,"Hide top toolbar (pixels)",top); NextDialog.Field(fields,"Hide bottom status bar (pixels)",bottom);
+                NextDialog.Field(fields,"Hide left edge (pixels)",left); NextDialog.Field(fields,"Hide right edge (pixels)",right);
+                NextDialog.Field(fields,"",ExperienceUi.Label("Standard window borders and menus are hidden in Play. Set edge sizes for controls drawn by the emulator. Start at zero, then adjust until only the game is visible. Open in window restores the original emulator view. " + (selected.ViewProfile==null ? "These adjustments apply to this session." : "These adjustments are saved for this emulator."),130),150);
+                dialog.Action("Apply",delegate {
+                    var value=new PlayViewSettings { ShowControls=controls.Checked, Top=(int)top.Value, Bottom=(int)bottom.Value, Left=(int)left.Value, Right=(int)right.Value };
+                    selected.View=value;
+                    if(selected.ViewProfile!=null) { selected.ViewProfile.PlayView=value; Store.Save(library); }
+                    foreach(var session in sessions.Where(s=>s==selected || selected.ViewProfile!=null && s.ViewProfile==selected.ViewProfile)) { session.View=value;session.Host.ConfigureView(value);if(value.ShowControls)session.RestoreFrontends(); }
+                    dialog.Close();
+                });
+                dialog.Action("Reset",delegate { controls.Checked=false;top.Value=bottom.Value=left.Value=right.Value=0; });
+                dialog.Action("Cancel",dialog.Close);dialog.ShowDialog(FindForm());
+            }
+        }
+        public bool HasRunningSessions { get { return sessions.Any(s=>s.Known.Any(PlayNative.IsAlive)); } }
+        public bool ConfirmExit(IWin32Window owner)
+        {
+            if(!HasRunningSessions) return true;
+            using(var dialog=new PlayExitDialog(sessions.Where(s=>s.Known.Any(PlayNative.IsAlive)).Select(s=>s.Title))) {
+                DialogResult answer=dialog.ShowDialog(owner);
+                if(answer==DialogResult.Yes) return TryDetachAll();
+                if(answer!=DialogResult.OK) return false;
+            }
+            return RequestCloseAll();
+        }
+        public bool RequestCloseAll()
+        {
+            var identities=sessions.SelectMany(s=>s.Known).GroupBy(p=>p.Key).Select(g=>g.First()).ToList();
+            var roots=sessions.Select(s=>s.Host.GameWindow).Where(w=>w!=IntPtr.Zero).ToList();
+            foreach(var session in sessions) if(session.Sharing!=null && !session.Sharing.IsDisposed) session.Sharing.Close();
+            // Keep renderers owned by FishBowl. The progress dialog hosts native save prompts.
+            timer.Stop();
+            bool closed;
+            try { closed=PlayShutdown.Close(FindForm(),identities,roots); }
+            finally { if(!disposing && sessions.Count>0) timer.Start(); }
+            foreach(var session in sessions) session.Notice=closed ? null : "The game is still running. Save your progress and try closing again.";
+            RefreshStatus();
+            return closed;
         }
         public void Launch(Process process, string title) { Launch(process, title, new List<SessionProcess>()); }
         public void Launch(Process process, string title, IList<SessionProcess> before)
@@ -470,7 +655,13 @@ namespace EmulatorHub
                 var existing=sessions.FirstOrDefault(s => s.Known.Any(p=>p.Key==identity.Key));
                 if(existing!=null) { existing.External=false; existing.Notice=null; existing.Added=DateTime.UtcNow; timer.Start(); choice.SelectedItem=existing; ShowSelected(); return; }
                 if ((before ?? new List<SessionProcess>()).Any(p => p.Key == identity.Key)) { status.Text = "This launcher is already running. Choose its window with Show in Play."; return; }
-                var session = new Session { Title = string.IsNullOrWhiteSpace(title) ? "Running game" : title, Before = new HashSet<string>((before ?? new List<SessionProcess>()).Select(p => p.Key)), Host = new PlayWindowHost() };
+                var session = new Session { Title = string.IsNullOrWhiteSpace(title) ? "Running game" : title, Before = new HashSet<string>((before ?? new List<SessionProcess>()).Select(p => p.Key)), Host = new PlayWindowHost { PreserveRendererWindow = true } };
+                try {
+                    string executable=PlayNative.Executable(process);
+                    session.ViewProfile=library.Emulators.FirstOrDefault(e=>PlayNative.SameExecutable(e.Executable,executable) || (e.Builds??new List<EmulatorBuild>()).Any(b=>PlayNative.SameExecutable(b.Executable,executable)));
+                    if(session.ViewProfile!=null && session.ViewProfile.PlayView!=null) session.View=session.ViewProfile.PlayView;
+                } catch(Exception error) { Store.Log("Play view profile: " + error.Message); }
+                session.Host.ConfigureView(session.View);
                 session.Known.Add(identity); timer.Start();
                 try
                 {
@@ -482,7 +673,7 @@ namespace EmulatorHub
                 stage.Controls.Add(session.Host); session.Host.Visible = false;
                 sessions.Add(session); choice.Items.Add(session); choice.SelectedItem = session;
                 ShowSelected();
-                IntPtr initial=PlayNative.Find(session.Known);
+                IntPtr initial=PlayNative.Find(session.Known,session.Title);
                 if(initial!=IntPtr.Zero) session.Host.AttachWindow(initial,identity.Pid,identity.StartedUtcTicks);
                 RefreshStatus();
                 timer.Interval=150;
@@ -553,7 +744,7 @@ namespace EmulatorHub
         void ShowSelected()
         {
             var selected = Selected(); foreach (var session in sessions) session.Host.Visible = session == selected;
-            if (selected != null) selected.Host.BringToFront(); RefreshStatus();
+            if (selected != null && stage.Controls.GetChildIndex(selected.Host) != 0) selected.Host.BringToFront(); RefreshStatus();
         }
         void RefreshStatus()
         {
@@ -565,14 +756,16 @@ namespace EmulatorHub
             choice.Enabled = selected != null;
             fullscreenButton.Text = fullScreenActive ? "Exit full screen" : "Full screen";
             fullscreenButton.Enabled = selected != null || fullScreenActive;
-            externalButton.Enabled = selected != null && !selected.External;
+            externalButton.Enabled = selected != null;
+            externalButton.Text=selected!=null&&selected.External?"Return to Play":"Open in window";
+            externalButton.AccessibleName=externalButton.Text;
             retryButton.Enabled = selected != null && (selected.External || !selected.Host.IsAttached);
             shareButton.Enabled = selected != null;
             moreButton.Enabled = selected != null;
             empty.Visible = selected == null;
             if (selected == null) status.Text = "Launch a game or emulator to show it here.";
             else if (!string.IsNullOrEmpty(selected.Notice)) status.Text = selected.Title + ": " + selected.Notice;
-            else if (selected.External) status.Text = selected.Title + " is open in its own window. The game keeps running.";
+            else if (selected.External) status.Text = selected.Title + " is open in its own window. Return to Play brings the same game back.";
             else if (selected.Host.IsAttached) status.Text = selected.Title + " is running in Play. Switching menus keeps it running.";
             else if ((DateTime.UtcNow - selected.Added).TotalSeconds > 20) status.Text = selected.Title + ": " + (selected.Host.LastError ?? "No compatible game window is available yet. Finish any emulator startup dialog, then choose Show in Play; Open in window keeps the session available.");
             else status.Text = "Waiting for " + selected.Title + " to open its game window...";
@@ -620,16 +813,17 @@ namespace EmulatorHub
                     sessions.Remove(session); choice.Items.Remove(session); session.Dispose();
                     Store.Log("Play session ended: " + session.Title); continue;
                 }
-                if (!session.External && !session.Host.IsAttached && (DateTime.UtcNow - session.Added).TotalSeconds <= 20)
+                if (!session.External && ((!session.Host.IsAttached && ((DateTime.UtcNow - session.Added).TotalSeconds <= 20 || session.Host.GameWindow!=IntPtr.Zero)) || session.Host.IsAttached && (DateTime.UtcNow-session.Added).TotalSeconds<=20 && PlayNative.Rank(session.Host.GameWindow,session.Title)<2))
                 {
-                    IntPtr candidate = PlayNative.Find(session.Known.Where(p => keys.Contains(p.Key)));
-                    if (candidate != IntPtr.Zero)
+                    IntPtr candidate = PlayNative.Find(session.Known.Where(p => keys.Contains(p.Key)),session.Title);
+                    if (candidate != IntPtr.Zero && (!session.Host.IsAttached || PlayNative.Rank(candidate,session.Title)>PlayNative.Rank(session.Host.GameWindow,session.Title)))
                     {
                         uint pid; PlayNative.GetWindowThreadProcessId(candidate, out pid);
                         var identity = session.Known.First(p => p.Pid == pid && keys.Contains(p.Key));
                         session.Host.AttachWindow(candidate, identity.Pid, identity.StartedUtcTicks);
                     }
                 }
+                HideFrontend(session);
             }
             if (choice.SelectedIndex < 0 && choice.Items.Count > 0) choice.SelectedIndex = 0;
             ShowSelected();
@@ -641,6 +835,23 @@ namespace EmulatorHub
             foreach(var session in sessions) if(!session.Host.PrepareHandleChange()) success=false;
             return success;
         }
+        void HideFrontend(Session session)
+        {
+            if(session.External || !session.Host.IsAttached || session.View.ShowControls || session.ViewProfile==null) return;
+            string vendor=PlayNative.NormalizeCaption(Path.GetFileNameWithoutExtension(session.ViewProfile.Executable??"").Split('-','_').FirstOrDefault());
+            if(vendor.Length<3)return;
+            PlayNative.EnumWindows(delegate(IntPtr window,IntPtr unused) {
+                if(window==session.Host.GameWindow || session.Frontends.Any(f=>f.Window==window) || !PlayNative.IsWindowVisible(window) || !PlayNative.IsWindowEnabled(window) || PlayNative.IsHungAppWindow(window) || PlayNative.GetWindow(window,4)!=IntPtr.Zero || (PlayNative.GetLong(window,PlayNative.ExStyle)&1)!=0)return true;
+                uint pid;PlayNative.GetWindowThreadProcessId(window,out pid);
+                var identity=session.Known.FirstOrDefault(p=>p.Pid==pid&&PlayNative.Matches(window,p.Pid,p.StartedUtcTicks));if(identity==null)return true;
+                string caption=PlayNative.WindowCaption(window);string normalized=PlayNative.NormalizeCaption(caption);
+                if(!normalized.StartsWith(vendor,StringComparison.Ordinal) || caption.IndexOfAny(new[]{'|',':'})>=0 || new[]{"settings","configuration","error","warning","save","open","load"}.Any(normalized.Contains) || PlayNative.Rank(window,session.Title)>=PlayNative.Rank(session.Host.GameWindow,session.Title))return true;
+                var placement=new PlayNative.Placement{Length=Marshal.SizeOf(typeof(PlayNative.Placement))};
+                if(PlayNative.GetWindowPlacement(window,ref placement)&&PlayNative.SetProp(window,session.FrontendMarker,new IntPtr(1))) {
+                    session.Frontends.Add(new Session.Frontend{Window=window,Pid=identity.Pid,Started=identity.StartedUtcTicks,Placement=placement});PlayNative.ShowWindowAsync(window,0);
+                }return true;
+            },IntPtr.Zero);
+        }
         public void ResumeHandleChange()
         {
             foreach(var session in sessions) if(!session.External) session.Host.ResumeHandleChange();
@@ -650,7 +861,7 @@ namespace EmulatorHub
         public bool TryDetachAll()
         {
             bool success=true;
-            foreach(var session in sessions) if(session.Host.TryDetach()) session.External=true; else success=false;
+            foreach(var session in sessions) if(session.RestoreFrontends() && session.Host.TryDetach()) session.External=true; else success=false;
             RefreshStatus(); return success;
         }
         protected override void Dispose(bool disposingValue)

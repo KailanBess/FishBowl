@@ -20,7 +20,8 @@ namespace EmulatorHub
     {
         public static void Open(Form owner, LibraryData library, EmulatorProfile emulator)
         {
-            using (var dialog = new RemotePlayDialog(library, emulator)) dialog.ShowDialog(owner);
+            var dialog=new RemotePlayDialog(library,emulator);
+            dialog.FormClosed+=delegate {dialog.Dispose();};dialog.Show(owner);
         }
         public static readonly Dictionary<string, ushort> Keys = new Dictionary<string, ushort> {
             { "ArrowUp", 0x26 }, { "ArrowDown", 0x28 }, { "ArrowLeft", 0x25 }, { "ArrowRight", 0x27 },
@@ -52,13 +53,13 @@ namespace EmulatorHub
             Field(fields, "Token service", service);
             Field(fields, "Game window", targets);
             Field(fields, "Shared input", allow);
-            var note = new Label { AutoSize = true, MaximumSize = new Size(680, 0), Text = "Start the game first, choose its window, then open the browser client. Share session in Play opens the selected emulator in its own window and returns it to Play when this dialog closes. Choose the same game window in the sharing picker. Approve one guest in the browser and allow controls here. Only the foreground game receives the listed keyboard controls. Configure those keys in the emulator." };
+            var note = new Label { AutoSize = true, MaximumSize = new Size(680, 0), Text = "Start the game first, choose its window, then open the browser client. The game stays in Play while this session is open. Choose the same game window in the sharing picker. Approve one guest in the browser and allow controls here. Only the focused game receives the listed keyboard controls. Configure those keys in the emulator." };
             Field(fields, "Session", note, 120);
             Field(fields, "Status", status, 70);
             Action("Refresh windows", RefreshTargets);
             Action("Open client", OpenClient);
             Action("Stop sharing", StopBridge);
-            Action(preferred == null ? "Close" : "Stop sharing and return", Close);
+            Action("Close", Close);
             allow.CheckedChanged += delegate { if (bridge != null) bridge.Allow(allow.Checked); };
             targets.SelectedIndexChanged += delegate { if (bridge != null) { StopBridge(); status.Text = "Target changed. Open a new client session."; } };
             FormClosed += delegate { StopBridge(); };
@@ -77,6 +78,8 @@ namespace EmulatorHub
                     targets.Items.Add(new RemoteWindow { Pid = process.Id, Started = process.StartTime.ToUniversalTime().Ticks, Handle = process.MainWindowHandle, Title = process.MainWindowTitle, Program = program });
                 } catch { }
             }
+            // Embedded child windows are not Process.MainWindowHandle; retain the exact selected Play HWND.
+            if(preferred!=null&&PlayNative.Matches(preferred.Handle,preferred.Pid,preferred.Started)&&!targets.Items.Cast<RemoteWindow>().Any(t=>t.Handle==preferred.Handle&&t.Pid==preferred.Pid&&t.Started==preferred.Started))targets.Items.Add(preferred);
             if (targets.Items.Count > 0) targets.SelectedIndex = 0;
             if (preferred != null) targets.SelectedIndex = -1;
             if (preferred != null) for (int i = 0; i < targets.Items.Count; i++) {
@@ -95,7 +98,7 @@ namespace EmulatorHub
                 if (library.Multiplayer == null) library.Multiplayer = new MultiplayerSettings();
                 library.Multiplayer.RelayGatewayUrl = address; Store.Save(library);
                 StopBridge(); bridge = new RemotePlayBridge(target, address); bridge.Start(); bridge.Allow(allow.Checked);
-                Process.Start(new ProcessStartInfo(bridge.Address) { UseShellExecute = true });
+                FishBowlWeb.OpenExternal(library,bridge.Address);
                 status.Text = "Client opened. Keep this session open. Stop sharing releases all guest controls.";
             } catch (Exception ex) { StopBridge(); status.Text = ex.Message; }
         }
