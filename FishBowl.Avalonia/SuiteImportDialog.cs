@@ -61,7 +61,9 @@ namespace EmulatorHub
             foreach (var candidate in candidates)
             {
                 bool registered = Registered(candidate) != null;
-                emulators.Add(candidate, !registered, candidate.Name, registered ? "Already in FishBowl" : "Not added", candidate.Executable);
+                var preset = EmulatorCatalog.Find(candidate.Preset).Name;
+                var same = preset == "Custom" ? null : library.Emulators.FirstOrDefault(e => EmulatorCatalog.Find(e.Preset).Name == preset);
+                emulators.Add(candidate, !registered && same == null, candidate.Name, registered ? "Already in FishBowl" : same != null ? "FishBowl already has " + same.Name : "Not added", candidate.Executable);
             }
             ShowFolders();
             status.Text = candidates.Count + " emulators and " + suite.RomFolders.Count + " ROM folders with games found.";
@@ -76,15 +78,14 @@ namespace EmulatorHub
             }
         }
 
-        // EmuDeck installs Flatpaks and AppImages that the regular scan finds; its launcher scripts cover the rest.
+        // EmuDeck installs Flatpaks and AppImages in ~/Applications, which the regular scan finds; its launcher scripts
+        // cover the rest. Distribution packages on PATH are not EmuDeck's and stay in Find installed.
         private static List<DiscoveredEmulator> Candidates(SuiteInstall suite)
         {
-            var result = new List<DiscoveredEmulator>(suite.Emulators.Where(e => suite.Kind == "RetroDECK"));
-            if (suite.Kind == "EmuDeck")
-            {
-                result.AddRange(EmulatorDiscovery.ScanSystem(CancellationToken.None).Items);
-                result.AddRange(suite.Emulators.Where(e => !result.Any(r => r.Name == e.Name)));
-            }
+            if (suite.Kind != "EmuDeck") return suite.Emulators.ToList();
+            var applications = Path.Combine(Platform.Home, "Applications") + "/";
+            var result = EmulatorDiscovery.ScanSystem(CancellationToken.None).Items.Where(e => Platform.FlatpakId(e.Executable) != null || e.Executable.StartsWith(applications, StringComparison.Ordinal)).ToList();
+            result.AddRange(suite.Emulators.Where(e => !result.Any(r => r.Name == e.Name)));
             return result;
         }
         private EmulatorProfile Registered(DiscoveredEmulator candidate)
