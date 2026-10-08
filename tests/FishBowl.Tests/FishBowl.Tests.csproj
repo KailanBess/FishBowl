@@ -31,5 +31,6 @@
     <Compile Include="GamesTests.cs" />
     <Compile Include="../../FishBowl.Profiles.cs" Link="Shared/FishBowl.Profiles.cs" />
     <Compile Include="ProfilesTests.cs" />
+    <Compile Include="LaunchOptionsTests.cs" />
   </ItemGroup>
 </Project>

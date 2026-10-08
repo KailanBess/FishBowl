@@ -64,13 +64,7 @@ namespace EmulatorHub
 
         public static void ApplyAccessibility(LibraryData data, string preset)
         {
-            if (preset == "Current") return;
-            if (data.Theme == null) data.Theme = new ThemeSettings();
-            if (data.Enhancements == null) data.Enhancements = new NextSettings();
-            if (preset == "Larger text") data.Enhancements.TextPercent = 150;
-            if (preset == "High contrast") { data.Theme.Name = "High Contrast"; data.Theme.SelectionContrast = "Strong"; data.Theme.RestrainedAccents = false; }
-            if (preset == "Reduced motion") { data.Enhancements.ReducedMotion = true; data.Theme.EnableMotion = false; }
-            if (preset == "Controller") { UserTools.Ensure(data).Controller = true; Immersion.Ensure(data).Roomier = true; data.Theme.ControlDensity = "Roomy"; data.Enhancements.TextPercent = Math.Max(125, data.Enhancements.TextPercent); }
+            ProfileTools.ApplyAccessibility(data, preset);
         }
 
         public static void Open(IWin32Window owner, LibraryData data, Action refresh)

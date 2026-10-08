@@ -557,6 +557,10 @@ namespace EmulatorHub
 			public string WorkingDirectory { get; set; }
 			public string GamePath { get; set; }
 			public EmulatorProfile Emulator { get; set; }
+			// Linux launch options (FishBowl.Profiles.cs): extra environment, skipped-tool notes and a short summary.
+			public Dictionary<string, string> Environment { get; set; }
+			public List<string> Notes { get; set; }
+			public string Summary { get; set; }
 		}
 
 		// The emulator with the game's preferred build applied (a copy when the build differs).
@@ -612,6 +616,7 @@ namespace EmulatorHub
 			plan.Program = emulator.Executable; plan.Arguments = arguments; plan.GamePath = path; plan.Emulator = emulator;
 			string working = game.Extras == null ? null : game.Extras.WorkingDirectory;
 			plan.WorkingDirectory = Directory.Exists(working) ? working : Path.GetDirectoryName(emulator.Executable);
+			LinuxLaunch.ApplyToGame(plan, emulator, game);
 			return plan;
 		}
 #endif

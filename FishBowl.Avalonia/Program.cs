@@ -77,9 +77,12 @@ namespace EmulatorHub
         public static int Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += (sender, e) => Store.Log("Unhandled failure: " + e.ExceptionObject);
+            // --launch, --launch-last, --list and --help start or list games and emulators without opening a window.
+            if (CommandLine.Requested(args)) return CommandLine.Run(args, Console.Out, Console.Error);
             try
             {
-                return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                // Held while the window is open so a command-line launch never saves over this window's library.
+                using (CommandLine.WindowLock()) return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             }
             catch (Exception error)
             {

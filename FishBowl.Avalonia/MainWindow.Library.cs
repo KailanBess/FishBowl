@@ -54,7 +54,7 @@ namespace EmulatorHub
                 MenuAction("Library maintenance...", "check", ShowLibraryMaintenance),
                 MenuAction("Repair game paths...", "repair", RepairLibraryPaths),
                 MenuAction("Artwork cleanup...", "image", CleanupLibraryArtwork),
-                MenuAction("Profiles...", "settings", ManageLibraryProfiles),
+                MenuAction("User tools...", "settings", ManageLibraryProfiles),
                 MenuAction("Remote couch play...", "controller", ShowRemoteCouchPlay) } };
             var toolbar = Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Add folder", AddLibraryFolder), Ui.Action("Play", LaunchLibraryGame), Ui.Action("Edit game", EditLibraryGame), Ui.Action("Remove", RemoveLibraryGame), more);
             DockPanel.SetDock(toolbar, Dock.Top); panel.Children.Add(toolbar);
@@ -459,9 +459,8 @@ namespace EmulatorHub
             GamePlay.LaunchPlan plan;
             try { plan = GamePlay.Prepare(library, game); }
             catch (IOException error) { await Ui.Message(this, game.Title + " could not start.\n\n" + error.Message); return; }
-            var info = Platform.StartInfo(plan.Program, "");
-            if (Directory.Exists(plan.WorkingDirectory)) info.WorkingDirectory = plan.WorkingDirectory;
-            foreach (var argument in plan.Arguments) info.ArgumentList.Add(argument);
+            if (!await ConfirmGameLaunch(game, plan)) return;
+            var info = LinuxLaunch.StartInfo(plan);
             var beforeLaunch = SessionLedger.ProcessSnapshot();
             var started = DateTime.UtcNow; Process process;
             try { process = Process.Start(info); }
@@ -469,9 +468,9 @@ namespace EmulatorHub
             if (process == null) throw new IOException("The game could not be started.");
             GamePlay.RecordLaunch(library, game, started);
             StartLibrarySession(game, process, beforeLaunch, started, plan.Program);
-            Store.Log("Game launched: " + game.Title + " | Program: " + plan.Program + " | Arguments: " + String.Join(" ", plan.Arguments));
+            Store.Log("Game launched: " + game.Title + " | " + LinuxLaunch.CommandLine(plan));
             Store.Save(library); RefreshGameLibrary();
-            SetStatus("Started " + game.Title + ".");
+            SetStatus("Started " + game.Title + "." + (plan.Notes == null || plan.Notes.Count == 0 ? "" : " " + String.Join(" ", plan.Notes)));
         }
 
         private async Task ReopenLastGame()

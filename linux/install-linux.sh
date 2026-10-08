@@ -35,7 +35,7 @@ if command -v magick >/dev/null 2>&1; then
 else
     cp "$here/../FishBowl.png" "$data/icons/hicolor/256x256/apps/fishbowl.png"
 fi
-sed "s|@EXEC@|$prefix/lib/fishbowl/FishBowl|" "$here/fishbowl.desktop" > "$data/applications/fishbowl.desktop"
+sed "s|@EXEC@|$prefix/lib/fishbowl/FishBowl|g" "$here/fishbowl.desktop" > "$data/applications/fishbowl.desktop"
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$data/applications" || true
 command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "$data/icons/hicolor" || true
 
