@@ -10,11 +10,11 @@ Use a game you own and back up saves before a live test. Do not install a packag
 | Switch Home, Emulators, Library and Play repeatedly | Game process remains alive; Play restores its window; no stray filter labels appear |
 | Enter and exit fullscreen using the visible button | Game renders at the new size; Exit full screen remains available when game input has focus |
 | Move and resize across monitors at different scaling | Rendering remains inside Play; no renderer DPI reset, lost window or clipped toolbar |
-| Open in window, then Show in Play | The same game and process survive; original window decorations and placement return |
+| Open in window, then Return to Play | The same game and process survive; original window decorations and placement return |
 | Open an emulator dialog while embedded | Dialog is usable; Play does not draw over FishBowl's own modal dialogs |
 | Keyboard, mouse and controller input | The focused emulator receives game input; shell navigation does not steal buttons |
 | Disconnect and reconnect a controller | No stuck input; navigation resumes only when FishBowl has focus |
-| Share session | Exact selected window is preselected; sharing stops and the game returns to Play when the dialog closes |
+| Share session | Exact selected window is preselected and remains embedded; the modeless sharing dialog leaves FishBowl enabled; closing it stops sharing |
 | Two-device streaming | Guest sees video and hears audio; approved controls reach only the exact foreground game; stopping releases keys |
 | Close FishBowl while the game runs | Confirmation defaults to Cancel; Close games and exit requests normal shutdown, honors save/exit vetoes, and Keep games running restores the external window; session checkpoints survive restart |
 | Busy, elevated or unsupported emulator | Actionable status and external-window fallback; no false detach-success message |

@@ -7,16 +7,16 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 | Windows | 1.25.8 | Current release |
 | Linux | Preview | Library and expansion screens; Linux desktop testing remains required |
 
-Source version **1.29.1** adds a Windows Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. Play includes game-only view adjustments and confirmation before closing running games, with normal emulator shutdown and save/exit prompts honored. It retains session recovery, controller navigation, Home customization and the existing game, save and integration tools. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source. See [Browser setup](docs/BROWSER.md) for requirements and native-window compatibility.
+Source version **1.29.2** adds a Windows Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. Play includes game-only view adjustments and confirmation before closing running games, with normal emulator shutdown and save/exit prompts honored. It retains session recovery, controller navigation, Home customization and the existing game, save and integration tools. The public release remains 1.25.8 until review and CI complete. Download complete app and source bundles from the latest passing Build workflow, or build from source. See [Browser setup](docs/BROWSER.md) for requirements and native-window compatibility.
 
-For Windows, choose **FishBowl-1.29.1.zip** to run the app; keep its six files together. **FishBowl-1.29.1-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
+For Windows, choose **FishBowl-1.29.2.zip** to run the app; keep its six files together. **FishBowl-1.29.2-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
 
 ## Features
 
 ### Windows
 
-- **Home, Emulators, Library and Play** sections, with a continue-playing dashboard, pinned games and quick actions.
-- **Play:** compatible Windows emulator windows appear inside FishBowl, using child hosting or a borderless window aligned to Play for per-monitor renderers. Sessions remain open when switching sections; Full screen expands the player, and Open in window restores the emulator’s own window. Closing FishBowl returns running emulators to their own windows. Elevated, incompatible or renderer-managed windows may require Open in window. Remote hosting currently uses a detached game window.
+- **Home, Emulators, Library, Play and Web** sections, with a continue-playing dashboard, pinned games and quick actions.
+- **Play:** compatible Windows emulator windows appear inside FishBowl, using child hosting or a borderless window aligned to Play for per-monitor renderers. Sessions remain open when switching sections; Full screen expands the player, and Open in window restores the emulator’s own window. Closing FishBowl asks before requesting normal emulator shutdown; Cancel keeps the app open, and Keep games running restores external windows. Save and exit prompts are honored. Elevated, incompatible or renderer-managed windows may require Open in window. Remote hosting keeps the game in Play. Open in window changes to Return to Play for reattaching the same session.
 - **Game library** with cover artwork, game identification, collections (including nested collections), smart lists, a play queue, favorites, ratings, progress and custom metadata. Already installed games can be launched directly.
 - **Emulator management:**
   - presets for more than 40 emulators, plus custom emulators
@@ -55,7 +55,7 @@ The Linux version shares the emulator presets, folder routing, backups and libra
 
 The preview includes Home, Library, profiles, collections, keyboard/joystick living-room browsing, title/cover editing, removal with Undo, game setup, Steam import, integrations, mods, media, play history and verified file save recovery. Folder save archives use the emulator backup manager. Linux controller navigation reads available `/dev/input/js*` devices; mappings and device permissions depend on the system. The library file is shared; Linux preserves unfamiliar fields when it saves.
 
-Session journals recover saved active time and resume verified running processes after restart. Time while FishBowl is closed is excluded; launchers without a verifiable process identity or ancestry remain uncertain. Games stay running when FishBowl closes. Windows includes browser window sharing and host-approved keyboard/gamepad-to-keyboard controls. Linux can join in the browser; native Linux hosting is not implemented. Remote play needs a configured LiveKit deployment and token service; see [setup and live-test checklist](remote-play/README.md).
+Session journals recover saved active time and resume verified running processes after restart. Time while FishBowl is closed is excluded; launchers without a verifiable process identity or ancestry remain uncertain. Linux leaves games running when FishBowl closes; Windows offers confirmed shutdown or explicit keep-running behavior. Windows includes browser window sharing and host-approved keyboard/gamepad-to-keyboard controls. Linux can join in the browser; native Linux hosting is not implemented. Remote play needs a configured LiveKit deployment and token service; see [setup and live-test checklist](remote-play/README.md).
 
 ## Installation
 
@@ -124,7 +124,7 @@ Extensions are declarative JSON manifests of kind `Metadata`, `Importer` or `Emu
 
 The companion starts explicitly on localhost or a selected private network address. Its random pairing address grants read-only title and play-history access while it is running. Closing it stops the server. It does not serve game files, save contents, local paths or credentials.
 
-Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (`v1.28.0` for this version). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
+Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (for example, `v1.29.2` for source version 1.29.2). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
 
 ## Repository layout
 
@@ -132,6 +132,7 @@ Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 ch
 | --- | --- |
 | `windows/` | Windows release source, build and test scripts, and change notes |
 | `FishBowl.Model.cs` | The library data model (`library.json`), shared by both versions |
+| `FishBowl.Games.cs`, `FishBowl.Library.cs`, `FishBowl.LivingRoom.cs`, `FishBowl.SaveTools.cs`, `FishBowl.Sessions.cs` | Shared library, living-room, save and session helpers |
 | `FishBowl.GameRecognition.cs` | Game identification from local metadata, shared by both versions |
 | `FishBowl.Core.cs`, `FishBowl.Platform.cs` | Shared emulator logic, and the differences between Windows and Linux |
 | `FishBowl.Avalonia/` | The Linux user interface |

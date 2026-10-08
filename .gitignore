@@ -33,3 +33,33 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Generated binaries, archives and diagnostic output (source-only repository)
+*.exe
+*.dll
+*.pdb
+*.zip
+*.7z
+*.tar.gz
+*.log
+TestResults/
+
+# Personal games, installation packages and firmware
+*.3ds
+*.cci
+*.cia
+*.cxi
+*.iso
+*.chd
+*.wbfs
+*.gcm
+*.nds
+*.gba
+*.gbc
+*.gb
+*.nes
+*.sfc
+*.smc
+*.nsp
+*.xci
+*.rom

@@ -454,6 +454,7 @@ namespace EmulatorHub
             internal readonly Dictionary<string, Process> Handles = new Dictionary<string, Process>();
             internal HashSet<string> Before;
             internal PlayWindowHost Host;
+            internal RemotePlayDialog Sharing;
             internal bool External;
             internal DateTime Added = DateTime.UtcNow;
             public override string ToString() { return Title; }
@@ -466,7 +467,7 @@ namespace EmulatorHub
                     Frontends.Remove(item);
                 }return true;
             }
-            public void Dispose() { RestoreFrontends();Host.Dispose(); foreach (Process process in Handles.Values) process.Dispose(); }
+            public void Dispose() { if(Sharing!=null)Sharing.Close();RestoreFrontends();Host.Dispose(); foreach (Process process in Handles.Values) process.Dispose(); }
         }
         readonly LibraryData library;
         readonly Action fullscreen;
@@ -492,7 +493,7 @@ namespace EmulatorHub
             choice = NextDialog.Choice(new string[0], null); choice.Width = 220; choice.AccessibleName = "Running games";
             toolbar.Controls.Add(choice);
             fullscreenButton = ExperienceUi.Button("Full screen", delegate { if (fullscreen != null) fullscreen(); });
-            externalButton = ExperienceUi.Button("Open in window", delegate { OpenSelectedInWindow(); });
+            externalButton = ExperienceUi.Button("Open in window", delegate { var selected=Selected();if(selected!=null&&selected.External)RetrySelected();else OpenSelectedInWindow(); });
             retryButton = ExperienceUi.Button("Show in Play", RetrySelected);
             shareButton = ExperienceUi.Button("Share session", ShareSelected);
             moreButton = ExperienceUi.Button("More", delegate { });
@@ -529,23 +530,31 @@ namespace EmulatorHub
         }
         void RetrySelected() {
             var selected = Selected(); if (selected == null) return;
-            selected.External = false; selected.Notice = null; selected.Added = DateTime.UtcNow; timer.Start(); RefreshStatus();
+            selected.External = false; selected.Notice = null; selected.Added = DateTime.UtcNow;timer.Interval=150; timer.Start();
+            IntPtr window=PlayNative.Find(selected.Known,selected.Title);
+            var identity=selected.Known.FirstOrDefault(p=>PlayNative.Matches(window,p.Pid,p.StartedUtcTicks));
+            if(identity!=null)selected.Host.AttachWindow(window,identity.Pid,identity.StartedUtcTicks);
+            HideFrontend(selected);ShowSelected();RefreshStatus();
         }
+        public void ShareSession() { ShareSelected(); }
         void ShareSelected() {
             var selected = Selected(); if (selected == null) return;
+            if(selected.Sharing!=null&&!selected.Sharing.IsDisposed){selected.Sharing.BringToFront();return;}
             IntPtr window = selected.Host.GameWindow;
             if (window == IntPtr.Zero) window = PlayNative.Find(selected.Known,selected.Title);
             uint pid; PlayNative.GetWindowThreadProcessId(window, out pid);
             var identity = selected.Known.FirstOrDefault(p => p.Pid == pid && PlayNative.Matches(window, p.Pid, p.StartedUtcTicks));
             if (identity == null) { selected.Notice = "No responding game window is available. Wait for the emulator, then retry."; RefreshStatus(); return; }
-            bool wasExternal = selected.External;
-            if (!OpenSelectedInWindow()) return;
-            try {
-                using (var dialog = new RemotePlayDialog(library, null, new RemoteWindow { Pid = identity.Pid, Started = identity.StartedUtcTicks, Handle = window, Title = selected.Title }))
-                    dialog.ShowDialog(FindForm());
-            } finally {
-                if (!wasExternal && sessions.Contains(selected)) { choice.SelectedItem = selected; RetrySelected(); }
+            if(!selected.External&&!selected.Host.IsAnchored) {
+                if(!selected.Host.PrepareHandleChange()){selected.Notice="The game window is busy. Wait for it to respond, then retry sharing.";RefreshStatus();return;}
+                selected.Host.PreserveRendererWindow=true;selected.Host.ResumeHandleChange();
+                if(!selected.Host.IsAttached){selected.Notice="The game window could not be prepared for sharing. Choose Show in Play to retry.";RefreshStatus();return;}
             }
+            // A modeless dialog leaves the owner enabled, so anchored renderers stay visible in Play.
+            var dialog=new RemotePlayDialog(library,null,new RemoteWindow{Pid=identity.Pid,Started=identity.StartedUtcTicks,Handle=window,Title=selected.Title});
+            selected.Sharing=dialog;
+            dialog.FormClosed+=delegate {selected.Sharing=null;dialog.Dispose();};
+            dialog.Show(FindForm());
         }
         void SessionDetails() {
             var selected = Selected(); if (selected == null) return;
@@ -723,14 +732,16 @@ namespace EmulatorHub
             choice.Enabled = selected != null;
             fullscreenButton.Text = fullScreenActive ? "Exit full screen" : "Full screen";
             fullscreenButton.Enabled = selected != null || fullScreenActive;
-            externalButton.Enabled = selected != null && !selected.External;
+            externalButton.Enabled = selected != null;
+            externalButton.Text=selected!=null&&selected.External?"Return to Play":"Open in window";
+            externalButton.AccessibleName=externalButton.Text;
             retryButton.Enabled = selected != null && (selected.External || !selected.Host.IsAttached);
             shareButton.Enabled = selected != null;
             moreButton.Enabled = selected != null;
             empty.Visible = selected == null;
             if (selected == null) status.Text = "Launch a game or emulator to show it here.";
             else if (!string.IsNullOrEmpty(selected.Notice)) status.Text = selected.Title + ": " + selected.Notice;
-            else if (selected.External) status.Text = selected.Title + " is open in its own window. The game keeps running.";
+            else if (selected.External) status.Text = selected.Title + " is open in its own window. Return to Play brings the same game back.";
             else if (selected.Host.IsAttached) status.Text = selected.Title + " is running in Play. Switching menus keeps it running.";
             else if ((DateTime.UtcNow - selected.Added).TotalSeconds > 20) status.Text = selected.Title + ": " + (selected.Host.LastError ?? "No compatible game window is available yet. Finish any emulator startup dialog, then choose Show in Play; Open in window keeps the session available.");
             else status.Text = "Waiting for " + selected.Title + " to open its game window...";

@@ -169,19 +169,22 @@ class PlayHostTests
                     Check(NextUi.Descendants(play).OfType<Label>().Any(l=>l.Text.Contains("It remains in Play")),"failed detach gives actionable feedback");
                 } finally { typeof(PlayWindowHost).GetField("transitioning",Private).SetValue(host,false); }
                 Check(play.OpenSelectedInWindow(),"retry succeeds after native transition completes");
-                NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Show in Play").PerformClick();
+                var returnToPlay=NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Return to Play");
+                Check(returnToPlay.Enabled,"external window button offers an enabled return action");returnToPlay.PerformClick();
                 Check(Until(delegate{return host.IsAttached;}),"retry returns exact native session after detach failure");
                 using(var closeSharing=new System.Windows.Forms.Timer{Interval=50}) {
-                    bool selectedExact=false;
+                    bool selectedExact=false,keptAttached=false;
                     closeSharing.Tick+=delegate {
                         var dialog=Application.OpenForms.Cast<Form>().OfType<RemotePlayDialog>().FirstOrDefault();
                         if(dialog==null)return;
                         var target=NextUi.Descendants(dialog).OfType<ComboBox>().Single().SelectedItem as RemoteWindow;
                         selectedExact=target!=null&&target.Pid==process.Id&&target.Started==start&&target.Handle==window;
+                        keptAttached=host.IsAttached&&host.GameWindow==window&&host.IsAnchored&&main.Enabled;
                         closeSharing.Stop(); dialog.Close();
                     };
                     closeSharing.Start(); NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Share session").PerformClick();
-                    Check(selectedExact,"guided sharing chooses exact detached session generation and HWND");
+                    Check(Until(delegate{return selectedExact;}),"guided sharing chooses the exact embedded session generation and HWND");
+                    Check(keptAttached,"sharing keeps the same renderer in Play and leaves the app enabled");
                 }
                 Check(Until(delegate{return host.IsAttached;}),"closing sharing restores selected game into Play");
                 foreach(int percent in new[]{150,200}) {
@@ -206,7 +209,7 @@ class PlayHostTests
                 foreach(int index in new[]{3,0,1,2,3})
                 {
                     tabs.SelectedIndex=index; Pump(80);
-                    Check(!process.HasExited && IsWindow(window) && GetParent(window)==host.Handle, "native process and attachment survive main tab "+index);
+                    Check(!process.HasExited && host.IsAttached && host.GameWindow==window && (host.IsAnchored?GetWindow(window,4)==main.Handle:GetParent(window)==host.Handle), "native process and attachment survive main tab "+index);
                 }
                 var oldOverride=TextFit.WorkingAreaOverride;
                 TextFit.WorkingAreaOverride=new Rectangle(-4000,-4000,1024,768);

@@ -1,3 +1,10 @@
+# Windows 1.29.2 window recovery
+
+- Go navigates the exact existing browser window through its address bar; searches no longer start another browser instance. Edge/Chrome use navigable normal windows with dedicated profiles.
+- Open in window changes to Return to Web or Return to Play, with accessible labels and immediate reattachment of the same verified session.
+- Share session keeps the game inside Play and uses a modeless dialog. Child renderers switch to an owned viewport for sharing; embedded windows are included by exact PID/start/HWND identity.
+- Main includes the Linux save-parity merge. Documentation and generated-file ignore rules are refreshed; native browser keyboard navigation and two-device streaming remain live checks.
+
 # Windows 1.29.1 browser hosting
 
 - Web uses borderless owned-window hosting to preserve browser rendering and DPI while keeping the browser inside FishBowl. Firefox starts as a normal window instead of desktop kiosk mode.

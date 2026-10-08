@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Reviewed source version, for example 1.29.1'
+        description: 'Reviewed source version, for example 1.29.2'
         required: true
 permissions:
   contents: write

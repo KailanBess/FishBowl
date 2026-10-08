@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.1.0")]
+[assembly: AssemblyFileVersion("1.29.2.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.1.0")]
+[assembly: AssemblyVersion("1.29.2.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.1";
+		private const string FishBowlVersion = "1.29.2";
 
-		private const string FishBowlTitleVersion = "1.29.1";
+		private const string FishBowlTitleVersion = "1.29.2";
 
 		private Icon ownedAppIcon;
 
@@ -319,7 +319,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.29.1";
+			Text = "FishBowl 1.29.2";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -405,11 +405,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.1" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.2" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.1";
+						library.Theme.LastSeenBuild = "1.29.2";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -1946,7 +1946,10 @@ namespace EmulatorHub
 				EmulatorProfile selectedProfile = multiplayerDialog.SelectedProfile;
 				if (multiplayerDialog.Mode == "Remote couch play")
 				{
-                    RemotePlayTools.Open(this, library, selectedProfile);
+                    if(EmulatorRuntime.State(selectedProfile.Executable)==RuntimeState.Running) {
+                        playSurface.Adopt(selectedProfile.Executable,selectedProfile.Name);
+                        workspaceNavigation.SelectedIndex=3;playSurface.ShareSession();
+                    } else RemotePlayTools.Open(this, library, selectedProfile);
 					return;
 				}
 				if (multiplayerDialog.Mode == "Native online")
@@ -3409,7 +3412,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.1"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.2"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3417,7 +3420,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.1"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.2"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3425,7 +3428,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.1"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.2"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}

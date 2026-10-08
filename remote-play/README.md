@@ -15,7 +15,7 @@ Start with `pnpm start`. The default listener is `127.0.0.1:8787`. Restarting th
 ## Host and guest
 
 1. Start the game and configure keyboard controls inside the emulator.
-2. Open FishBowl's Remote couch play, enter the HTTPS service address and choose the running game window. Open the client.
+2. In Play, choose Share session. The selected game stays inside Play, with its exact window preselected in a modeless dialog. Enter the HTTPS service address and open the client. Multiplayer > Start a session uses the same flow for an already running emulator. A child-hosted game switches to an owned viewport so its renderer remains a top-level window for capture; it keeps its place inside FishBowl.
 3. In the browser enter the host key and create a session. Choose **Share game window** and select that same window. Entire-screen sharing is rejected. Browser/OS support determines whether window audio is available.
 4. Send the invitation code privately to the guest. The guest opens the public token-service address, enters the invitation and chooses **Join session**. If browser autoplay blocks sound, choose **Enable sound**.
 5. For shared controls, approve one guest below the host preview, enable controls in FishBowl and bring the selected game to the foreground. The guest enables **Send controls to the host**. Turn these options off to return to viewing only.

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -50,7 +51,7 @@ namespace EmulatorHub {
   static string Quote(string value) { return "\""+value.Replace("\"","\\\"")+"\""; }
   public static ProcessStartInfo StartInfo(BrowserPreferences settings,string profile,string url,bool existing) {
    string address=Address(url);string executable=Resolve(settings);
-   string arguments=settings.Engine=="Firefox" ? (existing?"--profile "+Quote(profile)+" --new-tab "+Quote(address):"--new-instance --profile "+Quote(profile)+" --new-window "+Quote(address)) : "--user-data-dir="+Quote(profile)+" --no-first-run --no-default-browser-check --app="+Quote(address);
+   string arguments=settings.Engine=="Firefox" ? "--new-instance --profile "+Quote(profile)+" --new-window "+Quote(address) : "--user-data-dir="+Quote(profile)+" --no-first-run --no-default-browser-check --new-window "+Quote(address);
    return new ProcessStartInfo(executable,arguments){UseShellExecute=false,WorkingDirectory=Path.GetDirectoryName(executable)};
   }
   public static void OpenExternal(LibraryData library,string url) { var settings=Settings(library);Process.Start(new ProcessStartInfo(Resolve(settings),Quote(Address(url))){UseShellExecute=false}); }
@@ -81,6 +82,7 @@ namespace EmulatorHub {
   readonly List<SessionProcess> known=new List<SessionProcess>();readonly Dictionary<string,Process> handles=new Dictionary<string,Process>();
   HashSet<string> before=new HashSet<string>();Task<List<SessionProcess>> snapshot;
   BrowserPreferences active;string profile;DateTime started;bool inWindow,closing,disposing,fullScreen,leaveRunning;
+  Func<IntPtr,SessionProcess,string,bool> navigateWindow=BrowserNavigation.Navigate;
   public bool HasRunningBrowser {get{return known.Any(PlayNative.IsAlive);}}
   public BrowserSurface(LibraryData data,Action toggleFullscreen) {
    library=data;fullscreen=toggleFullscreen;Dock=DockStyle.Fill;BackColor=FishBowlPalette.ThemeSurface;
@@ -90,8 +92,8 @@ namespace EmulatorHub {
    bar.Controls.Add(address);bar.Controls.Add(ExperienceUi.Button("Go",delegate{Navigate(address.Text);}));
    back=ExperienceUi.Button("Back",delegate{Command(1);});forward=ExperienceUi.Button("Forward",delegate{Command(2);});reload=ExperienceUi.Button("Reload",delegate{Command(3);});
    stop=ExperienceUi.Button("Close browser",delegate{if(!RequestClose())status.Text="Finish the browser's save or exit prompt, then close it again.";});
-   external=ExperienceUi.Button("Open in window",delegate{if(host.TryDetach()){inWindow=true;UpdateState();}});
-   show=ExperienceUi.Button("Show in app",delegate{inWindow=false;timer.Start();UpdateState();});
+   external=ExperienceUi.Button("Open in window",delegate{if(inWindow)ShowInApp();else if(host.TryDetach()){inWindow=true;UpdateState();}});
+   show=ExperienceUi.Button("Show in app",ShowInApp);
    full=ExperienceUi.Button("Full screen",delegate{if(fullscreen!=null)fullscreen();});
    bar.Controls.AddRange(new Control[]{back,forward,reload,external,show,full,stop,ExperienceUi.Button("Browser settings",delegate{using(var dialog=new BrowserSettingsDialog(library))if(dialog.ShowDialog(FindForm())==DialogResult.OK){if(!HasRunningBrowser)address.Text=FishBowlWeb.Settings(library).HomePage;else status.Text="Browser settings saved. Close this Web session and press Go to use the new browser.";}})});
    host=new PlayWindowHost{PreserveRendererWindow=true};empty=ExperienceUi.Label("Browse inside FishBowl. Firefox is the default; Browser settings lets you choose another installed browser. Enter a web address or search, then press Go.",130);empty.Dock=DockStyle.Top;empty.Padding=new Padding(16);host.Controls.Add(empty);
@@ -102,9 +104,13 @@ namespace EmulatorHub {
   public void Navigate(string input) {
    try {
     string url=FishBowlWeb.Address(input);bool running=HasRunningBrowser;
-    if(running && active.Engine!="Firefox") {
-     if(!RequestClose())throw new IOException("Finish the browser's save or exit prompt before opening another address.");
-     running=false;
+    if(running) {
+     ShowInApp();
+     IntPtr window=host.GameWindow;
+     var identity=known.FirstOrDefault(p=>PlayNative.Matches(window,p.Pid,p.StartedUtcTicks));
+     if(!host.IsAttached||identity==null)throw new IOException("Wait for the browser window to return to Web, then press Go again.");
+     if(!navigateWindow(window,identity,url))throw new IOException("The browser could not receive the address. Release any held shortcut keys, return to Web and press Go again.");
+     address.Text=url;UpdateState();return;
     }
     if(!running) {
      Release();var settings=FishBowlWeb.Settings(library);active=new BrowserPreferences{Engine=settings.Engine,Executable=settings.Executable,HomePage=settings.HomePage};
@@ -118,6 +124,14 @@ namespace EmulatorHub {
     }finally{if(process!=null)process.Dispose();}
     address.Text=url;timer.Start();timer.Interval=150;UpdateState();
    }catch(Exception error){status.Text=error.Message;Store.Log("Web: "+error.Message);}
+  }
+  void ShowInApp() {
+   inWindow=false;started=DateTime.UtcNow;timer.Interval=150;timer.Start();
+   if(!host.IsAttached) {
+    IntPtr window=PlayNative.Find(known);var identity=known.FirstOrDefault(p=>PlayNative.Matches(window,p.Pid,p.StartedUtcTicks));
+    if(identity!=null)host.AttachWindow(window,identity.Pid,identity.StartedUtcTicks);
+   }
+   host.RefreshPlacement();UpdateState();
   }
   void Tick(object sender,EventArgs e) {
    if(disposing||closing)return;if(host.IsAnchored)host.RefreshPlacement();
@@ -141,6 +155,8 @@ namespace EmulatorHub {
   }
   void UpdateState() {
    bool running=HasRunningBrowser;back.Enabled=forward.Enabled=reload.Enabled=running;stop.Enabled=external.Enabled=running;show.Enabled=running&&(inWindow||!host.IsAttached);
+   external.Text=inWindow?"Return to Web":"Open in window";
+   external.AccessibleName=external.Text;
    full.Text=fullScreen?"Exit full screen":"Full screen";empty.Visible=!running;
    if(!running)status.Text="Web is ready. No browser runs until you press Go.";
    else if(inWindow)status.Text=active.Engine+" is open in its own window. Show in app returns it to FishBowl.";
@@ -167,6 +183,36 @@ namespace EmulatorHub {
   }
   void Release(){if(!host.TryDetach())throw new InvalidOperationException("The browser window could not be restored safely. Close it in the browser, then retry.");foreach(var process in handles.Values)process.Dispose();handles.Clear();known.Clear();snapshot=null;active=null;}
   protected override void Dispose(bool value){if(value&&!disposing){disposing=true;timer.Stop();if(!leaveRunning)RequestClose();timer.Dispose();Release();}base.Dispose(value);}
+ }
+ // Navigate the exact existing browser HWND instead of invoking a second browser instance.
+ internal static class BrowserNavigation {
+  [StructLayout(LayoutKind.Sequential)] struct NativeInput { public uint Type;public InputUnion Data; }
+  [StructLayout(LayoutKind.Explicit)] struct InputUnion { [FieldOffset(0)]public KeyboardInput Keyboard;[FieldOffset(0)]public MouseInput Mouse; }
+  [StructLayout(LayoutKind.Sequential)] struct KeyboardInput { public ushort VirtualKey,ScanCode;public uint Flags,Time;public IntPtr ExtraInfo; }
+  [StructLayout(LayoutKind.Sequential)] struct MouseInput { public int X,Y;public uint MouseData,Flags,Time;public IntPtr ExtraInfo; }
+  [DllImport("user32.dll")]static extern uint SendInput(uint count,NativeInput[] inputs,int size);
+  [DllImport("user32.dll")]static extern bool SetForegroundWindow(IntPtr window);
+  [DllImport("user32.dll")]static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")]static extern IntPtr SendMessageTimeout(IntPtr window,uint message,IntPtr wParam,IntPtr lParam,uint flags,uint timeout,out IntPtr result);
+  [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
+  static NativeInput Key(ushort key,uint flags){return new NativeInput{Type=1,Data=new InputUnion{Keyboard=new KeyboardInput{VirtualKey=key,Flags=flags}}};}
+  public static bool Navigate(IntPtr window,SessionProcess identity,string url) {
+   if(!PlayNative.Matches(window,identity.Pid,identity.StartedUtcTicks)||PlayNative.IsHungAppWindow(window)||!PlayNative.IsWindowEnabled(window)){Store.Log("Web navigation: window is unavailable, busy or disabled.");return false;}
+   foreach(int key in new[]{0x10,0x11,0x12,0x5b,0x5c})if((GetAsyncKeyState(key)&0x8000)!=0){Store.Log("Web navigation: release held modifier "+key+" before navigating.");return false;}
+   SetForegroundWindow(window);
+   // Cross-process activation is queued to the browser's UI thread. Wait for that thread before typing.
+   IntPtr ignored;SendMessageTimeout(window,0,IntPtr.Zero,IntPtr.Zero,2,250,out ignored);
+   if(GetForegroundWindow()!=window||!PlayNative.Matches(window,identity.Pid,identity.StartedUtcTicks)){Store.Log("Web navigation: Windows did not activate the owned browser window.");return false;}
+   var inputs=new List<NativeInput>{Key(0x11,0),Key(0x4c,0),Key(0x4c,2),Key(0x11,2)};
+   foreach(char character in url) {
+    inputs.Add(new NativeInput{Type=1,Data=new InputUnion{Keyboard=new KeyboardInput{ScanCode=character,Flags=4}}});
+    inputs.Add(new NativeInput{Type=1,Data=new InputUnion{Keyboard=new KeyboardInput{ScanCode=character,Flags=6}}});
+   }
+   inputs.Add(Key(0x0d,0));inputs.Add(Key(0x0d,2));
+   uint sent=SendInput((uint)inputs.Count,inputs.ToArray(),Marshal.SizeOf(typeof(NativeInput)));
+   if(sent!=inputs.Count)Store.Log("Web navigation: Windows accepted "+sent+" of "+inputs.Count+" input events.");
+   return sent==inputs.Count;
+  }
  }
  public sealed class BrowserExitDialog : NextDialog {
   public BrowserExitDialog() : base("Web browser is still running",720,460) {
