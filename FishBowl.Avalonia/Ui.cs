@@ -21,6 +21,8 @@ namespace EmulatorHub
     {
         public static Palette P { get { return Palette.Current; } }
         public static FontFamily Font = FontFamily.Default;
+        // The Interface scale setting (Linux's large-text option); the main window and FishBowl dialogs both apply it.
+        public static double Scale = 1;
 
         public static Button Action(string text, Func<Task> click, bool primary = false)
         {
@@ -178,12 +180,19 @@ namespace EmulatorHub
     {
         public FishDialog(string title, double width, double height = double.NaN)
         {
-            Title = title; Width = width; Icon = Ui.AppIcon(); ShowInTaskbar = false;
-            if (Double.IsNaN(height)) SizeToContent = SizeToContent.Height; else Height = height;
+            Title = title; Width = width * Ui.Scale; Icon = Ui.AppIcon(); ShowInTaskbar = false;
+            if (Double.IsNaN(height)) SizeToContent = SizeToContent.Height; else Height = height * Ui.Scale;
             WindowStartupLocation = WindowStartupLocation.CenterOwner; Background = Ui.P.TopBrush; Foreground = Ui.P.InkBrush; FontFamily = Ui.Font;
             KeyDown += (sender, e) => { if (e.Key == Key.Escape) { Close(); e.Handled = true; } };
         }
-        public Control Body { set { Content = new Border { Padding = new Thickness(18), Child = value }; } }
+        public Control Body
+        {
+            set
+            {
+                var body = new Border { Padding = new Thickness(18), Child = value };
+                Content = Ui.Scale == 1 ? (Control)body : new LayoutTransformControl { LayoutTransform = new ScaleTransform(Ui.Scale, Ui.Scale), Child = body };
+            }
+        }
         // Not ShowDialog: on X11 a modal dialog takes focus back whenever its disabled owner is activated, and on
         // focus-follows-mouse desktops (Hyprland, Sway, i3) that warps the pointer back into the dialog, trapping it.
         // Instead the dialog stays above its owner, and the owner ignores input until the dialog closes.

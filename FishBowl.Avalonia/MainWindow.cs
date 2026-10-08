@@ -136,6 +136,7 @@ namespace EmulatorHub
             Grid.SetRow(footer, 4); shell.Children.Add(footer);
 
             int percent = Math.Max(75, Math.Min(140, library.Theme.UiScalePercent == 0 ? 100 : library.Theme.UiScalePercent));
+            Ui.Scale = percent / 100.0;
             Content = percent == 100 ? (Control)shell : new LayoutTransformControl { LayoutTransform = new ScaleTransform(percent / 100.0, percent / 100.0), Child = shell };
 
             DragDrop.SetAllowDrop(this, true);
