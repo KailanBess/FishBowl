@@ -154,10 +154,13 @@ namespace EmulatorHub
         PlayViewSettings view = new PlayViewSettings();
         int pid;
         long started, originalStyle, originalExStyle;
+        Process identityProcess;
         PlayNative.Placement originalPlacement;
         PlayNative.Rect originalBounds;
         bool attached, disposing, transitioning, embedding, anchored, altered;
-        bool placementValid, windowHidden;
+        bool placementValid, windowHidden, clipValid;
+        Size clipSize;
+        Padding clipInsets;
         Rectangle lastViewport;
         public int PlacementUpdates { get; private set; }
         public string LastError { get; private set; }
@@ -165,7 +168,12 @@ namespace EmulatorHub
         readonly string ownership = "FishBowl.Play." + Guid.NewGuid().ToString("N");
         readonly IntPtr ownershipValue = new IntPtr(1);
         IntPtr desiredDpi;
-        bool OwnsWindow { get { return PlayNative.Matches(window,pid,started) && PlayNative.GetProp(window,ownership)==ownershipValue; } }
+        bool OwnsWindow { get {
+            uint actual;
+            if(identityProcess==null || !PlayNative.IsWindow(window) || PlayNative.GetProp(window,ownership)!=ownershipValue) return false;
+            PlayNative.GetWindowThreadProcessId(window,out actual);
+            try { return actual==pid && !identityProcess.HasExited; } catch(InvalidOperationException) { return false; }
+        } }
         public bool IsAttached { get { return attached && IsHandleCreated && OwnsWindow && (anchored ? anchorOwner!=null && anchorOwner.IsHandleCreated && PlayNative.GetWindow(window,4)==anchorOwner.Handle : PlayNative.GetParent(window)==Handle); } }
         public bool IsAnchored { get { return IsAttached && anchored; } }
         public bool PreserveRendererWindow { get; set; }
@@ -195,12 +203,21 @@ namespace EmulatorHub
         }
         public bool AttachWindow(IntPtr candidate, int processId, long processStarted)
         {
+            return AttachWindow(candidate, processId, processStarted, IntPtr.Zero);
+        }
+        internal bool AttachExitPrompt(IntPtr candidate, int processId, long processStarted, IntPtr root)
+        {
+            if (!PlayShutdown.OwnedPrompt(candidate, processId, processStarted, root)) return false;
+            return AttachWindow(candidate, processId, processStarted, root);
+        }
+        bool AttachWindow(IntPtr candidate, int processId, long processStarted, IntPtr promptRoot)
+        {
             LastError = null;
             if (disposing || !PlayNative.Matches(candidate, processId, processStarted)) { LastError = "The game window changed or the process ended. Choose Show in Play to retry."; return false; }
             if (PlayNative.IsHungAppWindow(candidate)) { LastError = "The emulator is busy. Wait for it to respond, then choose Show in Play."; return false; }
             if (window == candidate && IsAttached) return true;
             IntPtr owner=PlayNative.GetWindow(candidate,4);
-            if ((PlayNative.GetLong(candidate,PlayNative.Style)&PlayNative.Child)!=0 || owner!=IntPtr.Zero) return false;
+            if ((PlayNative.GetLong(candidate,PlayNative.Style)&PlayNative.Child)!=0 || owner!=IntPtr.Zero && promptRoot==IntPtr.Zero) return false;
             if (!TryDetach()) return false;
             window = candidate; pid = processId; started = processStarted;
             originalParent = PlayNative.GetParent(window);
@@ -211,6 +228,13 @@ namespace EmulatorHub
             originalPlacement = new PlayNative.Placement { Length = Marshal.SizeOf(typeof(PlayNative.Placement)) };
             if (!PlayNative.GetWindowPlacement(window, ref originalPlacement)) { window = IntPtr.Zero; return false; }
             if (!PlayNative.SetProp(window, ownership, ownershipValue)) { window=IntPtr.Zero; return false; }
+            try {
+                identityProcess=Process.GetProcessById(pid);
+                if(identityProcess.Handle==IntPtr.Zero || identityProcess.StartTime.ToUniversalTime().Ticks!=started) throw new InvalidOperationException();
+            } catch(Exception) {
+                PlayNative.RemoveProp(window,ownership);window=IntPtr.Zero;
+                if(identityProcess!=null)identityProcess.Dispose();identityProcess=null;return false;
+            }
             originalRegion = PlayNative.CreateRectRgn(0, 0, 0, 0);
             if (originalRegion != IntPtr.Zero && PlayNative.GetWindowRgn(window, originalRegion) == 0)
             { PlayNative.DeleteObject(originalRegion); originalRegion = IntPtr.Zero; }
@@ -336,12 +360,13 @@ namespace EmulatorHub
                     if(forget && (originalStyle & 0x10000000L)!=0) PlayNative.ShowWindowAsync(window,originalPlacement.Show==0 ? 1 : originalPlacement.Show);
                 }
                 if(forget && window!=IntPtr.Zero && OwnsWindow) PlayNative.RemoveProp(window,ownership);
-                attached = false;anchored=false;altered=false;placementValid=false;windowHidden=false;UnbindOwner();
+                attached = false;anchored=false;altered=false;placementValid=false;clipValid=false;windowHidden=false;UnbindOwner();
                 if (forget)
                 {
                     window = IntPtr.Zero;
                     if (originalRegion != IntPtr.Zero) PlayNative.DeleteObject(originalRegion);
                     originalRegion = IntPtr.Zero;
+                    if(identityProcess!=null)identityProcess.Dispose();identityProcess=null;
                 }
                 return true;
             }
@@ -376,10 +401,13 @@ namespace EmulatorHub
                             int width = Math.Max(1, client.Right-client.Left), height = Math.Max(1, client.Bottom-client.Top);
                             var viewport = new Rectangle(client.Left, client.Top, width, height);
                             if (placementValid && !windowHidden && viewport == lastViewport && PlayNative.IsWindowVisible(window)) return;
+                            if (!clipValid || clipSize != viewport.Size || clipInsets != inset) {
                             IntPtr clip = PlayNative.CreateRectRgn(inset.Left, inset.Top, inset.Left+width, inset.Top+height);
                             if (clip == IntPtr.Zero) { PlayNative.ShowWindowAsync(window, 0); return; }
                             if (PlayNative.SetWindowRgn(window, clip, false) == 0)
                             { PlayNative.DeleteObject(clip); PlayNative.ShowWindowAsync(window, 0); return; }
+                            clipValid=true; clipSize=viewport.Size; clipInsets=inset;
+                            }
                             if (PlayNative.SetWindowPos(window,IntPtr.Zero,client.Left-inset.Left,client.Top-inset.Top,width+inset.Horizontal,height+inset.Vertical,0x4074)) {
                                 lastViewport = viewport; placementValid = true; windowHidden = false; PlacementUpdates++;
                             }
@@ -605,21 +633,17 @@ namespace EmulatorHub
         }
         public bool RequestCloseAll()
         {
-            // Restore before WM_CLOSE so emulator confirmation/save dialogs can be used.
-            if(!TryDetachAll()) return false;
             var identities=sessions.SelectMany(s=>s.Known).GroupBy(p=>p.Key).Select(g=>g.First()).ToList();
-            PlayNative.EnumWindows(delegate(IntPtr window,IntPtr unused) {
-                uint pid;PlayNative.GetWindowThreadProcessId(window,out pid);
-                PlayNative.Rect client;
-                if(PlayNative.GetWindow(window,4)==IntPtr.Zero && PlayNative.IsWindowEnabled(window) && PlayNative.GetClientRect(window,out client) && client.Right-client.Left>64 && client.Bottom-client.Top>64 && identities.Any(p=>p.Pid==pid && PlayNative.Matches(window,p.Pid,p.StartedUtcTicks)))
-                    PlayNative.PostMessage(window,0x10,IntPtr.Zero,IntPtr.Zero);
-                return true;
-            },IntPtr.Zero);
-            foreach(var session in sessions) session.Notice="Closing the game. If the emulator asks to save or confirm, finish that prompt and close FishBowl again.";
+            var roots=sessions.Select(s=>s.Host.GameWindow).Where(w=>w!=IntPtr.Zero).ToList();
+            foreach(var session in sessions) if(session.Sharing!=null && !session.Sharing.IsDisposed) session.Sharing.Close();
+            // Keep renderers owned by FishBowl. The progress dialog hosts native save prompts.
+            timer.Stop();
+            bool closed;
+            try { closed=PlayShutdown.Close(FindForm(),identities,roots); }
+            finally { if(!disposing && sessions.Count>0) timer.Start(); }
+            foreach(var session in sessions) session.Notice=closed ? null : "The game is still running. Save your progress and try closing again.";
             RefreshStatus();
-            var wait=Stopwatch.StartNew();
-            while(HasRunningSessions && wait.ElapsedMilliseconds<1500) { Application.DoEvents(); System.Threading.Thread.Sleep(20); }
-            return !HasRunningSessions;
+            return closed;
         }
         public void Launch(Process process, string title) { Launch(process, title, new List<SessionProcess>()); }
         public void Launch(Process process, string title, IList<SessionProcess> before)
@@ -631,7 +655,7 @@ namespace EmulatorHub
                 var existing=sessions.FirstOrDefault(s => s.Known.Any(p=>p.Key==identity.Key));
                 if(existing!=null) { existing.External=false; existing.Notice=null; existing.Added=DateTime.UtcNow; timer.Start(); choice.SelectedItem=existing; ShowSelected(); return; }
                 if ((before ?? new List<SessionProcess>()).Any(p => p.Key == identity.Key)) { status.Text = "This launcher is already running. Choose its window with Show in Play."; return; }
-                var session = new Session { Title = string.IsNullOrWhiteSpace(title) ? "Running game" : title, Before = new HashSet<string>((before ?? new List<SessionProcess>()).Select(p => p.Key)), Host = new PlayWindowHost() };
+                var session = new Session { Title = string.IsNullOrWhiteSpace(title) ? "Running game" : title, Before = new HashSet<string>((before ?? new List<SessionProcess>()).Select(p => p.Key)), Host = new PlayWindowHost { PreserveRendererWindow = true } };
                 try {
                     string executable=PlayNative.Executable(process);
                     session.ViewProfile=library.Emulators.FirstOrDefault(e=>PlayNative.SameExecutable(e.Executable,executable) || (e.Builds??new List<EmulatorBuild>()).Any(b=>PlayNative.SameExecutable(b.Executable,executable)));
@@ -720,7 +744,7 @@ namespace EmulatorHub
         void ShowSelected()
         {
             var selected = Selected(); foreach (var session in sessions) session.Host.Visible = session == selected;
-            if (selected != null) selected.Host.BringToFront(); RefreshStatus();
+            if (selected != null && stage.Controls.GetChildIndex(selected.Host) != 0) selected.Host.BringToFront(); RefreshStatus();
         }
         void RefreshStatus()
         {
@@ -789,7 +813,7 @@ namespace EmulatorHub
                     sessions.Remove(session); choice.Items.Remove(session); session.Dispose();
                     Store.Log("Play session ended: " + session.Title); continue;
                 }
-                if (!session.External && ((!session.Host.IsAttached && (DateTime.UtcNow - session.Added).TotalSeconds <= 20) || session.Host.IsAttached && PlayNative.Rank(session.Host.GameWindow,session.Title)<2))
+                if (!session.External && ((!session.Host.IsAttached && ((DateTime.UtcNow - session.Added).TotalSeconds <= 20 || session.Host.GameWindow!=IntPtr.Zero)) || session.Host.IsAttached && (DateTime.UtcNow-session.Added).TotalSeconds<=20 && PlayNative.Rank(session.Host.GameWindow,session.Title)<2))
                 {
                     IntPtr candidate = PlayNative.Find(session.Known.Where(p => keys.Contains(p.Key)),session.Title);
                     if (candidate != IntPtr.Zero && (!session.Host.IsAttached || PlayNative.Rank(candidate,session.Title)>PlayNative.Rank(session.Host.GameWindow,session.Title)))

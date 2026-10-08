@@ -33,7 +33,10 @@ class PlayExitTests {
  static object Field(object target,string name){return target.GetType().GetField(name,Private).GetValue(target);}
  static void Answer(MainForm main,string answer) {
   using(var timer=new System.Windows.Forms.Timer{Interval=40}) {
-   bool shown=false;timer.Tick+=delegate{var dialog=Application.OpenForms.Cast<Form>().OfType<PlayExitDialog>().FirstOrDefault();if(dialog==null)return;shown=true;timer.Stop();NextUi.Descendants(dialog).OfType<Button>().Single(b=>b.Text==answer).PerformClick();};
+   var timeout=Stopwatch.StartNew(); bool shown=false;timer.Tick+=delegate{var dialog=Application.OpenForms.Cast<Form>().OfType<PlayExitDialog>().FirstOrDefault();if(dialog==null){
+ if(timeout.ElapsedMilliseconds>15000){var closing=Application.OpenForms.Cast<Form>().FirstOrDefault(f=>f.Text.Contains("Closing games"));if(closing!=null){Console.WriteLine("WATCHDOG: "+answer);NextUi.Descendants(closing).OfType<Button>().Single(b=>b.Text=="Cancel").PerformClick();}}
+ return;
+}shown=true;NextUi.Descendants(dialog).OfType<Button>().Single(b=>b.Text==answer).PerformClick();};
    timer.Start();main.Close();Check(shown,"actual MainForm closing asks before touching a running game (answer="+answer+", checks="+checks+", disposed="+main.IsDisposed+")");
   }
  }
@@ -43,14 +46,38 @@ class PlayExitTests {
    form.Menu=new MainMenu(new[]{new MenuItem("Emulator",new[]{new MenuItem("Settings")})});
    form.Controls.Add(new Label{Text="Game surface",Dock=DockStyle.Fill});
    if(args.Contains("--refuse"))form.FormClosing+=delegate(object sender,FormClosingEventArgs e){e.Cancel=true;};
+      if(args.Contains("--confirm"))form.FormClosing+=delegate(object sender,FormClosingEventArgs e){e.Cancel=MessageBox.Show(form,"Are you sure you want to exit?","Confirm exit",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes;};
+   if(args.Contains("--azahar"))form.FormClosing+=delegate(object sender,FormClosingEventArgs e){e.Cancel=MessageBox.Show(form,"Would you like to exit now?","Azahar",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes;};
+   if(args.Contains("--save"))form.FormClosing+=delegate(object sender,FormClosingEventArgs e){MessageBox.Show(form,"Save changes before exiting?","Confirm exit",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question);e.Cancel=true;};
+   if(args.Contains("--slow")) {
+    bool finished=false,requested=false;var finish=new System.Windows.Forms.Timer{Interval=1800};
+    finish.Tick+=delegate {finish.Stop();finished=true;form.Close();};
+    form.FormClosing+=delegate(object sender,FormClosingEventArgs e){if(finished)return;e.Cancel=true;if(!requested){requested=true;finish.Start();}};
+    form.FormClosed+=delegate{finish.Dispose();};
+   }
    Application.Run(form);
   }return 0; }
-  try { Application.EnableVisualStyles();Run(false);Run(true);Console.WriteLine("PASS: "+checks+" real native exit confirmation, graceful shutdown and game-view checks.");return 0; }
+  try { Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);Application.EnableVisualStyles();Run(false);Run(true);RunMode(" --confirm");RunMode(" --azahar");RunMode(" --slow");RunMode(" --save");Policy();Console.WriteLine("PASS: "+checks+" real native exit confirmation, graceful shutdown and game-view checks.");return 0; }
   catch(Exception error){Console.Error.WriteLine(error);return 1;}
  }
- static void Run(bool refuses) {
+ static void Policy() {
+  var type=typeof(MainForm).Assembly.GetType("EmulatorHub.PlayShutdown");
+  var method=type.GetMethod("PlainExit",BindingFlags.Static|BindingFlags.NonPublic);
+  Func<string,string[],string[],bool> plain=(title,text,buttons)=>(bool)method.Invoke(null,new object[]{title,text,buttons});
+  Check(plain("Confirm exit",new[]{"Are you sure you want to exit?"},new[]{"&Yes","&No"}),"plain exit confirmation is recognized");
+  Check(!plain("Confirm exit",new[]{"Are you sure you want to exit?","Unsaved progress will be lost."},new[]{"Yes","No"}),"loss warning prevents automatic acknowledgement");
+  Check(!plain("Confirm exit",new[]{"Save changes before exiting?"},new[]{"Yes","No"}),"save question is never automatically answered");
+  Check(plain("Azahar",new[]{"Would you like to exit now?"},new[]{"Yes","No"}),"Azahar upstream plain exit wording is recognized");
+  Check(!plain("Azahar",new[]{"Would you like to exit now?","Unsaved changes"},new[]{"Yes","No"}),"Azahar loss warning prevents acknowledgement");
+  Check(!plain("Delete",new[]{"Are you sure you want to exit?"},new[]{"Yes","No"}),"unrecognized dialog title is refused");
+  Check(!plain("Confirm exit",new[]{"Are you sure you want to exit?"},new[]{"Yes","No","Save"}),"additional choices prevent automatic acknowledgement");
+ }
+ static void Run(bool refuses) { RunMode(refuses ? " --refuse" : ""); }
+ static void RunMode(string mode) {
+  Console.WriteLine("Exit fixture mode: "+mode);
+  bool refuses=mode.Contains("--refuse") || mode.Contains("--save");
   string executable=Assembly.GetExecutingAssembly().Location;
-  using(var process=Process.Start(new ProcessStartInfo(executable,"--child"+(refuses?" --refuse":"")){UseShellExecute=false,CreateNoWindow=true})) {
+  using(var process=Process.Start(new ProcessStartInfo(executable,"--child"+mode){UseShellExecute=false,CreateNoWindow=true})) {
    long started=process.StartTime.ToUniversalTime().Ticks;IntPtr window=IntPtr.Zero;
    try {
     Check(Until(delegate{window=Find(process.Id);return window!=IntPtr.Zero;}),"fixture creates its own window");IntPtr menu=GetMenu(window);Check(menu!=IntPtr.Zero,"fixture has a real native emulator menu");
@@ -72,10 +99,30 @@ class PlayExitTests {
      Check(play.OpenSelectedInWindow()&&Until(delegate{return IsWindowVisible(manager);}),"external mode restores the original sibling emulator frontend");
      NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Show in Play").PerformClick();
      Check(Until(delegate{return host.IsAttached&&!IsWindowVisible(manager);}),"returning to Play selects the game and hides its frontend again");
+          var tabs=(FishBowlTabs)Field(main,"workspaceNavigation");
+     int placements=host.PlacementUpdates;
+     for(int n=0;n<12;n++){tabs.SelectedIndex=n%2==0?4:3;Pump(30);Check(host.IsAttached && host.IsAnchored && host.GameWindow==window,"active section switches retain an independent renderer thread");}
+     Check(host.PlacementUpdates-placements<=12,"section switches do not repeat native placement for unchanged bounds");
+     var frame=(AquariumFrame)tabs.Parent;Check(frame.PauseForPlay,"decorative animation pauses while a game runs in any workspace");
      Answer(main,"Cancel");Check(!main.IsDisposed&&!process.HasExited&&host.IsAttached,"Cancel retains FishBowl and the exact running renderer");
      if(refuses) {
-      Answer(main,"Close games and exit");Check(!main.IsDisposed&&!process.HasExited,"emulator save/exit veto prevents FishBowl shutdown without force killing");
-      Check(GetParent(window)==IntPtr.Zero&&GetMenu(window)==menu,"exit veto leaves restored native menus and window available");
+            using(var review=new System.Windows.Forms.Timer{Interval=100}) {
+       bool reviewed=false;
+       review.Tick+=delegate {
+        var closing=Application.OpenForms.Cast<Form>().FirstOrDefault(f=>f.Text.Contains("Closing games"));
+        if(closing==null || !mode.Contains("--save"))return;
+        var prompt=NextUi.Descendants(closing).OfType<PlayWindowHost>().FirstOrDefault(h=>h.IsAttached);
+        if(prompt==null)return;
+        Check(!process.HasExited,"save choices are not acknowledged automatically");
+        Check(GetWindow(prompt.GameWindow,4)==closing.Handle,"save prompt is hosted in FishBowl's shutdown dialog");
+        reviewed=true;review.Stop();PostMessage(prompt.GameWindow,0x111,new IntPtr(2),IntPtr.Zero);
+        NextUi.Descendants(closing).OfType<Button>().Single(b=>b.Text=="Cancel").PerformClick();
+       };
+       review.Start();Answer(main,"Close games and exit");
+       if(mode.Contains("--save"))Check(reviewed,"native save prompt was presented for review");
+      }
+      Check(!main.IsDisposed&&!process.HasExited,"emulator save/exit veto prevents FishBowl shutdown without force killing");
+      Check(host.IsAttached && host.GameWindow==window,"exit veto retains the same emulator in Play");
       Answer(main,"Keep games running");Check(main.IsDisposed&&!process.HasExited,"explicit keep-running choice detaches and closes FishBowl");
      } else { Answer(main,"Close games and exit");Check(main.IsDisposed&&process.WaitForExit(2500),"confirmed close exits both FishBowl and its emulator normally: disposed="+main.IsDisposed+" exited="+process.HasExited+" enabled="+IsWindowEnabled(window)+" visible="+IsWindowVisible(window)+" owner="+GetWindow(window,4)+" parent="+GetParent(window)+" status="+string.Join(" | ",NextUi.Descendants(play).OfType<Label>().Select(l=>l.Text))); }
     }

@@ -1,4 +1,4 @@
-param([switch]$FullVisual)
+param([switch]$FullVisual, [string[]]$Only)
 $ErrorActionPreference = 'Stop'
 $fixture = Join-Path $env:TEMP ('FB-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
@@ -19,9 +19,12 @@ function Invoke-FixtureTest([string]$Executable, [string[]]$TestArguments) {
  if (-not $finished) { throw ((Split-Path -Leaf $Executable) + ' timed out; see the fixture logs.') }
  if ($process.ExitCode -ne 0) { throw ((Split-Path -Leaf $Executable) + ' failed with exit code ' + $process.ExitCode) }
 }
+$executed = @()
 Push-Location $fixture
 try {
  foreach ($testName in @('BrowserTests','PlayExitTests','PlayHostTests','PlayLaunchTests','SessionTests','NavigationTests','RemotePlayTests','GameToolsTests','ControlDensityTests','ColorHarmonyTests','UiPolishTests','IntegrationExpansionTests','ExpansionVisualTests','ThemeTests','LibraryRecoveryTests','LibraryEditTests','RemovalTests','IntegrationTests','NextRegressionTests','RecognitionTests','AzaharStorageTests','VisualRegressionTests','VisualMatrixTests','EmulatorEditorTests','SmoothUiTests','PopupCloseTests','PopupPositionTests','PopupAnimationTests')) {
+  if ($Only -and $testName -notin $Only) { continue }
+  $executed += $testName
   Write-Output "Running $testName"
   Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('Tests\' + $testName + '.cs')) -Destination $fixture
   & $compiler /nologo /r:FishBowl.exe /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/out:$testName.exe" "$testName.cs"
@@ -31,6 +34,8 @@ try {
   Invoke-FixtureTest (Join-Path $fixture ($testName + '.exe')) $testArgs
  }
  foreach ($legacyTest in @('AdditionTests','CompactTests','CosmeticTests','UserToolsTests','PolishTests','AuditTests','HubTests','ImmersionTests','FluidTests','TextFieldTests','RowPaintTests','PauseAnimationTests')) {
+  if ($Only -and $legacyTest -notin $Only) { continue }
+  $executed += $legacyTest
   Write-Output "Running $legacyTest"
   $legacyFixture = $fixture
   if (@('CosmeticTests','FluidTests') -contains $legacyTest) {
@@ -55,5 +60,6 @@ try {
   }
   } finally { Pop-Location }
  }
+ if ($Only -and ($Only | Where-Object { $_ -notin $executed })) { throw "Unknown or unexecuted test selection: $Only" }
  Write-Output "Test fixtures and previews: $fixture"
 } finally { Pop-Location }

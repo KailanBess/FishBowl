@@ -1,3 +1,10 @@
+# Windows 1.29.3 active-game switching and shutdown
+
+- Play keeps renderers in owned viewports, reuses clipping geometry and verified process handles, and reduces repeated renderer discovery. Decorative motion stays paused when switching to other sections with a game running.
+- Close games and exit waits for graceful emulator shutdown within FishBowl. Strictly recognized English plain exit confirmations are acknowledged after FishBowl approval; save, warning and unknown prompts remain available for review in FishBowl. FishBowl finishes closing automatically when its tracked games exit.
+- Cancel or an emulator veto retains the running game in Play. Keep games running still restores the emulator's external window. Ordinary emulator processes are never force terminated.
+- Added active-game navigation, native plain confirmation, save-prompt hosting and cancellation checks. Actual emulator performance and accessibility providers require native compatibility testing.
+
 # Windows 1.29.2 window recovery
 
 - Go navigates the exact existing browser window through its address bar; searches no longer start another browser instance. Edge/Chrome use navigable normal windows with dedicated profiles.

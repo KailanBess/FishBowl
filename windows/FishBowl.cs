@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.2.0")]
+[assembly: AssemblyFileVersion("1.29.3.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.2.0")]
+[assembly: AssemblyVersion("1.29.3.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.2";
+		private const string FishBowlVersion = "1.29.3";
 
-		private const string FishBowlTitleVersion = "1.29.2";
+		private const string FishBowlTitleVersion = "1.29.3";
 
 		private Icon ownedAppIcon;
 
@@ -319,7 +319,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.29.2";
+			Text = "FishBowl 1.29.3";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -405,11 +405,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.2" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.3" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.2";
+						library.Theme.LastSeenBuild = "1.29.3";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -2972,7 +2972,7 @@ namespace EmulatorHub
 				playSurface.Adopt(profile.Executable, profile.Name);
                 workspaceNavigation.SelectedIndex = 3;
             var frame = workspaceNavigation.Parent as AquariumFrame;
-            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
+            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.HasSessions; frame.ApplyState(); }
 				SetStatus(profile.Name + " is already running.");
 			}
 			else if (!library.Theme.ConfirmBeforeEmulatorLaunch || MessageBox.Show(this, "Open " + launchName + "? FishBowl will start the emulator normally without changing its settings.", "Open emulator", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
@@ -3412,7 +3412,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.2"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.3"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3420,7 +3420,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.2"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.3"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3428,7 +3428,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.2"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.3"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -4697,7 +4697,7 @@ namespace EmulatorHub
             browserSurface=new BrowserSurface(library,ToggleFullScreen) { Dock=DockStyle.Fill };webPage.Controls.Add(browserSurface);
             playSurface = new PlaySurface(library, ToggleFullScreen) { Dock = DockStyle.Fill };
             playPage.Controls.Add(playSurface);
-            playSurface.SessionStateChanged += delegate { var frame = workspaceNavigation.Parent as AquariumFrame; if (frame != null) { frame.PauseForPlay = workspaceNavigation.SelectedIndex == 3 && playSurface.HasSessions; frame.ApplyState(); } };
+            playSurface.SessionStateChanged += delegate { var frame = workspaceNavigation.Parent as AquariumFrame; if (frame != null) { frame.PauseForPlay = playSurface.HasSessions; frame.ApplyState(); } };
 			homeSurface = new HomeSurface(library, HomeAction);
 			tabPage2.Controls.Add(homeSurface);
 			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
@@ -4746,7 +4746,7 @@ namespace EmulatorHub
 					UpdateWorkspaceChrome();
                     ApplyPlayFullscreenChrome();
                     var frame = workspaceNavigation.Parent as AquariumFrame;
-                    if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
+                    if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.HasSessions; frame.ApplyState(); }
 					if (workspaceNavigation.SelectedIndex == 0)
 					{
 						homeSurface.Reload(false);
@@ -4788,7 +4788,7 @@ namespace EmulatorHub
             playSurface.Launch(process, title, beforeLaunch);
             workspaceNavigation.SelectedIndex = 3;
             var frame = workspaceNavigation.Parent as AquariumFrame;
-            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.Visible && playSurface.HasSessions; frame.ApplyState(); }
+            if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.HasSessions; frame.ApplyState(); }
         }
 
         private void HomeAction(string command, GameEntry game, EmulatorProfile emulator)
@@ -4892,7 +4892,7 @@ namespace EmulatorHub
 				}
 				if (workspaceShell != null)
 				{
-					workspaceShell.RowStyles[2].Height = 0f;
+					if (workspaceShell.RowStyles[2].Height != 0f) workspaceShell.RowStyles[2].Height = 0f;
 				}
 				if (workspaceFooter != null)
 				{
@@ -4901,7 +4901,7 @@ namespace EmulatorHub
 					filterBox.Visible = flag;
                     var filterLabel = workspaceFooter.GetControlFromPosition(0, 0);
                     if (filterLabel != null) filterLabel.Visible = flag;
-                    workspaceFooter.PerformLayout();
+
 				}
 			}
 		}
