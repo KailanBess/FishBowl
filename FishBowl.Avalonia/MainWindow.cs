@@ -90,6 +90,7 @@ namespace EmulatorHub
                 if (library.Theme.ShowGameStorageAssistant) await ShowGameStoragePrompt();
                 if (Environment.GetCommandLineArgs().Skip(1).Any(a => a == "--living-room")) OpenLivingRoom();
                 await HandleExternalLaunch(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                await HandlePendingForwardedArguments();
             };
             Closing += (sender, e) =>
             {

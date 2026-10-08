@@ -79,6 +79,16 @@ namespace EmulatorHub
         public static int Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += (sender, e) => Store.Log("Unhandled failure: " + e.ExceptionObject);
+            // One FishBowl per library: a second launch hands its arguments to the running copy and exits.
+            SingleInstance instance = null;
+            try
+            {
+                var socket = SingleInstance.SocketPath(Store.DataDirectory);
+                if (SingleInstance.TryForward(socket, args)) return 0;
+                instance = SingleInstance.Listen(socket, MainWindow.ReceiveForwardedArguments);
+                if (instance == null && SingleInstance.TryForward(socket, args)) return 0;
+            }
+            catch (Exception error) { Store.Log("Single-instance check skipped: " + error.Message); }
             try
             {
                 return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
@@ -89,6 +99,7 @@ namespace EmulatorHub
                 Console.Error.WriteLine("FishBowl could not start.\n\n" + error);
                 return 1;
             }
+            finally { if (instance != null) instance.Dispose(); }
         }
 
         public static AppBuilder BuildAvaloniaApp()

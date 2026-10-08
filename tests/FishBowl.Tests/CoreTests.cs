@@ -84,6 +84,7 @@ static class T {
     SessionTests.Run(root, Check);
     GamesTests.Run(root, Check);
     LinuxIntegrationTests.Run(root, Check);
+    SingleInstanceTests.Run(root, Check);
     Directory.Delete(root, true);
     RecognitionTests.Run(Check);
     ControllerInputTests.Run(Check);
