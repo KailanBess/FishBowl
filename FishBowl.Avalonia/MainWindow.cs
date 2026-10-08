@@ -677,7 +677,8 @@ namespace EmulatorHub
         private readonly Border tile, marker, highlight; private readonly Ellipse dot; private readonly TextBlock statusText, name;
         private readonly List<TextBlock> texts = new List<TextBlock>();
         private string statusValue; private bool selected, hovered;
-        public static ColumnDefinitions Columns() { return new ColumnDefinitions("36*,18*,29*,17*"); }
+        // Status gets enough share for "Status unknown" at 1024 px; the name column never collapses below its icon and a few letters.
+        public static ColumnDefinitions Columns() { var columns = new ColumnDefinitions("32*,24*,28*,16*"); columns[0].MinWidth = 120; return columns; }
 
         public EmulatorRow(ThemeSettings theme, Palette palette, EmulatorProfile profile, Bitmap image, int index, string status)
         {
@@ -740,10 +741,12 @@ namespace EmulatorHub
             Background = new SolidColorBrush(selected ? Palette.Alpha(alpha, p.Blue) : theme.AlternateRowShading && index % 2 != 0 ? Palette.Alpha(20, p.Surface) : Colors.Transparent);
             BorderBrush = selected ? new SolidColorBrush(Palette.Rgb(207, 168, 255)) : Brushes.Transparent;
             marker.IsVisible = selected;
-            var ink = selected ? Colors.White : p.Ink;
+            // White on the selection wash, except where the wash is light (light themes): there the theme's dark ink stays readable.
+            var selectedInk = Palette.ReadableInk(Palette.Composite(Palette.Alpha(alpha, p.Blue), p.Bottom)) == Colors.White ? Colors.White : p.Ink;
+            var ink = selected ? selectedInk : p.Ink;
             foreach (var text in texts) text.Foreground = new SolidColorBrush(ink);
             dot.Fill = new SolidColorBrush(DotColor());
-            statusText.Foreground = new SolidColorBrush(selected ? Colors.White : DotColor());
+            statusText.Foreground = new SolidColorBrush(selected ? selectedInk : DotColor());
             if (highlight != null)
             {
                 highlight.IsVisible = theme.EnableMotion && (selected || hovered);
@@ -763,7 +766,7 @@ namespace EmulatorHub
             var initials = String.Concat(words.Take(2).Select(w => w.Substring(0, 1).ToUpperInvariant()));
             Width = Height = 34; CornerRadius = new CornerRadius(7);
             Background = new SolidColorBrush(Palette.Alpha(42, color)); BorderBrush = new SolidColorBrush(Palette.Alpha(150, color)); BorderThickness = new Thickness(1.5);
-            Child = new TextBlock { Text = initials.Length == 0 ? "?" : initials, FontSize = 15, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Palette.Rgb(242, 232, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            Child = new TextBlock { Text = initials.Length == 0 ? "?" : initials, FontSize = 15, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Palette.Current.IsDark ? Palette.Rgb(242, 232, 255) : Palette.Current.Ink), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         }
     }
 }

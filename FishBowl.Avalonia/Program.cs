@@ -66,6 +66,8 @@ namespace EmulatorHub
             r["ListBoxItemBackgroundSelected"] = r["ListBoxItemBackgroundSelectedPointerOver"] = r["ListBoxItemBackgroundPressed"] = Brushes.Transparent;
             r["TabItemHeaderBackgroundSelected"] = new SolidColorBrush(Palette.Blend(p.Top, 24));
             r["TabItemHeaderSelectedPipeFill"] = new SolidColorBrush(p.Blue);
+            // Fluent's unselected tab text is too faint on the light themes; use the palette's secondary text colour.
+            r["TabItemHeaderForegroundUnselected"] = r["TabItemHeaderForegroundUnselectedPointerOver"] = r["TabItemHeaderForegroundUnselectedPressed"] = new SolidColorBrush(p.Subtle);
             r["CheckBoxCheckBackgroundFillChecked"] = r["CheckBoxCheckBackgroundFillCheckedPointerOver"] = new SolidColorBrush(p.Blue);
             r["CheckBoxCheckGlyphForegroundChecked"] = new SolidColorBrush(p.Top);
         }

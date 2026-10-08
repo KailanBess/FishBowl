@@ -59,6 +59,8 @@ namespace EmulatorHub
             var toolbar = Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Add folder", AddLibraryFolder), Ui.Action("Play", LaunchLibraryGame), Ui.Action("Edit game", EditLibraryGame), Ui.Action("Remove", RemoveLibraryGame), more);
             DockPanel.SetDock(toolbar, Dock.Top); panel.Children.Add(toolbar);
 
+            // Both boxes are field initializers, created before the theme was applied: recolour them for the active palette.
+            foreach (var box in new[] { gameSearch, gameTags }) { box.Background = p.SurfaceBrush; box.Foreground = p.InkBrush; }
             gameSearch.Watermark = "Search title, platform, tags or notes";
             gameSearch.TextChanged += delegate { RefreshGameLibrary(); };
             gameTags.Watermark = "Tags"; gameTags.Text = library.Experience.LibraryFilter ?? ""; gameTags.Width = 130;
