@@ -96,7 +96,8 @@ namespace EmulatorHub
                 var line = raw.Trim(); if (line.StartsWith("export ", StringComparison.Ordinal)) line = line.Substring(7).Trim();
                 var m = Regex.Match(line, @"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$"); if (!m.Success) continue;
                 var value = m.Groups[2].Value.Trim();
-                if (value.Length >= 2 && (value[0] == '"' || value[0] == '\'') && value[value.Length - 1] == value[0]) value = value.Substring(1, value.Length - 2);
+                int close = value.Length > 0 && (value[0] == '"' || value[0] == '\'') ? value.IndexOf(value[0], 1) : -1;
+                if (close > 0) value = value.Substring(1, close - 1);
                 else { int comment = value.IndexOf(" #", StringComparison.Ordinal); if (comment >= 0) value = value.Substring(0, comment).Trim(); }
                 values[m.Groups[1].Value] = Expand(value, home, values);
             }
