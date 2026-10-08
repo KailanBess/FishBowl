@@ -57,7 +57,7 @@ namespace EmulatorHub
                 MenuAction("Repair game paths...", "repair", RepairLibraryPaths),
                 MenuAction("Artwork cleanup...", "image", CleanupLibraryArtwork),
                 MenuAction("Profiles...", "settings", ManageLibraryProfiles),
-                MenuAction("Remote couch play...", "controller", ShowRemoteCouchPlay) } };
+                MenuAction("Remote couch play...", "controller", ShowRemoteCouchPlay) }.Concat(LinuxLibraryItems()).ToArray() };
             var toolbar = Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Add folder", AddLibraryFolder), Ui.Action("Play", LaunchLibraryGame), Ui.Action("Edit game", EditLibraryGame), Ui.Action("Remove", RemoveLibraryGame), more);
             DockPanel.SetDock(toolbar, Dock.Top); panel.Children.Add(toolbar);
 

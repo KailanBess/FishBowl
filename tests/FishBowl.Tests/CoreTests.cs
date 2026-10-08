@@ -83,6 +83,7 @@ static class T {
     SaveMonitorTests.Run(root, Check);
     SessionTests.Run(root, Check);
     GamesTests.Run(root, Check);
+    LinuxIntegrationTests.Run(root, Check);
     Directory.Delete(root, true);
     RecognitionTests.Run(Check);
     ControllerInputTests.Run(Check);

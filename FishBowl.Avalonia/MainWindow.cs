@@ -89,6 +89,7 @@ namespace EmulatorHub
                 if (library.Theme.ShowStartupAssistant) await ShowFirstRunGuide();
                 if (library.Theme.ShowGameStorageAssistant) await ShowGameStoragePrompt();
                 if (Environment.GetCommandLineArgs().Skip(1).Any(a => a == "--living-room")) OpenLivingRoom();
+                await HandleExternalLaunch(Environment.GetCommandLineArgs().Skip(1).ToArray());
             };
             Closing += (sender, e) =>
             {
@@ -259,7 +260,7 @@ namespace EmulatorHub
                 MenuAction("FishBowl settings...", "settings", ShowSettings),
                 MenuAction("Enable portable mode", "storage", EnablePortableMode),
                 MenuAction("Open FishBowl activity log", "info", () => { if (!File.Exists(Store.LogFileName)) Store.Log("Activity log opened."); Platform.OpenTextFile(Store.LogFileName); }),
-                MenuAction("Diagnostics report...", "info", ShowDiagnostics) } };
+                MenuAction("Diagnostics report...", "info", ShowDiagnostics) }.Concat(LinuxToolItems()).ToArray() };
             var view = new MenuItem { Header = "_View", ItemsSource = new object[] {
                 MenuAction("Refresh emulators", "refresh", () => { reloadProgramMetadata = true; RefreshHub(); }),
                 MenuAction("Appearance...", "settings", ShowAppearanceHub),
