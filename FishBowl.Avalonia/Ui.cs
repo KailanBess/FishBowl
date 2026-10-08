@@ -190,6 +190,7 @@ namespace EmulatorHub
         public async Task Present(Window owner)
         {
             var closed = new TaskCompletionSource<bool>(); Closed += delegate { closed.TrySetResult(true); };
+            FitScreen(owner != null && owner.IsVisible ? owner : null);
             if (owner == null || !owner.IsVisible) { Show(); await closed.Task; return; }
             EventHandler<RoutedEventArgs> block = (sender, e) => e.Handled = true;
             var events = new RoutedEvent[] { InputElement.PointerPressedEvent, InputElement.PointerReleasedEvent, InputElement.PointerWheelChangedEvent, InputElement.KeyDownEvent, InputElement.KeyUpEvent, InputElement.TextInputEvent, DragDrop.DragOverEvent, DragDrop.DropEvent };
@@ -200,6 +201,21 @@ namespace EmulatorHub
                 foreach (var routed in events) owner.RemoveHandler(routed, block);
                 owner.Activate();
             }
+        }
+        // Tall dialogs (Settings, Edit game, emulator management) must keep their buttons on a 768-pixel laptop screen.
+        private void FitScreen(Window owner)
+        {
+            try
+            {
+                var screen = owner != null ? owner.Screens.ScreenFromWindow(owner) : null;
+                if (screen == null) screen = Screens.Primary;
+                if (screen == null) return;
+                double scale = screen.Scaling <= 0 ? 1 : screen.Scaling;
+                MaxWidth = Math.Max(320, screen.WorkingArea.Width / scale - 24); MaxHeight = Math.Max(240, screen.WorkingArea.Height / scale - 24);
+                if (!Double.IsNaN(Height) && Height > MaxHeight) Height = MaxHeight;
+                if (!Double.IsNaN(Width) && Width > MaxWidth) Width = MaxWidth;
+            }
+            catch (Exception error) { Store.Log("Dialog size could not be fitted to the screen: " + error.Message); }
         }
         // Standard right-aligned Save/Cancel row; save returns false to keep the dialog open.
         public Control Footer(string confirm, Func<Task<bool>> save, params Control[] extra)
