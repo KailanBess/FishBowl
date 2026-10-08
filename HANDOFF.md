@@ -45,7 +45,7 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
-- **2026-10-08 (Linux):** summarized Linux parity round 1 and started round 2 (see Linux work).
+- **2026-10-08 (Linux):** summarized Linux parity round 1 and started round 2 (see Linux work). The Build workflow now takes the expected package version from `FishBowl.Avalonia.csproj` instead of a hardcoded number (it failed on main because it still expected 1.29.2).
 
 - **2026-10-08:** Windows 1.29.3 addresses issue #32. Play defaults to owned renderer viewports so tab layout does not propagate through a foreign child window. Process ownership retains a verified lifetime handle, unchanged viewport clips are reused, renderer discovery stops rescanning stable windows after startup, and decorative motion pauses on every section while a game runs. Close games and exit waits in a responsive FishBowl dialog, acknowledges strictly recognized English plain exit confirmations, presents save/unknown prompts inside the dialog, and completes FishBowl closure when the tracked processes exit. Veto/cancel retains the game; no ordinary game process is force terminated. Added native shutdown and active-navigation fixtures. Linux has matching version metadata only; saved data is unchanged. Native emulator rendering and Qt accessibility remain compatibility checks.
 
