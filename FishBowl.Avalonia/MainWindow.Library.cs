@@ -27,6 +27,8 @@ namespace EmulatorHub
         private readonly StackPanel homeCards = new StackPanel { Spacing = 14 };
         private readonly Dictionary<string, Process> gameProcesses = new Dictionary<string, Process>();
         private bool rebuildingGames;
+        // Game covers by path and decoded width; separate from imageCache, which RefreshHub prunes to emulator images.
+        private readonly Dictionary<string, Task<Bitmap>> coverCache = new Dictionary<string, Task<Bitmap>>();
         private TabControl libraryPages;
         private const int HomePage = 0, LibraryPage = 1, EmulatorsPage = 2;
 
@@ -194,18 +196,33 @@ namespace EmulatorHub
             var frame = new Border { Width = size.Width, Height = size.Height, Background = p.SurfaceBrush, CornerRadius = new CornerRadius(6), ClipToBounds = true };
             if (!String.IsNullOrWhiteSpace(game.ArtworkPath) && File.Exists(game.ArtworkPath))
             {
-                try
+                // Decode at (about twice) the shown size and off the UI thread: full-size art for hundreds of games
+                // would otherwise take gigabytes of memory and block startup and every Library refresh.
+                int pixels = (int)Math.Ceiling(width * 2 / 64.0) * 64; var path = game.ArtworkPath; var key = path + "|" + pixels;
+                Task<Bitmap> decode;
+                if (!coverCache.TryGetValue(key, out decode))
                 {
-                    if (!imageCache.TryGetValue(game.ArtworkPath, out var bitmap)) { bitmap = new Bitmap(game.ArtworkPath); imageCache[game.ArtworkPath] = bitmap; }
-                    frame.Child = new Image { Source = bitmap, Stretch = Stretch.UniformToFill };
-                    return frame;
+                    decode = Task.Run(() => { using (var stream = File.OpenRead(path)) return Bitmap.DecodeToWidth(stream, pixels, BitmapInterpolationMode.HighQuality); });
+                    coverCache[key] = decode;
                 }
-                catch (Exception error) { Store.Log("Cover unavailable: " + error.Message); }
+                var image = new Image { Stretch = Stretch.UniformToFill }; frame.Child = image;
+                if (decode.Status == TaskStatus.RanToCompletion) image.Source = decode.Result;
+                else decode.ContinueWith(t => Ui.Post(() =>
+                {
+                    if (t.Status == TaskStatus.RanToCompletion) { image.Source = t.Result; return; }
+                    coverCache.Remove(key); Store.Log("Cover unavailable: " + (t.Exception == null ? "cancelled" : t.Exception.GetBaseException().Message));
+                    CoverPlaceholder(frame, game, width);
+                }));
+                return frame;
             }
+            CoverPlaceholder(frame, game, width);
+            return frame;
+        }
+        private void CoverPlaceholder(Border frame, GameEntry game, double width)
+        {
             var words = (game.Title ?? "?").Split(new[] { ' ', '-', '_', ':' }, StringSplitOptions.RemoveEmptyEntries).Where(w => Char.IsLetterOrDigit(w[0])).Take(2).Select(w => Char.ToUpperInvariant(w[0]));
             frame.Background = new SolidColorBrush(Palette.Blend(p.Surface, 18));
             frame.Child = new TextBlock { Text = new string(words.ToArray()), FontSize = Math.Max(14, width / 3), FontWeight = FontWeight.Bold, Foreground = p.BlueBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            return frame;
         }
 
         private string GameSubtitle(GameEntry game)
