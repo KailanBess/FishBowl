@@ -29,6 +29,9 @@
     <Compile Include="ControllerInputTests.cs" />
     <Compile Include="SessionTests.cs" />
     <Compile Include="GamesTests.cs" />
+    <Compile Include="../../FishBowl.Profiles.cs" Link="Shared/FishBowl.Profiles.cs" />
+    <Compile Include="ProfilesTests.cs" />
+    <Compile Include="LaunchOptionsTests.cs" />
     <!-- Linux integrations (Flatpak, updates, Steam, EmuDeck/RetroDECK, controllers): Linux-only files. -->
     <Compile Include="../../FishBowl.Avalonia/Linux/*.cs" LinkBase="Platform/Linux" />
     <Compile Include="LinuxIntegrationTests.cs" />

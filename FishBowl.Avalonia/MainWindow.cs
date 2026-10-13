@@ -70,6 +70,7 @@ namespace EmulatorHub
             BuildLayout();
             ConfigureControllerNavigation();
             ConfigureSessionTracking();
+            ConfigureProfiles();
             RefreshHub();
             ConfigureGameFolderWatchers();
             StartSaveMonitoring();
@@ -125,7 +126,7 @@ namespace EmulatorHub
             var splitter = new GridSplitter { Background = p.TopBrush, ResizeDirection = GridResizeDirection.Columns }; Grid.SetColumn(splitter, 1); split.Children.Add(splitter);
             emulatorInformation = BuildInformationPanel(); Grid.SetColumn(emulatorInformation, 2); split.Children.Add(emulatorInformation);
             var emulatorPage = new DockPanel(); DockPanel.SetDock(actions, Dock.Top); emulatorPage.Children.Add(actions); emulatorPage.Children.Add(split);
-            var pages = BuildLibraryPages(emulatorPage); Grid.SetRow(pages, 3); shell.Children.Add(pages);
+            var pages = WithAquarium(BuildLibraryPages(emulatorPage)); Grid.SetRow(pages, 3); shell.Children.Add(pages);
 
             var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,240,*"), Background = p.TopBrush, Height = 44, IsVisible = library.Theme.ShowStatusBar };
             footerFilterLabel = new TextBlock { Text = "Filter:", Foreground = p.SubtleBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
@@ -137,7 +138,9 @@ namespace EmulatorHub
             Grid.SetColumn(status, 2); footer.Children.Add(status);
             Grid.SetRow(footer, 4); shell.Children.Add(footer);
 
-            int percent = Math.Max(75, Math.Min(140, library.Theme.UiScalePercent == 0 ? 100 : library.Theme.UiScalePercent));
+            // Interface scale (FishBowl settings) times text size (Live appearance and accessibility).
+            int text = library.Enhancements == null || library.Enhancements.TextPercent < 75 || library.Enhancements.TextPercent > 200 ? 100 : library.Enhancements.TextPercent;
+            int percent = Math.Max(75, Math.Min(200, (library.Theme.UiScalePercent == 0 ? 100 : Math.Max(75, Math.Min(140, library.Theme.UiScalePercent))) * text / 100));
             Ui.Scale = percent / 100.0;
             Content = percent == 100 ? (Control)shell : new LayoutTransformControl { LayoutTransform = new ScaleTransform(percent / 100.0, percent / 100.0), Child = shell };
 
@@ -249,7 +252,8 @@ namespace EmulatorHub
                 MenuAction("Emulator backups / restore...", "export", () => ShowEmulatorManager("Backups")),
                 MenuAction("Setup checks...", "info", () => ShowEmulatorManager("Setup checks")),
                 MenuAction("Official setup guidance...", "info", OpenOfficialSetupGuidance),
-                MenuAction("Repair selected location...", "folder", RepairSelectedLocation) }.Concat(SelectedEmulatorSaveFolderItems()).ToArray() };
+                MenuAction("Repair selected location...", "folder", RepairSelectedLocation),
+                MenuAction("Launch profiles...", "play", ShowLaunchProfiles) }.Concat(SelectedEmulatorSaveFolderItems()).ToArray() };
             var tools = new MenuItem { Header = "_Tools", ItemsSource = new object[] {
                 MenuAction("Edit selected emulator...", "edit", EditEmulator),
                 MenuAction("Edit information and links...", "info", EditEmulatorInformation),
@@ -261,11 +265,12 @@ namespace EmulatorHub
                 MenuAction("FishBowl settings...", "settings", ShowSettings),
                 MenuAction("Enable portable mode", "storage", EnablePortableMode),
                 MenuAction("Open FishBowl activity log", "info", () => { if (!File.Exists(Store.LogFileName)) Store.Log("Activity log opened."); Platform.OpenTextFile(Store.LogFileName); }),
-                MenuAction("Diagnostics report...", "info", ShowDiagnostics) }.Concat(LinuxToolItems()).ToArray() };
+                MenuAction("Diagnostics report...", "info", ShowDiagnostics) }.Concat(ProfileToolsMenuItems()).Concat(LinuxToolItems()).ToArray() };
             var view = new MenuItem { Header = "_View", ItemsSource = new object[] {
                 MenuAction("Refresh emulators", "refresh", () => { reloadProgramMetadata = true; RefreshHub(); }),
                 MenuAction("Appearance...", "settings", ShowAppearanceHub),
-                MenuAction("Living-room Library (Ctrl+L)", "controller", OpenLivingRoom),
+                MenuAction("Live appearance and accessibility...", "settings", ShowLiveAppearance),
+                MenuAction("Living-room Library (Ctrl+B)", "controller", OpenLivingRoom),
                 MenuAction("Immersion settings...", "settings", () => ImmersionSettingsDialog.Show(this, library, () => RefreshGameLibrary())),
                 MenuAction("Full screen (F11)", "desktop", ToggleFullScreen) } };
             convertersMenu.SubmenuOpened += delegate { RefreshConvertersMenu(); }; RefreshConvertersMenu();
@@ -274,7 +279,7 @@ namespace EmulatorHub
                 MenuAction("About FishBowl", "info", () => Ui.Message(this, "FishBowl brings games and separately installed emulators together.\n\nUse Library to launch games, edit details, organize collections, and recover removed entries.")),
                 MenuAction("First-run guide...", "info", ShowFirstRunGuide),
                 MenuAction("Game storage guide...", "folder", ShowGameStoragePrompt) } };
-            menu.ItemsSource = new[] { file, games, emulators, tools, view, convertersMenu, linksMenu, help };
+            menu.ItemsSource = new[] { file, games, emulators, tools, view, MultiplayerMenu(), convertersMenu, linksMenu, help };
             return menu;
         }
 
@@ -616,13 +621,9 @@ namespace EmulatorHub
         {
             if (!IsActive) return;
             bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            if (ctrl && e.Key == Key.E) { e.Handled = true; await Ui.Run(this, AddEmulator); }
-            else if (ctrl && e.Key == Key.F) { e.Handled = true; if (libraryPages.SelectedIndex == EmulatorsPage) filterBox.Focus(); else { libraryPages.SelectedIndex = LibraryPage; gameSearch.Focus(); } }
-            else if (ctrl && e.Key == Key.R) { e.Handled = true; await Ui.Run(this, ReopenLastGame); }
-            else if (ctrl && e.Key == Key.L) { e.Handled = true; OpenLivingRoom(); }
-            else if (ctrl && e.Key == Key.H) { e.Handled = true; libraryPages.SelectedIndex = HomePage; }
-            else if (ctrl && e.Key == Key.G) { e.Handled = true; await Ui.Run(this, () => ShowGameStorageOrganizer(null)); }
-            else if (e.Key == Key.F11) { e.Handled = true; ToggleFullScreen(); }
+            // Keyboard shortcuts (Tools → Keyboard shortcuts): Home, Library, Add emulator, Last game, full screen...
+            if (await RunConfiguredShortcut(e)) return;
+            if (ctrl && e.Key == Key.F) { e.Handled = true; if (libraryPages.SelectedIndex == EmulatorsPage) filterBox.Focus(); else { libraryPages.SelectedIndex = LibraryPage; gameSearch.Focus(); } }
             else if (e.Key == Key.Escape)
             {
                 e.Handled = true;

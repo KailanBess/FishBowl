@@ -22,11 +22,9 @@ namespace EmulatorHub
                 SetStatus(profile.Name + " is already running." + (focused ? "" : " Switch to its window to continue."));
                 return;
             }
-            Platform.Launch(profile.Executable, "");
-            Store.Log("Opened " + profile.Name + ": " + profile.Executable);
-            Platform.ProcessesChanged();
-            await Task.Delay(400); RefreshRuntimeStatus();
-            SetStatus("Opened " + profile.Name + ". Add and launch games inside the emulator.");
+            if (library.Theme.ConfirmBeforeEmulatorLaunch && !await Ui.Confirm(this, "Open " + profile.Name + "?\n\n" + profile.Executable, "Open emulator")) return;
+            // Through its Linux launch options (Proton or Wine for Windows programs, GameMode, MangoHud, Gamescope).
+            await OpenEmulatorWith(profile, null);
         }
 
         private Task AddEmulator() { return AddEmulatorWithPath(null); }
@@ -298,7 +296,7 @@ namespace EmulatorHub
         {
             var file = await Ui.PickFile(this, "Import FishBowl settings", "JSON files|*.json");
             if (file == null) return;
-            if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before importing settings.");
+            if (UserTools.ActiveLaunches > 0) throw new IOException("Close launched games before importing settings.");
             var imported = Json.Deserialize<LibraryData>(File.ReadAllText(file));
             if (imported == null || imported.Emulators == null) throw new InvalidDataException("That file does not contain FishBowl emulator settings.");
             if (!await Ui.Confirm(this, "Replace your FishBowl settings with this backup?")) return;

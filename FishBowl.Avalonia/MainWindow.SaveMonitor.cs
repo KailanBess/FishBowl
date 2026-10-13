@@ -89,7 +89,7 @@ namespace EmulatorHub
 
         private async Task BackUpDueEmulators()
         {
-            if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before backing up their saves.");
+            if (UserTools.ActiveLaunches > 0) throw new IOException("Close launched games before backing up their saves.");
             SetStatus("Checking which emulators are due for a backup...");
             var due = await Task.Run(() => { var backups = BackupReminders.LastBackups(library, CancellationToken.None); return BackupReminders.Due(library, backups, BackupReminders.LastPlayed(library), DateTime.UtcNow); });
             if (due.Count == 0) { SetStatus("No emulators are due for a backup."); await Ui.Message(this, "No emulators are due for a backup.\n\nAn emulator becomes due when one of its games was played since its last save backup and that backup is more than " + BackupReminders.IntervalDays(library) + " day(s) old (FishBowl settings, backup reminder interval). One played but never backed up is due straight away."); return; }
@@ -314,7 +314,7 @@ namespace EmulatorHub
         // Runs once a minute: the linked-save capture schedule and the scheduled snapshot export, never during play.
         private void RunScheduledSaveWork()
         {
-            if (LibraryProfiles.ActiveLaunches > 0 || automaticCopyRunning || reviewingSaves) return;
+            if (UserTools.ActiveLaunches > 0 || automaticCopyRunning || reviewingSaves) return;
             var hub = EnsureHub();
             if (hub.CaptureMinutes > 0 && captureCancellation == null)
             {
@@ -378,7 +378,7 @@ namespace EmulatorHub
             body.Children.Add(Ui.Caption("Last capture")); body.Children.Add(report);
             body.Children.Add(Ui.Actions(
                 Ui.Action("Save schedule", () => { hub.CaptureMinutes = (int)(interval.Value ?? 0); hub.NextCaptureAt = DateTime.UtcNow.AddMinutes(Math.Max(1, hub.CaptureMinutes)).ToString("o"); Store.Save(library); dialog.Close(); }, true),
-                Ui.Action("Capture linked saves now", async () => { if (captureCancellation != null) throw new IOException("A capture is already running."); if (LibraryProfiles.ActiveLaunches > 0) throw new IOException("Close launched games before capturing saves."); await StartLinkedSaveCapture(dialog); report.Text = hub.LastCaptureReport ?? ""; }),
+                Ui.Action("Capture linked saves now", async () => { if (captureCancellation != null) throw new IOException("A capture is already running."); if (UserTools.ActiveLaunches > 0) throw new IOException("Close launched games before capturing saves."); await StartLinkedSaveCapture(dialog); report.Text = hub.LastCaptureReport ?? ""; }),
                 Ui.Action("Stop scheduled capture", () => { if (captureCancellation != null) captureCancellation.Cancel(); }),
                 Ui.Action("Snapshot export schedule", ShowBackupPlanner),
                 Ui.Action("Close", () => dialog.Close())));

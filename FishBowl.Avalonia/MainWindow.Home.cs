@@ -210,7 +210,7 @@ namespace EmulatorHub
                 case "Quick actions":
                     {
                         var panel = new WrapPanel();
-                        foreach (var action in new[] { Ui.Action("Add emulator", AddEmulator), Ui.Action("Organize games", () => ShowGameStorageOrganizer(null)), Ui.Action("Library", () => OpenLibraryScope(null)), Ui.Action("Session journal", () => ShowSessionJournal(null)), Ui.Action("Surprise me", ShowSurpriseMe), Ui.Action("Customize Home", CustomizeLibraryHome) })
+                        foreach (var action in new[] { Ui.Action("Add emulator", AddEmulator), Ui.Action("Organize games", () => ShowGameStorageOrganizer(null)), Ui.Action("Library", () => OpenLibraryScope(null)), Ui.Action("Save history", () => ShowSaveHistory(null)), Ui.Action("Readiness", () => ShowEmulatorManager("Setup checks")), Ui.Action("Session journal", () => ShowSessionJournal(null)), Ui.Action("Surprise me", ShowSurpriseMe), Ui.Action("Customize Home", CustomizeLibraryHome) })
                         { action.Margin = new Thickness(0, 3, 8, 3); panel.Children.Add(action); }
                         items.Add(panel);
                         break;

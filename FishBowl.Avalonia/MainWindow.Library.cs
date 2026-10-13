@@ -56,7 +56,7 @@ namespace EmulatorHub
                 MenuAction("Library maintenance...", "check", ShowLibraryMaintenance),
                 MenuAction("Repair game paths...", "repair", RepairLibraryPaths),
                 MenuAction("Artwork cleanup...", "image", CleanupLibraryArtwork),
-                MenuAction("Profiles...", "settings", ManageLibraryProfiles),
+                MenuAction("User tools...", "settings", ManageLibraryProfiles),
                 MenuAction("Remote couch play...", "controller", ShowRemoteCouchPlay) }.Concat(LinuxLibraryItems()).ToArray() };
             var toolbar = Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Add folder", AddLibraryFolder), Ui.Action("Play", LaunchLibraryGame), Ui.Action("Edit game", EditLibraryGame), Ui.Action("Remove", RemoveLibraryGame), more);
             DockPanel.SetDock(toolbar, Dock.Top); panel.Children.Add(toolbar);
@@ -310,11 +310,18 @@ namespace EmulatorHub
             if ((game.Tags ?? new List<string>()).Count > 0) AddFact(facts, "Tags", String.Join(", ", game.Tags));
             var inCollections = (library.Collections ?? new List<GameCollection>()).Where(c => !c.IsSmart && (c.GameIds ?? new List<string>()).Contains(game.Id)).Select(c => c.Name).ToList();
             if (inCollections.Count > 0) AddFact(facts, "Collections", String.Join(", ", inCollections));
+            if (game.PersonalRating > 0) AddFact(facts, "Your rating", new string('★', Math.Min(5, game.PersonalRating)) + new string('☆', 5 - Math.Min(5, game.PersonalRating)));
             if (!String.IsNullOrWhiteSpace(game.LaunchProfileName)) AddFact(facts, "Launch profile", game.LaunchProfileName);
+            var controllerProfile = (library.ControllerProfiles ?? new List<ControllerProfile>()).FirstOrDefault(c => c.Id == game.ControllerProfileId);
+            if (controllerProfile != null) AddFact(facts, "Controller", controllerProfile.Name);
+            if ((game.Discs ?? new List<string>()).Count > 0) AddFact(facts, "Discs", game.Discs.Count + " · next: " + Path.GetFileName(GamePlay.LaunchPath(game)));
+            if (!String.IsNullOrWhiteSpace(game.EmulatorCore)) AddFact(facts, "Emulator core", game.EmulatorCore);
+            if (!String.IsNullOrWhiteSpace(game.TitleId)) AddFact(facts, "Title ID", game.TitleId);
             AddFact(facts, "Added", String.IsNullOrWhiteSpace(game.AddedAt) ? "Unknown" : FriendlyDate(game.AddedAt));
             gameDetails.Children.Add(facts);
 
             if (!String.IsNullOrWhiteSpace(game.Description)) { var d = Ui.Text(game.Description, 13); d.TextWrapping = TextWrapping.Wrap; gameDetails.Children.Add(d); }
+            if (!String.IsNullOrWhiteSpace(game.CompatibilityNotes)) { gameDetails.Children.Add(Ui.Caption("Compatibility notes")); var c = Ui.Text(game.CompatibilityNotes, 13); c.TextWrapping = TextWrapping.Wrap; gameDetails.Children.Add(c); }
             if (!String.IsNullOrWhiteSpace(game.Notes)) { gameDetails.Children.Add(Ui.Caption("Notes")); var n = Ui.Text(game.Notes, 13); n.TextWrapping = TextWrapping.Wrap; gameDetails.Children.Add(n); }
 
             gameDetails.Children.Add(Ui.Caption("Recent sessions"));
@@ -324,9 +331,24 @@ namespace EmulatorHub
             if (!String.IsNullOrWhiteSpace(game.SessionTrackingNote)) { var note = Ui.Hint(game.SessionTrackingNote); note.TextWrapping = TextWrapping.Wrap; gameDetails.Children.Add(note); }
 
             var path = Ui.Hint(game.Path); path.TextWrapping = TextWrapping.Wrap; gameDetails.Children.Add(path);
-            var links = Ui.Actions(Ui.Action("Play sessions", () => ShowSessionJournal(game)), Ui.Action("Screenshots", () => ShowScreenshotGallery(game)), Ui.Action("Open game folder", OpenSelectedGameFolder), Ui.Action("Game setup", ShowLibraryGameTools));
+            var links = Ui.Actions(Ui.Action("Play sessions", () => ShowSessionJournal(game)), Ui.Action("Screenshots", () => ShowScreenshotGallery(game)), Ui.Action("Save history", () => ShowSaveHistory(game)), Ui.Action("Launch preview", () => ShowLaunchPreview(game)), Ui.Action("Open game folder", OpenSelectedGameFolder), Ui.Action("Game setup", ShowLibraryGameTools));
             if (File.Exists(game.ManualPath)) links.Children.Add(Ui.Action("Open manual", () => Platform.Open(game.ManualPath)));
             gameDetails.Children.Add(links);
+        }
+
+        // What Play would run, without running it: the command line with Linux launch options, or why it can't start.
+        private Task ShowLaunchPreview(GameEntry game)
+        {
+            string text;
+            try
+            {
+                var plan = GamePlay.Prepare(library, game);
+                text = LinuxLaunch.CommandLine(plan) + "\n\nFolder: " + plan.WorkingDirectory;
+                if (!String.IsNullOrWhiteSpace(plan.Summary)) text += "\nLinux launch options: " + plan.Summary;
+                foreach (var note in plan.Notes ?? new List<string>()) text += "\n" + note;
+            }
+            catch (Exception error) { text = "This game can't start yet:\n" + error.Message; }
+            return ShowReport(this, "Launch preview", text);
         }
 
         private string SessionLength(PlaySession session)
@@ -421,6 +443,7 @@ namespace EmulatorHub
             var description = Ui.Paragraphs(game.Description, false); description.MinHeight = 70;
             var arguments = Ui.Field(game.Arguments); var statusChoice = Ui.Combo(GameLibraryQuery.Progress, game.PlayStatus ?? "Not started");
             var tags = Ui.Field(String.Join(", ", game.Tags ?? new List<string>())); var favorite = Ui.Check("Favorite", game.Favorite); var pinned = Ui.Check("Pinned", game.Pinned);
+            var rating = new NumericUpDown { Minimum = 0, Maximum = 5, Increment = 1, Value = Math.Max(0, Math.Min(5, game.PersonalRating)), FormatString = "0", HorizontalAlignment = HorizontalAlignment.Stretch };
             var console = Ui.Field(game.ConsoleLabel); var genre = Ui.Field(game.Genre); var developer = Ui.Field(game.Developer); var year = Ui.Field(game.ReleaseYear);
             var emulatorEntries = new[] { "Native game / shortcut" }.Concat(library.Emulators.Select(e => e.Name + " · " + e.Id.Substring(0, Math.Min(6, e.Id.Length)))).ToArray();
             var current = GameLibraryQuery.EmulatorFor(library, game);
@@ -436,8 +459,8 @@ namespace EmulatorHub
             var left = new StackPanel { Spacing = 4 }; var right = new StackPanel { Spacing = 4 }; Grid.SetColumn(right, 2); grid.Children.Add(left); grid.Children.Add(right);
             left.Children.Add(Ui.Caption("Platform")); left.Children.Add(console); left.Children.Add(Ui.Caption("Genre")); left.Children.Add(genre);
             right.Children.Add(Ui.Caption("Developer")); right.Children.Add(developer); right.Children.Add(Ui.Caption("Release year")); right.Children.Add(year);
-            left.Children.Add(Ui.Caption("Progress")); left.Children.Add(statusChoice); right.Children.Add(Ui.Caption(" ")); right.Children.Add(Ui.Actions(favorite, pinned));
-            fields.Children.Add(grid);
+            left.Children.Add(Ui.Caption("Progress")); left.Children.Add(statusChoice); right.Children.Add(Ui.Caption("Personal rating (0-5)")); right.Children.Add(rating);
+            fields.Children.Add(grid); fields.Children.Add(Ui.Actions(favorite, pinned));
             fields.Children.Add(Ui.Caption("Tags, separated by commas")); fields.Children.Add(tags);
             fields.Children.Add(Ui.Caption("Description")); fields.Children.Add(description);
             fields.Children.Add(Ui.Caption("Notes")); fields.Children.Add(notes);
@@ -457,7 +480,7 @@ namespace EmulatorHub
                 game.PreferredEmulatorId = chosen?.Id; game.EmulatorId = chosen?.Id; game.RequiresEmulatorAssignment = false;
                 if (game.Extras == null) game.Extras = new GameExtras(); game.Extras.Native = emulator.SelectedIndex == 0;
                 if (game.Extras.Native && String.IsNullOrWhiteSpace(game.Extras.WorkingDirectory)) game.Extras.WorkingDirectory = Path.GetDirectoryName(game.Path);
-                game.Arguments = arguments.Text; game.Notes = notes.Text; game.Description = description.Text; game.PlayStatus = statusChoice.SelectedItem as string; game.Favorite = favorite.IsChecked == true; game.Pinned = pinned.IsChecked == true;
+                game.Arguments = arguments.Text; game.Notes = notes.Text; game.Description = description.Text; game.PlayStatus = statusChoice.SelectedItem as string; game.Favorite = favorite.IsChecked == true; game.Pinned = pinned.IsChecked == true; game.PersonalRating = (int)(rating.Value ?? 0);
                 game.ConsoleLabel = Blank(console.Text); game.Genre = Blank(genre.Text); game.Developer = Blank(developer.Text); game.ReleaseYear = Blank(year.Text);
                 game.Tags = (tags.Text ?? "").Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 Store.Save(library); RefreshGameLibrary(); return true;
@@ -483,9 +506,8 @@ namespace EmulatorHub
             GamePlay.LaunchPlan plan;
             try { plan = GamePlay.Prepare(library, game); }
             catch (IOException error) { await Ui.Message(this, game.Title + " could not start.\n\n" + error.Message); return; }
-            var info = Platform.StartInfo(plan.Program, "");
-            if (Directory.Exists(plan.WorkingDirectory)) info.WorkingDirectory = plan.WorkingDirectory;
-            foreach (var argument in plan.Arguments) info.ArgumentList.Add(argument);
+            if (!await ConfirmGameLaunch(game, plan)) return;
+            var info = LinuxLaunch.StartInfo(plan);
             var beforeLaunch = SessionLedger.ProcessSnapshot();
             var started = DateTime.UtcNow; Process process;
             try { process = Process.Start(info); }
@@ -493,9 +515,9 @@ namespace EmulatorHub
             if (process == null) throw new IOException("The game could not be started.");
             GamePlay.RecordLaunch(library, game, started);
             StartLibrarySession(game, process, beforeLaunch, started, plan.Program);
-            Store.Log("Game launched: " + game.Title + " | Program: " + plan.Program + " | Arguments: " + String.Join(" ", plan.Arguments));
+            Store.Log("Game launched: " + game.Title + " | " + LinuxLaunch.CommandLine(plan));
             Store.Save(library); RefreshGameLibrary();
-            SetStatus("Started " + game.Title + ".");
+            SetStatus("Started " + game.Title + "." + (plan.Notes == null || plan.Notes.Count == 0 ? "" : " " + String.Join(" ", plan.Notes)));
         }
 
         private async Task ReopenLastGame()

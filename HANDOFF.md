@@ -9,22 +9,24 @@ _Last updated: 2026-10-08, browser viewport fitting._
 | Area | State |
 | --- | --- |
 | Windows | Source **1.29.4**, browser fitting on branch `fishbowl-browser-auto-fit`. PR #25 is merged; source includes main through `5b96312`. |
-| Linux | Library/Home/living-room and save/backup parity merged through PRs #28–#30. Round 2 in progress (see Linux work). |
+| Linux | Round 1 (#28–#30) and round 2 integrations/QA (#37) merged; round 2 profiles in PR #38 (see Linux work). |
 | Shared | C# 5 game, library, session, save and living-room helpers. Optional Browser/PlayView fields survive Linux saves; Linux browsing remains external. |
 | Issues | [Issue #34](https://github.com/KailanBess/FishBowl/issues/34) tracks automatic browser fitting. Issues #23/#27/#31/#32 are implemented through merged PR #25. |
 
 ## Open pull requests
 
-- [#36: Browser viewport fitting](https://github.com/KailanBess/FishBowl/pull/36), branch `fishbowl-browser-auto-fit`, targets `main`. PR #25 and #33 are merged. Paired version metadata is 1.29.4 because the Build workflow reads its expected Windows package version from the Linux project; Linux UI and active parity work are otherwise unchanged.
+- [#38: Linux profiles, launch options and settings](https://github.com/KailanBess/FishBowl/pull/38), branch `parity/profiles-2`, targets `main` (see Linux work). #36 and #37 are merged.
 
 Required checks must pass before merging. Distribute executables through Releases or passing workflow artifacts.
 ## Linux work
 
-**Round 2:** PR #37 merged QA and integration changes; PR #38 retains profiles work. Remaining branches `parity/profiles-2` (profiles, launch profiles with Proton/GameMode/MangoHud/Gamescope, controller profiles, multiplayer, settings, themes), `parity/integrations-2` (Flatpak permissions and updates, AppImage updates, Add to Steam, EmuDeck/RetroDECK, AUR package) and `parity/qa-2` (every Linux screen and dialog checked and fixed). **Windows-side agents: please avoid changing `FishBowl.Avalonia/` until these merge;** Windows work and shared-model additions are fine.
+**Round 2:** PR #37 merged integrations (Flatpak permissions and updates, AppImage updates, Add to Steam, EmuDeck/RetroDECK, AUR `linux/PKGBUILD`, Living Room desktop action) and QA (every Linux screen and dialog checked; interface scale applies to dialogs; single-instance guard: a second launch forwards its arguments to the running copy over a socket in `XDG_RUNTIME_DIR`). PR #38 (`parity/profiles-2`) adds shared `FishBowl.Profiles.cs` (user profiles, guest mode, profile transfer/reviewed sync, multiplayer readiness, ROM integrity, accessibility presets; Windows keeps its dialogs and calls it), Linux launch options per emulator or launch profile (Proton/Wine, GameMode, MangoHud, Gamescope; stored as the extra `LinuxLaunch` field, which Windows ignores), `fishbowl --launch/--launch-last/--list/--help`, and Linux User tools, controller profiles, multiplayer, preferences, appearance/accessibility and keyboard shortcut dialogs. **Windows-side agents: please avoid changing `FishBowl.Avalonia/` until #38 merges.**
 
 **Round 1 (#28–#30):** shared `FishBowl.Games.cs` (library queries, collections, lists, import, launch/sessions via `GamePlay`), `FishBowl.SaveTools.cs` (save history; Windows keeps its emulator rules through partial-method hooks; both apps use `Game Saves/<id>/<kind>/History`) and `FishBowl.LivingRoom.cs` (Immersion logic and living-room navigation; Windows `Immersion` calls it). Linux controllers use evdev, falling back to `/dev/input/js*`.
 
-**Still missing on Linux:** game details dialog (`GameExperienceDialog`), aquarium bubble rails, ambient artwork on the main window, Home "Save history"/"Readiness" quick actions, embedded Play/Web (Linux launches emulators and browsers as separate windows). Possible follow-up: Windows MainForm could use the shared `SaveMonitor` rules.
+**Round 3 (`parity/details-3`, after #38):** the rest of the Windows game details dialog: personal rating (Edit game), disc list and disc to launch, emulator core and title ID (Game setup); the Library details panel shows them plus controller and compatibility notes, and links Save history and Launch preview (the exact command with Linux launch options, or why the game can't start). Home quick actions gain Save history and Readiness. `FishBowl.Avalonia/Aquarium.cs` adds the Windows bubble rails beside the workspace (the Bubbles immersion setting; they animate only while the window is active, motion is allowed and no game runs) and main-window ambient artwork (the Ambient setting and idle minutes; full screen, closes on any input).
+
+**Still missing on Linux:** embedded Play/Web (Linux launches emulators and browsers as separate windows). Possible follow-up: Windows MainForm could use the shared `SaveMonitor` rules.
 
 ## Validation and compatibility
 
@@ -45,6 +47,10 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+
+- **2026-10-13 (Linux):** branch `parity/details-3` (stacked on #38) fills the remaining game-details gaps and Home quick actions, and adds bubble rails and main-window ambient artwork (see Linux work). Linux build and core tests pass; checked headlessly with a fake library.
+
+- **2026-10-13 (Linux):** merged main (through #36/#37) into PR #38 and resolved conflicts (menus keep both the profile and Linux integration items; the desktop file has both Living Room and Reopen last game actions; `--launch`/`--list` run before the single-instance check; interface scale times text size). The PR's earlier Windows CI failure was the stale 1.29.2 package version that #33 fixed. Linux build, core tests, schema (229) and C# 5 shared/Windows-source compiles pass locally.
 
 - **2026-10-08:** reviewed all open GitHub issues. Issue #34 has an implemented browser fitting fix with successful Build and Text overflow audit checks. Resolved the PR #36 handoff conflict against merged Linux QA/AppImage work, preserving notes from both maintainers. Fresh integration checks must pass before merging the fix and closing #34. PR #38 remains separate Linux feature work.
 

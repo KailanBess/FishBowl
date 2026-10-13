@@ -43,7 +43,7 @@ namespace EmulatorHub
             if (session == null || game == null || UserTools.Guest || !Immersion.OfferRecap(library, session)) return;
             Ui.Post(async () =>
             {
-                if (LibraryProfiles.ActiveLaunches > 0) return;
+                if (UserTools.ActiveLaunches > 0) return;
                 Window owner = livingRoom != null && livingRoom.IsVisible ? (Window)livingRoom : this;
                 await Ui.Run(owner, () => SessionRecapDialog.Show(owner, library, game, session));
                 if (livingRoom != null) livingRoom.RefreshGames();

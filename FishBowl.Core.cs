@@ -70,8 +70,12 @@ namespace EmulatorHub
             }
         }
 
+        // Set during guest mode (UserTools.BeginGuest): the guest browses a copy and nothing is written, as on Windows.
+        public static bool ReadOnly;
+
         public static void Save(LibraryData data)
         {
+            if (ReadOnly) return;
             LibraryPaths.Stamp(data, DataDirectory, PortableMode ? AppDomain.CurrentDomain.BaseDirectory : null);
             Directory.CreateDirectory(DataDirectory);
             var temporary = FileName + "." + Guid.NewGuid().ToString("N") + ".tmp";
