@@ -21,6 +21,10 @@ These are from the Linux version, with made-up example games. The Windows versio
 
 ![The Living-room Library: large covers for controller and couch use](docs/images/living-room.png)
 
+## Bring your own games and emulators
+
+**FishBowl does not include, download or link to games (ROMs, disc images), BIOS, firmware, keys or emulator packages.** It organizes and launches files you already have. Install emulators yourself from their official sources, and use only games and firmware you have dumped from hardware you own, or that you are otherwise legally allowed to use. Never post copyrighted games or firmware in issues or pull requests.
+
 ## Features
 
 ### Windows
