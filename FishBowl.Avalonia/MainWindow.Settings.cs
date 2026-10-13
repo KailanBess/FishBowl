@@ -52,7 +52,7 @@ namespace EmulatorHub
         {
             return new MenuItem { Header = "_Multiplayer", ItemsSource = new object[] {
                 MenuAction("Start a session...", "controller", ShowMultiplayerHub),
-                MenuAction("Multiplayer readiness check", "check", () => Ui.Message(this, MultiplayerSupport.Report(CurrentEmulator(), library.Multiplayer), "Multiplayer readiness")),
+                MenuAction("Multiplayer readiness check", "check", () => Ui.Message(this, MultiplayerSupport.Report(CurrentEmulator() ?? (SelectedLibraryGame() == null ? null : GamePlay.LaunchEmulator(library, SelectedLibraryGame())), library.Multiplayer), "Multiplayer readiness")),
                 MenuAction("Privacy and connection settings...", "settings", ShowMultiplayerSettings),
                 MenuAction("Remote couch play...", "controller", ShowRemoteCouchPlay) } };
         }
@@ -88,7 +88,6 @@ namespace EmulatorHub
             var accent = Ui.Combo(Palette.Accents, t.AccentColor ?? "Ocean");
             var font = Ui.Combo(Palette.FontChoices, String.IsNullOrWhiteSpace(t.FontFamily) ? "Bahnschrift" : t.FontFamily);
             var text = new NumericUpDown { Minimum = 75, Maximum = 200, Increment = 5, Value = n.TextPercent < 75 || n.TextPercent > 200 ? 100 : n.TextPercent, FormatString = "0", Width = 160, HorizontalAlignment = HorizontalAlignment.Left };
-            var density = Ui.Combo(new[] { "Compact", "Standard", "Roomy" }, t.ControlDensity ?? "Compact");
             var motion = Ui.Check("Reduce decorative motion", n.ReducedMotion || !t.EnableMotion);
             var focus = Ui.Check("Stronger keyboard focus outlines", n.StrongFocus);
             var preset = Ui.Combo(ProfileTools.AccessibilityPresets, "Current");
@@ -106,7 +105,6 @@ namespace EmulatorHub
             body.Children.Add(Ui.Caption("Accent")); body.Children.Add(accent);
             body.Children.Add(Ui.Caption("Font")); body.Children.Add(font);
             body.Children.Add(Ui.Caption("Text size (%) — independent of spacing")); body.Children.Add(text);
-            body.Children.Add(Ui.Caption("Control spacing")); body.Children.Add(density);
             body.Children.Add(Ui.Caption("Reduced motion")); body.Children.Add(motion);
             body.Children.Add(Ui.Caption("Keyboard focus")); body.Children.Add(focus);
             body.Children.Add(Ui.Caption("Accessibility preset")); body.Children.Add(preset);
@@ -115,7 +113,7 @@ namespace EmulatorHub
             body.Children.Add(dialog.Footer("Save", () =>
             {
                 t.Name = theme.SelectedItem as string; t.AccentColor = accent.SelectedItem as string; t.FontFamily = font.SelectedItem as string;
-                n.TextPercent = (int)(text.Value ?? 100); t.ControlDensity = density.SelectedItem as string;
+                n.TextPercent = (int)(text.Value ?? 100);
                 n.ReducedMotion = motion.IsChecked == true; t.EnableMotion = !n.ReducedMotion; n.StrongFocus = focus.IsChecked == true;
                 ProfileTools.ApplyAccessibility(library, preset.SelectedItem as string);
                 Store.Save(library); return Task.FromResult(true);

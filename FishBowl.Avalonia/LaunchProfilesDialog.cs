@@ -29,6 +29,8 @@ namespace EmulatorHub
         private readonly LaunchOptionsEditor editor;
         private readonly TextBox checks = Ui.Paragraphs("");
         private readonly StackPanel profileFields = new StackPanel { Spacing = 4 };
+        private readonly TextBlock defaultHint = Ui.Hint("The emulator default applies when the emulator opens by itself and to games whose launch profile has no options of its own.");
+        private Button open;
         private bool loading;
         public LaunchProfile OpenSelectedProfile { get; private set; }
         public bool OpenDefault { get; private set; }
@@ -59,14 +61,14 @@ namespace EmulatorHub
             profileFields.Children.Add(Ui.Caption("Command-line arguments")); profileFields.Children.Add(arguments);
             profileFields.Children.Add(Ui.Hint("A launch profile adds only the arguments you save here when a game uses it or you choose Open profile. It does not rewrite the emulator's settings or its usual launch behavior."));
             profileFields.Children.Add(own);
-            right.Children.Add(profileFields);
+            right.Children.Add(profileFields); right.Children.Add(defaultHint);
             right.Children.Add(Ui.Text("Linux launch options", 15, true));
             right.Children.Add(editor);
             right.Children.Add(Ui.Caption("Checks and command"));
             checks.MinHeight = 120; right.Children.Add(checks);
 
             var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0), Spacing = 8 };
-            footer.Children.Add(Ui.Action("Open profile", () => { if (!Save()) return; var row = list.SelectedItem as Row; OpenDefault = row == null || row.Original == null && row.Name == null; OpenSelectedProfile = OpenDefault ? null : emulator.LaunchProfiles.FirstOrDefault(p => p.Name == row.Name); Confirmed = true; Close(); }));
+            footer.Children.Add(open = Ui.Action("Open profile", () => { if (!Save()) return; var row = list.SelectedItem as Row; OpenDefault = row == null || row.Original == null && row.Name == null; OpenSelectedProfile = OpenDefault ? null : emulator.LaunchProfiles.FirstOrDefault(p => p.Name == row.Name); Confirmed = true; Close(); }));
             var save = Ui.Action("Save", () => { if (Save()) { Confirmed = true; Close(); } }, true); save.IsDefault = true; footer.Children.Add(save);
             var cancel = Ui.Action("Close", () => Close()); cancel.IsCancel = true; footer.Children.Add(cancel);
 
@@ -88,7 +90,7 @@ namespace EmulatorHub
             var row = list.SelectedItem as Row; if (row == null) return;
             loading = true;
             bool isDefault = row.Original == null && row.Name == null;
-            profileFields.IsVisible = !isDefault;
+            profileFields.IsVisible = !isDefault; defaultHint.IsVisible = isDefault; Ui.SetAction(open, isDefault ? "Open emulator" : "Open profile");
             name.Text = row.Name ?? ""; arguments.Text = row.Arguments ?? "";
             own.IsChecked = row.OwnOptions; editor.IsEnabled = row.OwnOptions;
             editor.Load(row.OwnOptions ? row.Options : rows[0].Options);
