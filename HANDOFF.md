@@ -48,6 +48,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-10-13 (Linux):** README gains Screenshots and Tutorials sections (eight short walkthroughs) with images in `docs/images/`. They are Linux screenshots taken headlessly from a demo library of made-up games and generated covers; Windows screenshots could be added beside them. Snapshot rows on Linux no longer say "Not reported by this program" when the emulator reports no version, and the Living room tab's button now shows the real shortcut, Ctrl+B. Fixed the README's stale version table and controller note.
+
 - **2026-10-13 (Linux):** branch `parity/details-3` (stacked on #38) fills the remaining game-details gaps and Home quick actions, and adds bubble rails and main-window ambient artwork (see Linux work). Linux build and core tests pass; checked headlessly with a fake library.
 
 - **2026-10-13 (Linux):** merged main (through #36/#37) into PR #38 and resolved conflicts (menus keep both the profile and Linux integration items; the desktop file has both Living Room and Reopen last game actions; `--launch`/`--list` run before the single-instance check; interface scale times text size). The PR's earlier Windows CI failure was the stale 1.29.2 package version that #33 fixed. Linux build, core tests, schema (229) and C# 5 shared/Windows-source compiles pass locally.

@@ -4,12 +4,22 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 
 | Platform | Version | Status |
 | --- | --- | --- |
-| Windows | 1.25.8 | Current release |
-| Linux | Preview | Library and expansion screens; Linux desktop testing remains required |
+| Windows | 1.29.3 | Current release |
+| Linux | 1.29.3 | AppImage on the latest release; Linux desktop testing remains required |
 
 Source version **1.29.4** adds a Windows Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. Browser windows fit the Web viewport automatically; Open in window starts at that size and position. Play includes game-only view adjustments and confirmation before closing running games, with normal emulator shutdown, recognized plain exit confirmations handled after FishBowl approval, and save/unknown prompts available inside FishBowl. Active-game section switching uses owned renderers and cached placement. It retains session recovery, controller navigation, Home customization and the existing game, save and integration tools. The public release is 1.29.3; newer source changes require review and CI before release. Download complete app and source bundles from the latest passing Build workflow, or build from source. See [Browser setup](docs/BROWSER.md) for requirements and native-window compatibility.
 
 For Windows, choose **FishBowl-1.29.4.zip** to run the app; keep its six files together. **FishBowl-1.29.4-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
+
+## Screenshots
+
+These are from the Linux version, with made-up example games. The Windows version has the same sections, plus Play and Web, where games and websites run inside FishBowl.
+
+![Home: continue playing, play time this week, pinned games](docs/images/home.png)
+
+![Library in cover view, with the selected game's details](docs/images/library.png)
+
+![The Living-room Library: large covers for controller and couch use](docs/images/living-room.png)
 
 ## Features
 
@@ -53,7 +63,7 @@ The Linux version shares the emulator presets, folder routing, backups and libra
 - **Running emulators** are detected, including Flatpak and AppImage processes. Opening one that is already running brings its window forward on Hyprland, Sway and X11.
 - **Importing:** AppImages and ZIP packages can be imported into a dedicated emulator folder.
 
-The preview includes Home, Library, profiles, collections, keyboard/joystick living-room browsing, title/cover editing, removal with Undo, game setup, Steam import, integrations, mods, media, play history and verified file save recovery. Folder save archives use the emulator backup manager. Linux controller navigation reads available `/dev/input/js*` devices; mappings and device permissions depend on the system. The library file is shared; Linux preserves unfamiliar fields when it saves.
+The preview includes Home, Library, profiles, collections, keyboard/joystick living-room browsing, title/cover editing, removal with Undo, game setup, Steam import, integrations, mods, media, play history and verified file save recovery. Folder save archives use the emulator backup manager. Linux controller navigation reads controllers through evdev (`/dev/input/event*`), falling back to `/dev/input/js*`; mappings and device permissions depend on the system. The library file is shared; Linux preserves unfamiliar fields when it saves.
 
 Session journals recover saved active time and resume verified running processes after restart. Time while FishBowl is closed is excluded; launchers without a verifiable process identity or ancestry remain uncertain. Linux leaves games running when FishBowl closes; Windows offers confirmed shutdown or explicit keep-running behavior. Windows includes browser window sharing and host-approved keyboard/gamepad-to-keyboard controls. Linux can join in the browser; native Linux hosting is not implemented. Remote play needs a configured LiveKit deployment and token service; see [setup and live-test checklist](remote-play/README.md).
 
@@ -75,6 +85,83 @@ linux/uninstall-linux.sh   # removes the program; your library is kept
 ```
 
 To run from source without installing: `dotnet run --project FishBowl.Avalonia`. To build an AppImage yourself: `linux/build-appimage.sh`.
+
+## Tutorials
+
+Short walkthroughs of common tasks. The steps and menu names follow the Linux version. Windows has the same features, though some menu names differ.
+
+FishBowl doesn't include or download emulators, games, BIOS, firmware or keys. Install emulators from their official sites or your distribution, and use only games and firmware you are legally allowed to use.
+
+### 1. Add your emulators
+
+![Emulators page](docs/images/emulators.png)
+
+1. Install your emulators the usual way, for example as Flatpaks, distribution packages or AppImages.
+2. In FishBowl, choose **Emulators > Find installed emulators...**, then **Find installed emulators**.
+3. Check the programs you want and click **Add checked programs**. To add one by hand instead, click **Add emulator** on the Emulators page and pick its preset and program.
+4. Select an emulator to see its overview, setup, controls and folders on the right.
+
+### 2. Add your games
+
+![Library in list view](docs/images/library-list.png)
+
+1. Open the **Library** tab.
+2. Click **Add games** to choose files, or **Add folder** to add every file in a folder that your emulators can open. Your files stay where they are.
+3. FishBowl names each game from the file and its built-in information, and picks the emulator by file type. If it can't tell which emulator to use, it asks when you first play the game.
+4. To fix a title, cover, platform or rating, select the game and click **Edit game**.
+
+![Edit game](docs/images/edit-game.png)
+
+### 3. Play and track your time
+
+1. Select a game and click **Play**, or press Enter. FishBowl opens it in its emulator.
+2. FishBowl records how long the emulator runs. Play time, recent sessions and **Continue playing** on Home update when you close the emulator.
+3. **Library > Session journal and charts...** shows every session. You can correct a session if the timing was off.
+4. Mark games as **Favorite** or **Pin** them to keep them on Home, and use **Add to queue** for what you want to play next.
+
+### 4. Check that an emulator is set up
+
+![Setup checks](docs/images/setup-checks.png)
+
+1. Select the emulator, then choose **Emulators > Setup checks...**.
+2. FishBowl checks that the program exists and shows where the emulator keeps its saves, save states and settings.
+3. BIOS and firmware setup happens inside the emulator. **Setup guide** opens the emulator's official instructions.
+
+### 5. Keep your saves safe
+
+![Save history for a game](docs/images/save-history.png)
+
+1. Select a game in the Library and click **Save history** in its details.
+2. Click **Link file** or **Link folder**, and choose the emulator's save file for that game (the setup checks show where the emulator keeps them).
+3. Click **Create snapshot** whenever you want a copy. FishBowl verifies each copy.
+4. To go back, close the emulator, select a snapshot and click **Restore**. FishBowl shows what will change and keeps a copy of the current save first.
+
+To back up a whole emulator (settings, in-game saves and save states), choose **File > Emulator backups / restore...**, then **Preview backup** and **Create backup**. Game files and emulator programs are never included.
+
+![Emulator backups](docs/images/backups.png)
+
+### 6. Play from the couch
+
+1. Choose **View > Living-room Library**, or press Ctrl+B.
+2. Use a controller or the keyboard: A (Enter) plays, X (F) favorites, Y (I) shows details, LB and RB (Tab) switch shelves, Start (M) opens the menu and B (Esc) exits.
+3. **View > Immersion settings...** sets backgrounds, sounds, the theme bubbles, and an artwork slideshow after idle time.
+
+On Linux, FishBowl reads controllers from `/dev/input`. Your user needs read access to the controller's device, which most desktop distributions give the signed-in user.
+
+### 7. Set up a game
+
+![Game setup](docs/images/game-setup.png)
+
+Select a game and click **Game setup** in its details to choose its emulator build, launch profile and controller profile. For multi-disc games, click **Choose discs**, select every disc file, then pick the disc FishBowl opens next. **Launch preview** in the game's details shows exactly what Play will run.
+
+### 8. Linux: GameMode, MangoHud, Gamescope and Proton
+
+![Launch options](docs/images/launch-options.png)
+
+1. Select an emulator and choose **Emulators > Launch profiles...**.
+2. Under **Emulator default**, check **GameMode**, **MangoHud** or **Gamescope**, or add environment variables. **Checks and command** shows whether each tool is installed and the exact command.
+3. To use different options for some games only, click **New** to make a launch profile, then pick it in that game's **Game setup**.
+4. If the emulator is a Windows program (`.exe`), FishBowl runs it through Proton (with umu-launcher) or Wine. Choose which, and the Proton build, in the same dialog.
 
 ## Where FishBowl keeps your data
 
