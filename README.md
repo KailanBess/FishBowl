@@ -4,12 +4,12 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 
 | Platform | Version | Status |
 | --- | --- | --- |
-| Windows | 1.29.3 | Current release |
-| Linux | 1.29.3 | AppImage on the latest release; Linux desktop testing remains required |
+| Windows | 1.29.4 | Current release: app ZIP with installer |
+| Linux | 1.29.4 | Current release: AppImage; testing on more Linux desktops is welcome |
 
-Source version **1.29.4** adds a Windows Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. Browser windows fit the Web viewport automatically; Open in window starts at that size and position. Play includes game-only view adjustments and confirmation before closing running games, with normal emulator shutdown, recognized plain exit confirmations handled after FishBowl approval, and save/unknown prompts available inside FishBowl. Active-game section switching uses owned renderers and cached placement. It retains session recovery, controller navigation, Home customization and the existing game, save and integration tools. The public release is 1.29.3; newer source changes require review and CI before release. Download complete app and source bundles from the latest passing Build workflow, or build from source. See [Browser setup](docs/BROWSER.md) for requirements and native-window compatibility.
-
-For Windows, choose **FishBowl-1.29.4.zip** to run the app; keep its six files together. **FishBowl-1.29.4-Source.zip** is for building or reviewing code and contains no compiled app. Packages include matching app/installer versions, source commit metadata, checksums and upgrade/rollback instructions. See [Play validation](docs/PLAY-VALIDATION.md) for emulator, controller, monitor and remote tests.
+**What's new in 1.29.4:**
+- **Windows:** a Web workspace that uses your installed Firefox (Edge and Chrome can be chosen instead), with separate browser profiles. Browser windows fit the Web area automatically. Play adds game-only view adjustments, and asks before closing running games so emulators can shut down normally. See [Browser setup](docs/BROWSER.md) and [Play validation](docs/PLAY-VALIDATION.md).
+- **Linux:** launch options (GameMode, MangoHud, Gamescope, and Proton or Wine for Windows-only emulators), user profiles and guest mode, game details, Flatpak and AppImage updates, Add to Steam, EmuDeck/RetroDECK import, command-line launching and an AppImage download. See [Linux](#linux) below.
 
 ## Screenshots
 
@@ -67,7 +67,11 @@ The Linux version shares the emulator presets, folder routing, backups and libra
 - **Running emulators** are detected, including Flatpak and AppImage processes. Opening one that is already running brings its window forward on Hyprland, Sway and X11.
 - **Importing:** AppImages and ZIP packages can be imported into a dedicated emulator folder.
 
-The preview includes Home, Library, profiles, collections, keyboard/joystick living-room browsing, title/cover editing, removal with Undo, game setup, Steam import, integrations, mods, media, play history and verified file save recovery. Folder save archives use the emulator backup manager. Linux controller navigation reads controllers through evdev (`/dev/input/event*`), falling back to `/dev/input/js*`; mappings and device permissions depend on the system. The library file is shared; Linux preserves unfamiliar fields when it saves.
+- **Launch options:** GameMode, MangoHud, Gamescope and environment variables per emulator or launch profile. Windows-only emulators (`.exe`) run through Proton (with umu-launcher) or Wine. Launch preview shows the exact command.
+- **Integrations:** Flatpak permission checks and updates, AppImage updates, Add to Steam (non-Steam shortcuts), and importing emulators set up by EmuDeck or RetroDECK.
+- **Command line:** `fishbowl --launch "Game"`, `--launch-last`, `--list` and `--living-room`. Opening FishBowl again hands over to the copy that's already running.
+
+Everything else matches Windows except Play and Web: Home, the Library with collections, smart lists and the play queue, game details and setup, profiles and guest mode, play-time tracking, save snapshots and emulator backups, mods, media, and the Living-room Library. On Linux, emulators and browsers open in their own windows. Linux controller navigation reads controllers through evdev (`/dev/input/event*`), falling back to `/dev/input/js*`; mappings and device permissions depend on the system. The library file is shared; Linux preserves unfamiliar fields when it saves.
 
 Session journals recover saved active time and resume verified running processes after restart. Time while FishBowl is closed is excluded; launchers without a verifiable process identity or ancestry remain uncertain. Linux leaves games running when FishBowl closes; Windows offers confirmed shutdown or explicit keep-running behavior. Windows includes browser window sharing and host-approved keyboard/gamepad-to-keyboard controls. Linux can join in the browser; native Linux hosting is not implemented. Remote play needs a configured LiveKit deployment and token service; see [setup and live-test checklist](remote-play/README.md).
 
@@ -75,7 +79,7 @@ Session journals recover saved active time and resume verified running processes
 
 ### Windows
 
-Download the complete app ZIP or `FishBowl Setup.exe` from the [latest release](../../releases/latest) and run it, or download `FishBowl.exe` to run FishBowl without installing.
+Download `FishBowl-<version>.zip` from the [latest release](../../releases/latest) and extract it, keeping its six files together. Run `FishBowl Setup.exe` to install, or `FishBowl.exe` to run FishBowl without installing.
 
 ### Linux
 
@@ -88,7 +92,7 @@ linux/install-linux.sh     # installs to ~/.local/lib/fishbowl and adds a menu e
 linux/uninstall-linux.sh   # removes the program; your library is kept
 ```
 
-To run from source without installing: `dotnet run --project FishBowl.Avalonia`. To build an AppImage yourself: `linux/build-appimage.sh`.
+To run from source without installing: `dotnet run --project FishBowl.Avalonia`. To build an AppImage yourself: `linux/build-appimage.sh`. On Arch-based systems, `linux/PKGBUILD` builds a `fishbowl-git` package (`makepkg -si` in a copy of that folder); it isn't on the AUR yet.
 
 ## Tutorials
 
@@ -217,7 +221,7 @@ Extensions are declarative JSON manifests of kind `Metadata`, `Importer` or `Emu
 
 The companion starts explicitly on localhost or a selected private network address. Its random pairing address grants read-only title and play-history access while it is running. Closing it stops the server. It does not serve game files, save contents, local paths or credentials.
 
-Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux executable artifact. After review, tag the matching source version (for example, `v1.29.4` for source version 1.29.4). Release packages verifies the installer/app versions and creates a draft release for the owner to review. Source ZIPs contain code; app ZIPs contain the executable and setup files.
+Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 checksums and a Linux build. To release, tag the matching source version (for example, `v1.29.5` for source version 1.29.5). The release workflow checks the versions, builds and tests both apps, and creates a draft release with the Windows ZIPs, the Linux AppImage and archive, and checksums. Review the draft, then publish it.
 
 ## Repository layout
 
@@ -225,11 +229,13 @@ Every passing Build provides a complete Windows app ZIP, a source ZIP, SHA256 ch
 | --- | --- |
 | `windows/` | Windows release source, build and test scripts, and change notes |
 | `FishBowl.Model.cs` | The library data model (`library.json`), shared by both versions |
-| `FishBowl.Games.cs`, `FishBowl.Library.cs`, `FishBowl.LivingRoom.cs`, `FishBowl.SaveTools.cs`, `FishBowl.Sessions.cs` | Shared library, living-room, save and session helpers |
+| `FishBowl.Games.cs`, `FishBowl.Library.cs`, `FishBowl.LivingRoom.cs`, `FishBowl.SaveTools.cs`, `FishBowl.Sessions.cs`, `FishBowl.GameTools.cs` | Shared library, living-room, save, session and game-tool helpers |
+| `FishBowl.Profiles.cs`, `FishBowl.Integrations.cs` | Shared profiles, guest mode, transfer, multiplayer readiness, Linux launch options and integrations |
 | `FishBowl.GameRecognition.cs` | Game identification from local metadata, shared by both versions |
 | `FishBowl.Core.cs`, `FishBowl.Platform.cs` | Shared emulator logic, and the differences between Windows and Linux |
-| `FishBowl.Avalonia/` | The Linux user interface |
-| `linux/` | Linux install scripts and desktop entry |
+| `FishBowl.Avalonia/` | The Linux user interface; `FishBowl.Avalonia/Linux/` holds Linux-only integrations (Flatpak, AppImage updates, Steam, controllers) |
+| `linux/` | Linux install scripts, desktop entry, AppImage build script and PKGBUILD |
+| `docs/` | Browser setup, Play validation, development history and README screenshots |
 | `tests/` | Linux and compatibility tests |
 | `Folder Routing.md` | How FishBowl finds each emulator's save, state and configuration folders |
 | `HANDOFF.md`, `AGENTS.md` | Current development status and instructions for contributors' coding agents |
