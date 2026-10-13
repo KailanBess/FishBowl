@@ -24,7 +24,9 @@ Required checks must pass before merging. Distribute executables through Release
 
 **Round 1 (#28–#30):** shared `FishBowl.Games.cs` (library queries, collections, lists, import, launch/sessions via `GamePlay`), `FishBowl.SaveTools.cs` (save history; Windows keeps its emulator rules through partial-method hooks; both apps use `Game Saves/<id>/<kind>/History`) and `FishBowl.LivingRoom.cs` (Immersion logic and living-room navigation; Windows `Immersion` calls it). Linux controllers use evdev, falling back to `/dev/input/js*`.
 
-**Still missing on Linux:** game details dialog (`GameExperienceDialog`), aquarium bubble rails, ambient artwork on the main window, Home "Save history"/"Readiness" quick actions, embedded Play/Web (Linux launches emulators and browsers as separate windows). Possible follow-up: Windows MainForm could use the shared `SaveMonitor` rules.
+**Round 3 (`parity/details-3`, after #38):** the rest of the Windows game details dialog: personal rating (Edit game), disc list and disc to launch, emulator core and title ID (Game setup); the Library details panel shows them plus controller and compatibility notes, and links Save history and Launch preview (the exact command with Linux launch options, or why the game can't start). Home quick actions gain Save history and Readiness.
+
+**Still missing on Linux:** aquarium bubble rails, ambient artwork on the main window, embedded Play/Web (Linux launches emulators and browsers as separate windows). Possible follow-up: Windows MainForm could use the shared `SaveMonitor` rules.
 
 ## Validation and compatibility
 
@@ -45,6 +47,8 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+
+- **2026-10-13 (Linux):** branch `parity/details-3` (stacked on #38) fills the remaining game-details gaps and Home quick actions (see Linux work). Linux build and core tests pass; checked headlessly with a fake library.
 
 - **2026-10-13 (Linux):** merged main (through #36/#37) into PR #38 and resolved conflicts (menus keep both the profile and Linux integration items; the desktop file has both Living Room and Reopen last game actions; `--launch`/`--list` run before the single-instance check; interface scale times text size). The PR's earlier Windows CI failure was the stale 1.29.2 package version that #33 fixed. Linux build, core tests, schema (229) and C# 5 shared/Windows-source compiles pass locally.
 
