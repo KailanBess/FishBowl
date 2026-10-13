@@ -91,6 +91,12 @@ namespace EmulatorHub
             double luminance = channel(c.R) * 0.2126 + channel(c.G) * 0.7152 + channel(c.B) * 0.0722;
             return luminance > 0.179 ? Rgb(0, 0, 0) : Colors.White;
         }
+        // A translucent colour painted over an opaque background, for choosing readable text on selection washes.
+        public static Color Composite(Color over, Color background)
+        {
+            int a = over.A;
+            return Color.FromRgb((byte)((over.R * a + background.R * (255 - a)) / 255), (byte)((over.G * a + background.G * (255 - a)) / 255), (byte)((over.B * a + background.B * (255 - a)) / 255));
+        }
         public static bool IsDarkColor(Color c) { return Brightness(c) < 0.65f; }
         public static Color Rgb(byte r, byte g, byte b) { return Color.FromRgb(r, g, b); }
         public static Color Alpha(byte alpha, Color c) { return Color.FromArgb(alpha, c.R, c.G, c.B); }

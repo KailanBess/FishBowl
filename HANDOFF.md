@@ -2,28 +2,37 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-10-08, active-game switching and shutdown._
+_Last updated: 2026-10-08, browser viewport fitting._
 
 ## Current state
 
 | Area | State |
 | --- | --- |
-| Windows | Source **1.29.3**, pending review in [PR #25](https://github.com/KailanBess/FishBowl/pull/25). Public release remains [v1.25.8](https://github.com/KailanBess/FishBowl/releases/tag/v1.25.8). |
-| Linux | Library/Home/living-room and save/backup parity merged through PRs #28–#30. Native desktop smoke testing remains required. |
+| Windows | Source **1.29.4**, browser fitting on branch `fishbowl-browser-auto-fit`. PR #25 is merged; source includes main through `5b96312`. |
+| Linux | Round 1 (#28–#30) and round 2 integrations/QA (#37) merged; round 2 profiles in PR #38 (see Linux work). |
 | Shared | C# 5 game, library, session, save and living-room helpers. Optional Browser/PlayView fields survive Linux saves; Linux browsing remains external. |
-| Issues | [Issue #32](https://github.com/KailanBess/FishBowl/issues/32) tracks active-game switching and shutdown. [Issue #31](https://github.com/KailanBess/FishBowl/issues/31) tracks Web navigation, embedded multiplayer and external-window return. Issues #23/#27 are closed; their implementation remains under review in PR #25. |
+| Issues | [Issue #34](https://github.com/KailanBess/FishBowl/issues/34) tracks automatic browser fitting. Issues #23/#27/#31/#32 are implemented through merged PR #25. |
 
 ## Open pull requests
 
-- [#25: Windows Web, game-only Play and confirmed shutdown](https://github.com/KailanBess/FishBowl/pull/25), branch `fishbowl-web-game-view`, targets `main`. Includes main through `10a5d4e0`, the merged Linux save-parity work. Source 1.29.3 adds active-game switching and responsive in-app shutdown to the prior fixes. Web navigates the existing browser window, adds Return to Web/Play on the external-window button, and keeps multiplayer renderers in an owned Play viewport with a modeless sharing dialog. Issue #31 remains open pending review and native verification.
+- [#38: Linux profiles, launch options and settings](https://github.com/KailanBess/FishBowl/pull/38), branch `parity/profiles-2`, targets `main` (see Linux work). #36 and #37 are merged.
 
-PRs #28–#30 are merged. Required checks must pass before merging #25. Distribute executables through Releases or passing workflow artifacts. Latest prior Copilot merge `983f0113` awaits workflow approval; the new pushed commit gets its own checks.
+Required checks must pass before merging. Distribute executables through Releases or passing workflow artifacts.
+## Linux work
+
+**Round 2:** PR #37 merged integrations (Flatpak permissions and updates, AppImage updates, Add to Steam, EmuDeck/RetroDECK, AUR `linux/PKGBUILD`, Living Room desktop action) and QA (every Linux screen and dialog checked; interface scale applies to dialogs; single-instance guard: a second launch forwards its arguments to the running copy over a socket in `XDG_RUNTIME_DIR`). PR #38 (`parity/profiles-2`) adds shared `FishBowl.Profiles.cs` (user profiles, guest mode, profile transfer/reviewed sync, multiplayer readiness, ROM integrity, accessibility presets; Windows keeps its dialogs and calls it), Linux launch options per emulator or launch profile (Proton/Wine, GameMode, MangoHud, Gamescope; stored as the extra `LinuxLaunch` field, which Windows ignores), `fishbowl --launch/--launch-last/--list/--help`, and Linux User tools, controller profiles, multiplayer, preferences, appearance/accessibility and keyboard shortcut dialogs. **Windows-side agents: please avoid changing `FishBowl.Avalonia/` until #38 merges.**
+
+**Round 1 (#28–#30):** shared `FishBowl.Games.cs` (library queries, collections, lists, import, launch/sessions via `GamePlay`), `FishBowl.SaveTools.cs` (save history; Windows keeps its emulator rules through partial-method hooks; both apps use `Game Saves/<id>/<kind>/History`) and `FishBowl.LivingRoom.cs` (Immersion logic and living-room navigation; Windows `Immersion` calls it). Linux controllers use evdev, falling back to `/dev/input/js*`.
+
+**Still missing on Linux:** game details dialog (`GameExperienceDialog`), aquarium bubble rails, ambient artwork on the main window, Home "Save history"/"Readiness" quick actions, embedded Play/Web (Linux launches emulators and browsers as separate windows). Possible follow-up: Windows MainForm could use the shared `SaveMonitor` rules.
 
 ## Validation and compatibility
 
 Windows regression suites, browser/process ownership fixtures and normal/compact text audits cover the automated behavior. Run `windows/Build.ps1`, `windows/Run Tests.ps1` and both modes of `windows/Run Overflow Audit.ps1` after shared-source changes. CI also compiles all retained shared sources with C# 5 and runs the Linux build, core tests and schema checks.
 
-1.29.3 automated checks pass: the complete Windows regression run, final exit/prompt fixtures (196), native hosting (90), launch routing (20), framework/large-library audit (46), five workspaces plus 68 dialogs with zero normal/compact overflow at 100/150/200%, shared C# 5 compilation, schema preservation (229) and Linux semantic compilation. Required GitHub checks and owner review remain pending before merge. Native emulator performance and Qt accessibility-provider behavior still need live checks.
+Windows 1.29.4 targeted checks pass: browser routing/geometry (40), game exit (196), hosting (90), launch (20), smooth UI (667) and framework/large-library audit (46). Normal and compact text audits report zero findings across five workspaces and 68 dialogs at 100/150/200%. Live browser and monitor compatibility checks remain open.
+
+1.29.3 automated checks pass: the complete Windows regression run, final exit/prompt fixtures (196), native hosting (90), launch routing (20), framework/large-library audit (46), five workspaces plus 68 dialogs with zero normal/compact overflow at 100/150/200%, shared C# 5 compilation, schema preservation (229) and Linux semantic compilation. PR #25 is merged and 1.29.3 is released. Native emulator performance and Qt accessibility-provider behavior still need live checks.
 
 Installed Firefox has rendered inside Web, survived section changes and rendered fullscreen. 1.29.2 address-bar keyboard navigation, browser forms/downloads/permissions, normal live shutdown, Edge/Chrome versions and mixed-monitor setups still need native checks. Browser fixtures use a fixture-only navigation transport because the test desktop cannot activate a foreign window; those passes establish routing/window lifetime, not live keyboard delivery. Browser executables are installed separately; none is bundled. See [Browser setup](docs/BROWSER.md) and [Play validation](docs/PLAY-VALIDATION.md).
 
@@ -33,9 +42,17 @@ Actual emulator rendering/audio, physical controllers and two-device remote stre
 
 Source, scripts, tests, artwork and documentation belong in Git. Generated executables, packages, temporary output, personal libraries and game files are ignored. See [Source layout](SOURCE-LAYOUT.md).
 
-Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-web-game-view` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
+Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+
+- **2026-10-13 (Linux):** merged main (through #36/#37) into PR #38 and resolved conflicts (menus keep both the profile and Linux integration items; the desktop file has both Living Room and Reopen last game actions; `--launch`/`--list` run before the single-instance check; interface scale times text size). The PR's earlier Windows CI failure was the stale 1.29.2 package version that #33 fixed. Linux build, core tests, schema (229) and C# 5 shared/Windows-source compiles pass locally.
+
+- **2026-10-08:** reviewed all open GitHub issues. Issue #34 has an implemented browser fitting fix with successful Build and Text overflow audit checks. Resolved the PR #36 handoff conflict against merged Linux QA/AppImage work, preserving notes from both maintainers. Fresh integration checks must pass before merging the fix and closing #34. PR #38 remains separate Linux feature work.
+
+- **2026-10-08:** Windows 1.29.4 addresses issue #34. Browser viewports verify native geometry and restore browser-native movement, resizing and maximization to the Web area. Open in window starts fitted over Web, then respects user adjustments; Return to Web resumes fitting. Unsupported attachment receives an initial external fit. Browser fixtures cover automatic fit, native geometry reset, app move/resize, idle placement stability and external positioning. Updated the Linux version only to satisfy the paired CI package contract; Linux parity implementations are untouched. Based on merged main through #25/#33.
+
+- **2026-10-08 (Linux):** summarized Linux parity round 1 and started round 2 (see Linux work). The Build workflow now takes the expected package version from `FishBowl.Avalonia.csproj` instead of a hardcoded number (it failed on main because it still expected 1.29.2). Releases now include a Linux AppImage (`linux/build-appimage.sh`, run by the release workflow) with `SHA256SUMS-linux.txt`; v1.29.3 was released with one.
 
 - **2026-10-08:** Windows 1.29.3 addresses issue #32. Play defaults to owned renderer viewports so tab layout does not propagate through a foreign child window. Process ownership retains a verified lifetime handle, unchanged viewport clips are reused, renderer discovery stops rescanning stable windows after startup, and decorative motion pauses on every section while a game runs. Close games and exit waits in a responsive FishBowl dialog, acknowledges strictly recognized English plain exit confirmations, presents save/unknown prompts inside the dialog, and completes FishBowl closure when the tracked processes exit. Veto/cancel retains the game; no ordinary game process is force terminated. Added native shutdown and active-navigation fixtures. Linux has matching version metadata only; saved data is unchanged. Native emulator rendering and Qt accessibility remain compatibility checks.
 

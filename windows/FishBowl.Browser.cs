@@ -83,6 +83,7 @@ namespace EmulatorHub {
   HashSet<string> before=new HashSet<string>();Task<List<SessionProcess>> snapshot;
   BrowserPreferences active;string profile;DateTime started;bool inWindow,closing,disposing,fullScreen,leaveRunning;
   Func<IntPtr,SessionProcess,string,bool> navigateWindow=BrowserNavigation.Navigate;
+  readonly HashSet<IntPtr> fittedFallbackWindows=new HashSet<IntPtr>();
   public bool HasRunningBrowser {get{return known.Any(PlayNative.IsAlive);}}
   public BrowserSurface(LibraryData data,Action toggleFullscreen) {
    library=data;fullscreen=toggleFullscreen;Dock=DockStyle.Fill;BackColor=FishBowlPalette.ThemeSurface;
@@ -92,11 +93,11 @@ namespace EmulatorHub {
    bar.Controls.Add(address);bar.Controls.Add(ExperienceUi.Button("Go",delegate{Navigate(address.Text);}));
    back=ExperienceUi.Button("Back",delegate{Command(1);});forward=ExperienceUi.Button("Forward",delegate{Command(2);});reload=ExperienceUi.Button("Reload",delegate{Command(3);});
    stop=ExperienceUi.Button("Close browser",delegate{if(!RequestClose())status.Text="Finish the browser's save or exit prompt, then close it again.";});
-   external=ExperienceUi.Button("Open in window",delegate{if(inWindow)ShowInApp();else if(host.TryDetach()){inWindow=true;UpdateState();}});
+   external=ExperienceUi.Button("Open in window",delegate{if(inWindow)ShowInApp();else {IntPtr window=host.GameWindow;if(window==IntPtr.Zero)window=PlayNative.Find(known);if(host.TryDetach()){inWindow=true;FitExternalWindow(window);UpdateState();}}});
    show=ExperienceUi.Button("Show in app",ShowInApp);
    full=ExperienceUi.Button("Full screen",delegate{if(fullscreen!=null)fullscreen();});
    bar.Controls.AddRange(new Control[]{back,forward,reload,external,show,full,stop,ExperienceUi.Button("Browser settings",delegate{using(var dialog=new BrowserSettingsDialog(library))if(dialog.ShowDialog(FindForm())==DialogResult.OK){if(!HasRunningBrowser)address.Text=FishBowlWeb.Settings(library).HomePage;else status.Text="Browser settings saved. Close this Web session and press Go to use the new browser.";}})});
-   host=new PlayWindowHost{PreserveRendererWindow=true};empty=ExperienceUi.Label("Browse inside FishBowl. Firefox is the default; Browser settings lets you choose another installed browser. Enter a web address or search, then press Go.",130);empty.Dock=DockStyle.Top;empty.Padding=new Padding(16);host.Controls.Add(empty);
+   host=new PlayWindowHost{PreserveRendererWindow=true,MaintainViewportBounds=true};empty=ExperienceUi.Label("Browse inside FishBowl. Firefox is the default; Browser settings lets you choose another installed browser. Enter a web address or search, then press Go.",130);empty.Dock=DockStyle.Top;empty.Padding=new Padding(16);host.Controls.Add(empty);
    status=ExperienceUi.Label("Web is ready. No browser runs until you press Go.",80);status.Dock=DockStyle.Bottom;status.AutoSize=true;
    Controls.Add(host);Controls.Add(status);Controls.Add(bar);timer=new Timer{Interval=150};timer.Tick+=Tick;UpdateState();
   }
@@ -110,6 +111,7 @@ namespace EmulatorHub {
      var identity=known.FirstOrDefault(p=>PlayNative.Matches(window,p.Pid,p.StartedUtcTicks));
      if(!host.IsAttached||identity==null)throw new IOException("Wait for the browser window to return to Web, then press Go again.");
      if(!navigateWindow(window,identity,url))throw new IOException("The browser could not receive the address. Release any held shortcut keys, return to Web and press Go again.");
+     host.RefreshPlacement();
      address.Text=url;UpdateState();return;
     }
     if(!running) {
@@ -133,6 +135,19 @@ namespace EmulatorHub {
    }
    host.RefreshPlacement();UpdateState();
   }
+  bool FitExternalWindow(IntPtr window) {
+   if(!Visible || !host.IsHandleCreated || !known.Any(p=>PlayNative.Matches(window,p.Pid,p.StartedUtcTicks)) ||
+      PlayNative.GetWindow(window,4)!=IntPtr.Zero || (PlayNative.GetLong(window,PlayNative.Style)&PlayNative.Child)!=0 || PlayNative.IsHungAppWindow(window)) return false;
+   PlayNative.Rect bounds;
+   IntPtr previous=IntPtr.Zero;
+   try {
+    previous=PlayNative.SetThreadDpiAwarenessContext(PlayNative.GetWindowDpiAwarenessContext(window));
+    if(!PlayNative.GetWindowRect(host.Handle,out bounds))return false;
+    if(PlayNative.IsZoomed(window)||PlayNative.IsIconic(window))PlayNative.ShowWindowAsync(window,9);
+    return PlayNative.SetWindowPos(window,IntPtr.Zero,bounds.Left,bounds.Top,Math.Max(1,bounds.Right-bounds.Left),Math.Max(1,bounds.Bottom-bounds.Top),0x4054);
+   } catch(EntryPointNotFoundException) { return false; }
+   finally { if(previous!=IntPtr.Zero)PlayNative.SetThreadDpiAwarenessContext(previous); }
+  }
   void Tick(object sender,EventArgs e) {
    if(disposing||closing)return;if(host.IsAnchored)host.RefreshPlacement();
    if(snapshot==null){snapshot=Task.Factory.StartNew<List<SessionProcess>>(SessionLedger.ProcessSnapshot);return;}
@@ -146,7 +161,7 @@ namespace EmulatorHub {
     try { var process=Process.GetProcessById(candidate.Pid);if(process.StartTime.ToUniversalTime().Ticks!=candidate.StartedUtcTicks){process.Dispose();continue;}known.Add(candidate);handles.Add(candidate.Key,process);added=true; }catch{}
    }}while(added);
    if(!HasRunningBrowser&&(DateTime.UtcNow-started).TotalSeconds>3){Release();timer.Stop();UpdateState();return;}
-   if(!inWindow&&!host.IsAttached){IntPtr window=PlayNative.Find(known);uint pid;PlayNative.GetWindowThreadProcessId(window,out pid);var identity=known.FirstOrDefault(p=>p.Pid==pid&&keys.Contains(p.Key));if(identity!=null)host.AttachWindow(window,identity.Pid,identity.StartedUtcTicks);}
+   if(!inWindow&&!host.IsAttached){IntPtr window=PlayNative.Find(known);uint pid;PlayNative.GetWindowThreadProcessId(window,out pid);var identity=known.FirstOrDefault(p=>p.Pid==pid&&keys.Contains(p.Key));if(identity!=null && !host.AttachWindow(window,identity.Pid,identity.StartedUtcTicks) && !fittedFallbackWindows.Contains(window) && FitExternalWindow(window))fittedFallbackWindows.Add(window);}
    timer.Interval=host.IsAttached||inWindow||DateTime.UtcNow-started>TimeSpan.FromSeconds(25)?(Visible?1000:2000):150;UpdateState();
   }
   void Command(int command) {
@@ -181,7 +196,7 @@ namespace EmulatorHub {
     if(!host.TryDetach())return false;leaveRunning=true;return true;
    }
   }
-  void Release(){if(!host.TryDetach())throw new InvalidOperationException("The browser window could not be restored safely. Close it in the browser, then retry.");foreach(var process in handles.Values)process.Dispose();handles.Clear();known.Clear();snapshot=null;active=null;}
+  void Release(){if(!host.TryDetach())throw new InvalidOperationException("The browser window could not be restored safely. Close it in the browser, then retry.");foreach(var process in handles.Values)process.Dispose();handles.Clear();known.Clear();fittedFallbackWindows.Clear();snapshot=null;active=null;}
   protected override void Dispose(bool value){if(value&&!disposing){disposing=true;timer.Stop();if(!leaveRunning)RequestClose();timer.Dispose();Release();}base.Dispose(value);}
  }
  // Navigate the exact existing browser HWND instead of invoking a second browser instance.

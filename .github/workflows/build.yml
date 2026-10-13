@@ -49,7 +49,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Shared C# 5 compilation failed' }
       - name: Package complete Windows app and source
         shell: pwsh
-        run: ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion 1.29.2
+        run: |
+          # The expected version comes from the Linux project, so both apps must carry the same version.
+          $version = [regex]::Match((Get-Content FishBowl.Avalonia/FishBowl.Avalonia.csproj -Raw), '<Version>([^<]+)</Version>').Groups[1].Value
+          if (-not $version) { throw 'No <Version> in FishBowl.Avalonia.csproj' }
+          ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion $version
       - uses: actions/upload-artifact@v7
         with:
           name: FishBowl-windows

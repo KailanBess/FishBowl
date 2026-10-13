@@ -54,10 +54,17 @@ jobs:
           if [ "$GITHUB_REF_TYPE" != tag ]; then version="$REQUESTED_VERSION"; fi
           grep -q "<Version>$version</Version>" FishBowl.Avalonia/FishBowl.Avalonia.csproj
           tar -czf "artifacts/FishBowl-$version-linux-x64.tar.gz" -C artifacts/linux-x64 .
+      - name: Build AppImage
+        run: linux/build-appimage.sh artifacts
+      - name: Linux checksums
+        run: cd artifacts && sha256sum *.tar.gz *.AppImage > SHA256SUMS-linux.txt
       - uses: actions/upload-artifact@v7
         with:
           name: FishBowl-release-linux-x64
-          path: artifacts/*.tar.gz
+          path: |
+            artifacts/*.tar.gz
+            artifacts/*.AppImage
+            artifacts/SHA256SUMS-linux.txt
   publish:
     if: github.ref_type == 'tag'
     needs: [windows, linux]
@@ -79,4 +86,12 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           folder="packages/FishBowl-release-windows"
           (cd "$folder" && sha256sum --check SHA256SUMS.txt)
-          gh release create "$GITHUB_REF_NAME" "$folder/FishBowl-$version.zip" "$folder/FishBowl-$version-Source.zip" "packages/FishBowl-release-linux-x64/FishBowl-$version-linux-x64.tar.gz" "$folder/SHA256SUMS.txt" "$folder/BUILD-INFO.json" "$folder/RELEASE-NOTES.md" --draft --title "FishBowl $GITHUB_REF_NAME" --notes-file "$folder/RELEASE-NOTES.md"
+          linux="packages/FishBowl-release-linux-x64"
+          (cd "$linux" && sha256sum --check SHA256SUMS-linux.txt)
+          cat >> "$folder/RELEASE-NOTES.md" <<EOF
+
+          ## Linux
+
+          Download **FishBowl-$version-x86_64.AppImage**, make it executable (\`chmod +x\`, or Properties → Allow executing as program) and run it. **FishBowl-$version-linux-x64.tar.gz** holds the same program as a plain folder. SHA256SUMS-linux.txt covers both.
+          EOF
+          gh release create "$GITHUB_REF_NAME" "$folder/FishBowl-$version.zip" "$folder/FishBowl-$version-Source.zip" "$linux/FishBowl-$version-linux-x64.tar.gz" "$linux/FishBowl-$version-x86_64.AppImage" "$linux/SHA256SUMS-linux.txt" "$folder/SHA256SUMS.txt" "$folder/BUILD-INFO.json" "$folder/RELEASE-NOTES.md" --draft --title "FishBowl $GITHUB_REF_NAME" --notes-file "$folder/RELEASE-NOTES.md"

@@ -21,6 +21,8 @@ namespace EmulatorHub
     {
         public static Palette P { get { return Palette.Current; } }
         public static FontFamily Font = FontFamily.Default;
+        // The Interface scale setting (Linux's large-text option); the main window and FishBowl dialogs both apply it.
+        public static double Scale = 1;
 
         public static Button Action(string text, Func<Task> click, bool primary = false)
         {
@@ -178,18 +180,26 @@ namespace EmulatorHub
     {
         public FishDialog(string title, double width, double height = double.NaN)
         {
-            Title = title; Width = width; Icon = Ui.AppIcon(); ShowInTaskbar = false;
-            if (Double.IsNaN(height)) SizeToContent = SizeToContent.Height; else Height = height;
+            Title = title; Width = width * Ui.Scale; Icon = Ui.AppIcon(); ShowInTaskbar = false;
+            if (Double.IsNaN(height)) SizeToContent = SizeToContent.Height; else Height = height * Ui.Scale;
             WindowStartupLocation = WindowStartupLocation.CenterOwner; Background = Ui.P.TopBrush; Foreground = Ui.P.InkBrush; FontFamily = Ui.Font;
             KeyDown += (sender, e) => { if (e.Key == Key.Escape) { Close(); e.Handled = true; } };
         }
-        public Control Body { set { Content = new Border { Padding = new Thickness(18), Child = value }; } }
+        public Control Body
+        {
+            set
+            {
+                var body = new Border { Padding = new Thickness(18), Child = value };
+                Content = Ui.Scale == 1 ? (Control)body : new LayoutTransformControl { LayoutTransform = new ScaleTransform(Ui.Scale, Ui.Scale), Child = body };
+            }
+        }
         // Not ShowDialog: on X11 a modal dialog takes focus back whenever its disabled owner is activated, and on
         // focus-follows-mouse desktops (Hyprland, Sway, i3) that warps the pointer back into the dialog, trapping it.
         // Instead the dialog stays above its owner, and the owner ignores input until the dialog closes.
         public async Task Present(Window owner)
         {
             var closed = new TaskCompletionSource<bool>(); Closed += delegate { closed.TrySetResult(true); };
+            FitScreen(owner != null && owner.IsVisible ? owner : null);
             if (owner == null || !owner.IsVisible) { Show(); await closed.Task; return; }
             EventHandler<RoutedEventArgs> block = (sender, e) => e.Handled = true;
             var events = new RoutedEvent[] { InputElement.PointerPressedEvent, InputElement.PointerReleasedEvent, InputElement.PointerWheelChangedEvent, InputElement.KeyDownEvent, InputElement.KeyUpEvent, InputElement.TextInputEvent, DragDrop.DragOverEvent, DragDrop.DropEvent };
@@ -200,6 +210,21 @@ namespace EmulatorHub
                 foreach (var routed in events) owner.RemoveHandler(routed, block);
                 owner.Activate();
             }
+        }
+        // Tall dialogs (Settings, Edit game, emulator management) must keep their buttons on a 768-pixel laptop screen.
+        private void FitScreen(Window owner)
+        {
+            try
+            {
+                var screen = owner != null ? owner.Screens.ScreenFromWindow(owner) : null;
+                if (screen == null) screen = Screens.Primary;
+                if (screen == null) return;
+                double scale = screen.Scaling <= 0 ? 1 : screen.Scaling;
+                MaxWidth = Math.Max(320, screen.WorkingArea.Width / scale - 24); MaxHeight = Math.Max(240, screen.WorkingArea.Height / scale - 24);
+                if (!Double.IsNaN(Height) && Height > MaxHeight) Height = MaxHeight;
+                if (!Double.IsNaN(Width) && Width > MaxWidth) Width = MaxWidth;
+            }
+            catch (Exception error) { Store.Log("Dialog size could not be fitted to the screen: " + error.Message); }
         }
         // Standard right-aligned Save/Cancel row; save returns false to keep the dialog open.
         public Control Footer(string confirm, Func<Task<bool>> save, params Control[] extra)

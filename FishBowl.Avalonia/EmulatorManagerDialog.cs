@@ -49,7 +49,7 @@ namespace EmulatorHub
         public static void Uncheck(ListBoxItem item) { var panel = item.Content as DockPanel; if (panel != null) foreach (var box in panel.Children.OfType<CheckBox>()) box.IsChecked = false; }
     }
 
-    public class EmulatorManagerDialog : FishDialog
+    public partial class EmulatorManagerDialog : FishDialog
     {
         private readonly LibraryData library;
         private EmulatorProfile profile;
@@ -287,11 +287,11 @@ namespace EmulatorHub
         {
             var hint = Ui.Hint("Checks published releases from the project's GitHub feed when available. No emulator files are replaced automatically. Projects without a feed use their official download page." + (Platform.IsWindows ? "" : " Flatpak and distribution packages update through your package manager."));
             FillPage("Updates", "download", updateText, hint, Input("Optional GitHub repository override: owner/repository (blank = preset source)", repository),
-                Ui.Actions(Button("Check for updates", CheckUpdates), Button("Official downloads", () => OpenUrl(EmulatorReference.For(Selected()).Releases)), Button("Open found release", () => OpenUrl(releaseUrl)), previews));
+                Ui.Actions(Button("Check for updates", CheckUpdates), Button("Official downloads", () => OpenUrl(EmulatorReference.For(Selected()).Releases)), Button("Open found release", () => OpenUrl(releaseUrl)), previews), InstallUpdateBar());
         }
         private void RefreshUpdates()
         {
-            releaseUrl = profile == null ? "" : profile.LatestReleaseUrl;
+            releaseUrl = profile == null ? "" : profile.LatestReleaseUrl; RefreshInstallInfo(profile);
             if (profile == null) { updateText.Text = "Select an emulator to check its releases."; return; }
             var snapshot = profile;
             updateText.Text = "Installed: checking…\nRelease source: " + (EmulatorUpdates.Repository(profile).Length > 0 ? EmulatorUpdates.Repository(profile) : "Official download page; no automatic feed") + "\n";
@@ -426,19 +426,20 @@ namespace EmulatorHub
         {
             var hint = Ui.Hint("Check the program path, running status and storage folder availability. An uncreated save folder is informational. BIOS/firmware validity and graphics/controller configuration are checked inside the emulator.");
             requirementText.Height = 130; DockPanel.SetDock(requirementText, Dock.Bottom); requirementText.Margin = new Thickness(0, 10, 0, 0);
-            var dock = FillPage("Setup checks", "check", health, hint, Ui.Actions(Button("Refresh checks", RefreshHealth), Button("Choose firmware folder…", ChooseFirmware), Button("Setup guide", () => OpenUrl(EmulatorReference.For(Selected()).Documentation)), Button("Repair location", RepairLocation)));
+            var dock = FillPage("Setup checks", "check", health, hint, Ui.Actions(Button("Refresh checks", RefreshHealth), Button("Choose firmware folder…", ChooseFirmware), Button("Setup guide", () => OpenUrl(EmulatorReference.For(Selected()).Documentation)), Button("Repair location", RepairLocation)), FlatpakBar());
             dock.Children.Insert(1, requirementText);
         }
         private async void RefreshHealth()
         {
-            health.Clear(); if (profile == null) { requirementText.Text = "Select an emulator to review its setup requirements."; return; }
+            health.Clear(); ShowFlatpakFixes(null, null); if (profile == null) { requirementText.Text = "Select an emulator to review its setup requirements."; return; }
             var snapshot = profile;
             requirementText.Text = (EmulatorReference.For(profile).Requirements ?? "").Replace("\r\n", "\n");
             try
             {
-                var checks = await Task.Run(() => EmulatorHealth.Check(snapshot, library));
+                var checks = await Task.Run(() => { var list = EmulatorHealth.Check(snapshot, library); if (!Platform.IsWindows) list.AddRange(FlatpakSetup.Checks(snapshot, library)); return list; });
                 if (profile != snapshot) return;
                 health.Clear(); foreach (var check in checks) health.Add(check, false, check.Name, check.Status, check.Detail);
+                ShowFlatpakFixes(snapshot, checks);
             }
             catch (Exception ex) { Store.Log("Setup checks failed: " + ex.Message); }
         }

@@ -119,7 +119,7 @@ namespace EmulatorHub
     {
         public bool OpenSetupAssistant { get { return SecondaryChosen; } }
         public StartupAssistantDialog() : base("Welcome to FishBowl", "FishBowl Setup Assistant",
-            "Get your library ready in a few steps:\n\n• Add an emulator program" + (Platform.IsWindows ? " or shortcut." : ", AppImage or Flatpak — Find installed detects them for you.") + "\n• Review its setup checks and official requirements.\n• Configure controllers and graphics inside each emulator.\n• Add and play games inside the emulator.", "Open setup") { }
+            "Get your library ready in a few steps:\n\n• Add an emulator program" + (Platform.IsWindows ? " or shortcut." : ", AppImage or Flatpak — Find installed detects them for you.") + "\n• Review its setup checks and official requirements.\n• Add or sync games in Game Library.\n• Configure controllers and graphics inside each emulator.", "Open setup") { }
     }
     public class GameStoragePromptDialog : AssistantPrompt
     {

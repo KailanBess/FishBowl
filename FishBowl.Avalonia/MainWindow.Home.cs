@@ -49,6 +49,8 @@ namespace EmulatorHub
 
             var last = GamePlay.LastGame(library);
             if (last != null) homeCards.Children.Add(ContinueHero(last));
+            // First run: games need an emulator, so start there instead of offering Add games first.
+            else if (library.Emulators.Count == 0) homeCards.Children.Add(Card("Welcome", new Control[] { Wrapped("Start by adding an emulator: Find installed detects " + (!Platform.IsWindows && !Platform.IsMac ? "programs, AppImages and Flatpaks" : "installed programs") + ". Then add your games, and FishBowl will launch them with the right emulator and track your play time."), Ui.Actions(Ui.Action("Find installed emulators", () => ShowEmulatorManager("Find installed"), true), Ui.Action("Add emulator", AddEmulator), Ui.Action("Add games", AddLibraryGames)) }));
             else homeCards.Children.Add(Card("Welcome", new Control[] { Wrapped(library.Games.Count == 0 ? "Add your games, and FishBowl will launch them with the right emulator and track your play time." : "Pick a game in Library to start playing."), Ui.Actions(Ui.Action("Add games", AddLibraryGames, true), Ui.Action("Add folder", AddLibraryFolder), Ui.Action("Open library", () => OpenLibraryScope(null))) }));
 
             var grid = new Grid(); bool twoColumns = (Bounds.Width > 0 ? Bounds.Width : Width) >= 1000;

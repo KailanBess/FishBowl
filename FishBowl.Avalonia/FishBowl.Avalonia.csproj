@@ -7,7 +7,7 @@
     <RootNamespace>EmulatorHub</RootNamespace>
     <Nullable>disable</Nullable>
     <ApplicationIcon>../FishBowl.ico</ApplicationIcon>
-    <Version>1.29.3</Version>
+    <Version>1.29.4</Version>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <!-- Windows-only calls in the shared files are guarded at run time; HttpWebRequest keeps parity with the csc.exe build. -->
     <NoWarn>$(NoWarn);CA1416;SYSLIB0014;CS0618</NoWarn>

@@ -9,7 +9,11 @@ Terminal=false
 Categories=Game;Emulator;
 Keywords=emulator;retro;games;
 StartupWMClass=FishBowl
-Actions=launch-last;
+Actions=LivingRoom;launch-last;
+
+[Desktop Action LivingRoom]
+Name=Living Room
+Exec="@EXEC@" --living-room
 
 [Desktop Action launch-last]
 Name=Reopen last game

@@ -1,0 +1,54 @@
+# Maintainer: FishBowl maintainers <https://github.com/KailanBess/FishBowl>
+# AUR package for the Linux (Avalonia) FishBowl, built from the main branch.
+# Check locally:  makepkg --printsrcinfo > .SRCINFO   ·   build and install:  makepkg -si
+pkgname=fishbowl-git
+_pkgname=fishbowl
+pkgver=r0.0000000
+pkgrel=1
+pkgdesc="Emulator hub: your emulators and games together, with a living-room mode"
+arch=('x86_64' 'aarch64')
+url="https://github.com/KailanBess/FishBowl"
+# The repository has no license file yet; replace this once the project chooses one.
+license=('LicenseRef-FishBowl')
+depends=('fontconfig' 'libx11' 'libice' 'libsm' 'zlib' 'icu')
+makedepends=('git' 'dotnet-sdk>=10')
+optdepends=('flatpak: Flatpak emulators, permission checks and updates'
+            'librsvg: emulator icons and Steam artwork from SVG icons'
+            'steam: Add to Steam shortcuts')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+# Self-contained .NET single-file bundle: stripping corrupts it, and it carries no separate debug symbols.
+options=('!strip' '!debug')
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+build() {
+  cd "$_pkgname"
+  case "$CARCH" in
+    x86_64) _rid=linux-x64 ;;
+    aarch64) _rid=linux-arm64 ;;
+  esac
+  export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_HOME="$srcdir/dotnet-home" NUGET_PACKAGES="$srcdir/nuget"
+  dotnet publish FishBowl.Avalonia/FishBowl.Avalonia.csproj -c Release -r "$_rid" --self-contained true \
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o "$srcdir/publish" --nologo
+}
+
+check() {
+  cd "$_pkgname"
+  DOTNET_CLI_HOME="$srcdir/dotnet-home" NUGET_PACKAGES="$srcdir/nuget" dotnet run --project tests/FishBowl.Tests -c Release
+}
+
+package() {
+  cd "$_pkgname"
+  install -d "$pkgdir/usr/lib/$_pkgname" "$pkgdir/usr/bin"
+  cp -r "$srcdir/publish/." "$pkgdir/usr/lib/$_pkgname/"
+  install -Dm644 FishBowl.png "$pkgdir/usr/lib/$_pkgname/FishBowl.png"
+  ln -s "/usr/lib/$_pkgname/FishBowl" "$pkgdir/usr/bin/$_pkgname"
+  install -Dm644 FishBowl.png "$pkgdir/usr/share/pixmaps/$_pkgname.png"
+  sed "s|@EXEC@|/usr/lib/$_pkgname/FishBowl|" linux/fishbowl.desktop | install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/$_pkgname.desktop"
+}
