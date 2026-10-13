@@ -126,7 +126,7 @@ namespace EmulatorHub
             var splitter = new GridSplitter { Background = p.TopBrush, ResizeDirection = GridResizeDirection.Columns }; Grid.SetColumn(splitter, 1); split.Children.Add(splitter);
             emulatorInformation = BuildInformationPanel(); Grid.SetColumn(emulatorInformation, 2); split.Children.Add(emulatorInformation);
             var emulatorPage = new DockPanel(); DockPanel.SetDock(actions, Dock.Top); emulatorPage.Children.Add(actions); emulatorPage.Children.Add(split);
-            var pages = BuildLibraryPages(emulatorPage); Grid.SetRow(pages, 3); shell.Children.Add(pages);
+            var pages = WithAquarium(BuildLibraryPages(emulatorPage)); Grid.SetRow(pages, 3); shell.Children.Add(pages);
 
             var footer = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,240,*"), Background = p.TopBrush, Height = 44, IsVisible = library.Theme.ShowStatusBar };
             footerFilterLabel = new TextBlock { Text = "Filter:", Foreground = p.SubtleBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
