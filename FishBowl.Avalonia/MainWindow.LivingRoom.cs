@@ -13,7 +13,7 @@ namespace EmulatorHub
         // True while the Living-room Library is open: controller input then works even if navigation is off elsewhere.
         private bool LivingRoomOpen { get { return livingRoom != null; } }
 
-        // Opens (or brings back) the full-screen Living-room Library. Menu: View > Living-room Library; Ctrl+L;
+        // Opens (or brings back) the full-screen Living-room Library. Menu: View > Living-room Library; Ctrl+B (the Controller launcher shortcut);
         // command line: fishbowl --living-room.
         public void OpenLivingRoom()
         {
@@ -30,7 +30,7 @@ namespace EmulatorHub
             var panel = new StackPanel { Spacing = 14, Margin = new Avalonia.Thickness(24), MaxWidth = 720, HorizontalAlignment = HorizontalAlignment.Left };
             panel.Children.Add(Ui.Text("Living-room Library", 24, true));
             panel.Children.Add(Ui.Hint("Full-screen, large cards with controller, keyboard and mouse navigation. Personal shelves (Continue playing, Recently added, Favorites), a focus view, artwork backdrops, launch presentation, session recaps and ambient artwork are set in Immersion settings."));
-            panel.Children.Add(Ui.Actions(Ui.Action("Open Living-room Library (Ctrl+L)", () => OpenLivingRoom(), true), Ui.Action("Immersion settings", () => ImmersionSettingsDialog.Show(this, library, () => RefreshGameLibrary()))));
+            panel.Children.Add(Ui.Actions(Ui.Action("Open Living-room Library (Ctrl+B)", () => OpenLivingRoom(), true), Ui.Action("Immersion settings", () => ImmersionSettingsDialog.Show(this, library, () => RefreshGameLibrary()))));
             panel.Children.Add(Ui.Hint("Controller: A plays, B goes back, X marks a favorite, Y opens the focus view, LB and RB switch shelves, Start opens the menu. Keyboard: arrows, Enter, F, I, Tab, M and Esc."));
             return panel;
         }

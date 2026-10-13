@@ -60,6 +60,13 @@ namespace EmulatorHub
         private string Kind { get { return kind.SelectedItem as string ?? InGame; } }
         private void Save() { Store.Save(library); Reload(); }
 
+        // "Dolphin 2412", or just "Dolphin" when the program reported no version.
+        private static string SnapshotEmulator(SaveSnapshot snapshot)
+        {
+            string version = snapshot.EmulatorVersion ?? "";
+            if (version.StartsWith("Not reported", StringComparison.Ordinal) || version == "Version unavailable" || version == "Unknown") version = "";
+            return ((snapshot.EmulatorName ?? "") + " " + version).Trim();
+        }
         private static string LocalDate(string value) { DateTime date; return DateTime.TryParse(value, out date) ? date.ToLocalTime().ToString("g") : value; }
 
         private void Reload()
@@ -73,7 +80,7 @@ namespace EmulatorHub
                     items.Add(Row("Live link  ·  " + state + "  ·  Original", link.Path, link));
                 }
                 foreach (var snapshot in library.SaveSnapshots.Where(s => s.GameId == game.Id && s.Kind == Kind).OrderByDescending(s => s.CreatedAt))
-                    items.Add(Row((snapshot.Pinned ? "★ " : "") + "Snapshot  ·  " + LocalDate(snapshot.CreatedAt) + "  ·  " + SaveHistory.Bytes(snapshot.Bytes) + "  ·  " + (snapshot.EmulatorName + " " + snapshot.EmulatorVersion).Trim(),
+                    items.Add(Row((snapshot.Pinned ? "★ " : "") + "Snapshot  ·  " + LocalDate(snapshot.CreatedAt) + "  ·  " + SaveHistory.Bytes(snapshot.Bytes) + "  ·  " + SnapshotEmulator(snapshot),
                         (snapshot.Note ?? snapshot.Core ?? "") + (String.IsNullOrWhiteSpace(snapshot.Source) ? "" : "  ·  from " + snapshot.Source), snapshot));
             }
             list.ItemsSource = items;
