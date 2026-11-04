@@ -48,6 +48,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-04 (Windows hosting readiness correction):** defer the Aquarium workspace marker until after the first Shown cycle, preventing Aquarium from reparenting a form while WinForms is still initializing its top-level state. Handle recreation republishes readiness after initialization. No shared/Linux data or code changes.
+
 - **2026-11-04 (Windows Aquarium hosting):** opt-in AQUARIUM_HOSTED workspace registration marks only MainForm, selects compatible DPI mode before UI startup and permits a smaller embedded workspace. Existing standalone startup and saved data are unchanged. Aquarium hosts only the marked main workspace; startup/sign-in dialogs are not adopted. No Linux or shared-schema changes. Parent lifecycle/DPI and physical controller compatibility need native checks.
 
 - **2026-11-04 (Windows library essentials):** surfaced per-game launch/controller setup, local cover selection, save/configuration backups and a controller-navigation guide in the existing library menus. Existing path repair, profile, backup and XInput navigation implementations are reused. No shared schema or Linux files changed. Physical controller/emulator compatibility remains a native check.
@@ -81,3 +83,6 @@ Merged/closed branches should be deleted after checking their pull request and a
 - **2026-10-07:** PR #29 merged Library/Home/living-room work; PR #28 retains additional save/backup changes. Windows 1.29.1 browser rendering fix is tracked by closed issues #23/#27 and pending PR #25.
 
 
+
+
+Tracked hosting readiness defect: #45. Windows navigation and reference-layout fixtures pass; Linux and shared data are unchanged.

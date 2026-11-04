@@ -18,8 +18,10 @@ namespace EmulatorHub {
   internal static void Prepare() { if(Enabled) SetProcessDpiAwarenessContext(new IntPtr(-4)); }
   internal static void Register(Form form) {
    if(!Enabled) return;
-   form.HandleCreated += delegate { SetProp(form.Handle,"Aquarium.Workspace.v1",new IntPtr(1)); };
-   form.Shown += delegate { form.MinimumSize = new Size(640,400); form.WindowState=FormWindowState.Normal; if(GetParent(form.Handle)==IntPtr.Zero) ShowWindow(form.Handle,0); };
+   bool ready=false;
+   Action mark=delegate { if(!form.IsDisposed&&form.IsHandleCreated) SetProp(form.Handle,"Aquarium.Workspace.v1",new IntPtr(1)); };
+   form.HandleCreated += delegate { if(ready) form.BeginInvoke(mark); };
+   form.Shown += delegate { form.MinimumSize = new Size(640,400); form.WindowState=FormWindowState.Normal; if(GetParent(form.Handle)==IntPtr.Zero) ShowWindow(form.Handle,0); form.BeginInvoke((Action)delegate { ready=true;mark(); }); };
   }
  }
 }

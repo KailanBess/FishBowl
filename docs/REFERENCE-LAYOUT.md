@@ -7,3 +7,5 @@ Choosing a platform filters the existing game library and selects artwork view, 
 Library menus now expose Per-game launch and controller profile, Choose local cover art, Save and configuration backups and Controller navigation guide alongside the existing Repair game paths action. These reuse existing implementations; no games or emulators are bundled.
 
 Aquarium hosting mode marks MainForm only, selects matching DPI before startup and permits a smaller workspace. Embedded geometry does not overwrite the standalone saved window layout. Standalone launch and shared/Linux data remain unchanged. Physical emulator/controller/full-screen compatibility still requires native checks.
+
+Workspace readiness is now published after first Shown, preventing a startup race between WinForms top-level initialization and Aquarium parenting.
