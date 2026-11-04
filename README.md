@@ -1,5 +1,7 @@
 # FishBowl
 
+Windows appearance: [Aquarium family themes and customization](docs/AQUARIUM-APPEARANCE.md).
+
 FishBowl is a hub for your emulators and games. It keeps your installed emulators, your game library, saves and setup information in one place, and launches everything with the emulator you already use.
 
 | Platform | Version | Status |

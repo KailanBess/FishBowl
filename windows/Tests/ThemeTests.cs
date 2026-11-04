@@ -23,6 +23,11 @@ class ThemeTests
     }
     static void Run()
     {
+        var customized = new LibraryData { Theme = new ThemeSettings { Name = "Light", AccentColor = "Sunset", FontFamily = "Verdana", ControlDensity = "Compact", EnableMotion = false }, Cosmetics = new CosmeticSettings { CustomPalette = true } };
+        UiPolishTools.ApplyAquariumStyle(customized);
+        Check(customized.Theme.Name == "Aquarium Ocean" && customized.Theme.AccentColor == "Aquarium Mint", "Aquarium preset is selectable");
+        Check(customized.Theme.FontFamily == "Verdana" && customized.Theme.ControlDensity == "Compact" && !customized.Theme.EnableMotion, "Aquarium preset preserves text, density and motion preferences");
+        Check(!customized.Cosmetics.CustomPalette && customized.Cosmetics.CornerRadius == 16, "explicit preset applies rounded named palette");
         Directory.CreateDirectory("theme-fixture"); Directory.SetCurrentDirectory("theme-fixture");
         var data = Store.Load(); NextData.Ensure(data); LibraryAdditions.Ensure(data); ExperienceData.Ensure(data);
         if (data.Cosmetics == null) data.Cosmetics = new CosmeticSettings(); data.Cosmetics.CustomPalette = false; Store.Save(data);

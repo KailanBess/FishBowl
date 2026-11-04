@@ -11,6 +11,17 @@ namespace EmulatorHub
 {
     public static class UiPolishTools
     {
+        public static void ApplyAquariumStyle(LibraryData data)
+        {
+            if (data.Theme == null) data.Theme = new ThemeSettings();
+            if (data.Cosmetics == null) data.Cosmetics = new CosmeticSettings();
+            data.Theme.Name = "Aquarium Ocean";
+            data.Theme.AccentColor = "Aquarium Mint";
+            data.Theme.ColorHarmony = "Harmonized";
+            data.Cosmetics.CustomPalette = false;
+            data.Cosmetics.CornerRadius = 16;
+            data.Cosmetics.BackgroundStyle = "Gradient";
+        }
         public static string[] ResolveHomeCards(LibraryData data)
         {
             ExperienceData.Ensure(data);
