@@ -86,3 +86,5 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 
 Tracked hosting readiness defect: #45. Windows navigation and reference-layout fixtures pass; Linux and shared data are unchanged.
+
+2026-11-04: Follow-up to #45: the WinForms workspace now handles cooperative visibility messages using Form.Show/Hide so child controls are restored after native parenting. Aquarium opts in through a window property. Windows-only adapter change; shared schema and Linux are unchanged.
