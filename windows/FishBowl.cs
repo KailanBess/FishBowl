@@ -314,6 +314,7 @@ namespace EmulatorHub
 
 		public MainForm(bool isolatedPreview)
 		{
+            AquariumWorkspace.Register(this);
 			MainForm mainForm = this;
 			DoubleBuffered = true;
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
@@ -3833,6 +3834,7 @@ namespace EmulatorHub
 
 		private void SaveWindowLayout()
 		{
+            if (AquariumWorkspace.Enabled) return;
 			try
 			{
 				FormWindowState formWindowState = (fullScreen ? savedWindowState : base.WindowState);
@@ -17242,6 +17244,7 @@ namespace EmulatorHub
 		[STAThread]
 		private static void Main()
 		{
+            AquariumWorkspace.Prepare();
 			FishBowlJumpList.Initialize();
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);

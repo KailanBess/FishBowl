@@ -6,6 +6,24 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
+[assembly: System.Reflection.AssemblyMetadata("AquariumWorkspace", "1")]
+
+namespace EmulatorHub {
+ internal static class AquariumWorkspace {
+  internal static bool Enabled { get { return Environment.GetEnvironmentVariable("AQUARIUM_HOSTED") == "1"; } }
+  [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern bool SetProp(IntPtr window, string name, IntPtr value);
+  [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr window);
+  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window, int show);
+  internal static void Prepare() { if(Enabled) SetProcessDpiAwarenessContext(new IntPtr(-4)); }
+  internal static void Register(Form form) {
+   if(!Enabled) return;
+   form.HandleCreated += delegate { SetProp(form.Handle,"Aquarium.Workspace.v1",new IntPtr(1)); };
+   form.Shown += delegate { form.MinimumSize = new Size(640,400); form.WindowState=FormWindowState.Normal; if(GetParent(form.Handle)==IntPtr.Zero) ShowWindow(form.Handle,0); };
+  }
+ }
+}
+
 namespace EmulatorHub {
  public static class WindowsAppearance {
   public static void Open(IWin32Window owner, LibraryData data, Action refresh, Action fonts, Action cosmetics) {
