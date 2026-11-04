@@ -48,6 +48,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-04 (Windows library essentials):** surfaced per-game launch/controller setup, local cover selection, save/configuration backups and a controller-navigation guide in the existing library menus. Existing path repair, profile, backup and XInput navigation implementations are reused. No shared schema or Linux files changed. Physical controller/emulator compatibility remains a native check.
+
 - **2026-11-04 (Windows reference-layout pass):** added a Platforms entry in the Windows Game Library that opens a searchable rounded-tile platform gallery. Counts come from existing game entries; choosing a tile filters the existing library and switches to artwork view. Existing launch, saves, controller and library logic remain intact. No Linux files or shared schema changes. The gallery is the first layout pass; the complete shell/sidebar migration remains follow-up work.
 
 - **2026-11-04 (Windows):** added an opt-in Aquarium family preset in Appearance and accessibility, with Ocean/Midnight/Slate themes and Mint/Blue/Coral accents. The preset uses rounded, harmonized surfaces and retains text size, density, motion, library data and existing themes. Windows UI only; Linux sources and shared schema are unchanged. Original conversation images were search references, so this matches the Aquarium family palette rather than claiming pixel-identical mockups. Build and theme regression checks are recorded in the pull request; native visual review remains required.
@@ -75,3 +77,4 @@ Merged/closed branches should be deleted after checking their pull request and a
 - **2026-10-07:** audited GitHub issues, pull requests and workflow status; confirmed zero open issues and two distinct pending pull requests. Refreshed release/shutdown/browser and shared-source documentation, archived historical notes and expanded ignore rules. Copilot workflow approval and native compatibility checks remain explicit.
 - **2026-10-07:** synchronized PR #25 with latest main shared game/living-room extraction, retaining `FishBowl.Browser.cs`, `FishBowl.Games.cs` and `FishBowl.LivingRoom.cs` in the Windows build.
 - **2026-10-07:** PR #29 merged Library/Home/living-room work; PR #28 retains additional save/backup changes. Windows 1.29.1 browser rendering fix is tracked by closed issues #23/#27 and pending PR #25.
+

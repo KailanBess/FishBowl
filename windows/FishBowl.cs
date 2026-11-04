@@ -9974,6 +9974,17 @@ namespace EmulatorHub
             RefreshGames();
         }
 
+        private void ChooseLocalCover()
+        {
+            var game = SelectedGame(); if (game == null) return;
+            using (var picker = new OpenFileDialog { Title = "Choose local cover art", Filter = "Cover image|*.png;*.jpg;*.jpeg;*.bmp" })
+            {
+                if (picker.ShowDialog(this) != DialogResult.OK) return;
+                using (var image = Image.FromFile(picker.FileName))
+                    if (image.Width > 16000 || image.Height > 16000) throw new IOException("Image dimensions are too large.");
+                game.ArtworkPath = picker.FileName; Store.Save(library); RefreshGames();
+            }
+        }
 		private void EditGame()
 		{
 			GameEntry gameEntry = SelectedGame();
@@ -10419,6 +10430,8 @@ namespace EmulatorHub
 			AddActionGroup(bar, "Game actions", delegate(ContextMenuStrip menu)
 			{
 				GroupAction(menu, "Edit game", EditGame, true);
+                GroupAction(menu, "Per-game launch and controller profile", delegate { WindowsGameTools.Setup(this, library, SelectedGame(), ReloadLibrary); }, true);
+                GroupAction(menu, "Choose local cover art", ChooseLocalCover, true);
 				GroupAction(menu, "Remove selected games from FishBowl", RemoveGames, true);
                 GroupAction(menu, "Identify game and retain icon", delegate
                 {
@@ -10481,6 +10494,8 @@ namespace EmulatorHub
 				GroupAction(menu, "Sync folders", SyncFolders);
 				GroupAction(menu, "Find duplicates", ShowDuplicates);
 				GroupAction(menu, "Repair game paths", RepairGames);
+                GroupAction(menu, "Save and configuration backups", delegate { ExperienceTools.Backups(this, library); ReloadLibrary(); });
+                GroupAction(menu, "Controller navigation guide", delegate { using (var guide = new ResultsDialog("Controller navigation", new[] { "D-pad or left stick: move focus", "A: activate focused control", "B: back or close dialog", "LB / RB: switch tabs", "Start: open menu", "Per-game controller profiles are reminders/settings; configure emulator mappings in the emulator itself." })) guide.ShowDialog(this); });
                 GroupAction(menu, "Undo removal", delegate { ExperienceTools.UndoRemoval(this, library); ReloadLibrary(); });
                 GroupAction(menu, "Cleanup artwork", delegate { ExperienceTools.CleanupArtwork(this, library); ReloadLibrary(); });
 				GroupAction(menu, "Export current view to CSV", delegate
@@ -34260,3 +34275,4 @@ namespace EmulatorHub
 		}
 	}
 }
+
