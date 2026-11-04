@@ -11,6 +11,7 @@ namespace EmulatorHub {
   public static void Open(IWin32Window owner, LibraryData data, Action refresh, Action fonts, Action cosmetics) {
    using(var dialog=new NextDialog("Appearance and accessibility",760,580)) {
     var fields=NextDialog.Fields(dialog.Body);
+    NextDialog.Field(fields,"Reference library",ExperienceUi.Button("Use platform library style",delegate{UiPolishTools.ApplyReferenceLibraryStyle(data);Store.Save(data);refresh();}));
     NextDialog.Field(fields,"Aquarium family",ExperienceUi.Button("Use Aquarium style",delegate{UiPolishTools.ApplyAquariumStyle(data);Store.Save(data);refresh();}));
     NextDialog.Field(fields,"Theme, accent and Home",ExperienceUi.Button("Appearance and Home",delegate{UiPolishTools.Open(dialog,data,refresh);}));
     NextDialog.Field(fields,"Text and layout",ExperienceUi.Button("Live appearance and accessibility",fonts));

@@ -48,6 +48,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-04 (Windows reference-layout pass):** added a Platforms entry in the Windows Game Library that opens a searchable rounded-tile platform gallery. Counts come from existing game entries; choosing a tile filters the existing library and switches to artwork view. Existing launch, saves, controller and library logic remain intact. No Linux files or shared schema changes. The gallery is the first layout pass; the complete shell/sidebar migration remains follow-up work.
+
 - **2026-11-04 (Windows):** added an opt-in Aquarium family preset in Appearance and accessibility, with Ocean/Midnight/Slate themes and Mint/Blue/Coral accents. The preset uses rounded, harmonized surfaces and retains text size, density, motion, library data and existing themes. Windows UI only; Linux sources and shared schema are unchanged. Original conversation images were search references, so this matches the Aquarium family palette rather than claiming pixel-identical mockups. Build and theme regression checks are recorded in the pull request; native visual review remains required.
 
 - **2026-10-13:** README refreshed for the 1.29.4 release: version table, a short "What's new" in place of the long source-version paragraph, Windows install steps (the release ships one ZIP with `FishBowl Setup.exe` and `FishBowl.exe`), the Linux feature list (launch options, integrations, command line), the PKGBUILD, the release process and the repository layout.

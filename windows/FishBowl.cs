@@ -9792,6 +9792,13 @@ namespace EmulatorHub
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
 			BuildCompactActions(flowLayoutPanel);
+            AddButton(flowLayoutPanel, "Platforms", delegate {
+                var platforms = library.Games.GroupBy(g => ConsoleName(g)).ToDictionary(g => g.Key, g => g.Count());
+                using (var gallery = new ReferencePlatformGallery(platforms, delegate(string platform) {
+                    consoleChoice.SelectedItem = platform; artworkView = true;
+                    library.Experience.LibraryView = "Artwork"; RefreshGames(); Store.Save(library);
+                })) gallery.ShowDialog(this);
+            });
 			base.Controls.Add(flowLayoutPanel);
 			games.Dock = DockStyle.Fill;
 			games.View = View.Details;
@@ -33762,6 +33769,7 @@ namespace EmulatorHub
 		{
 
 			new ThemeColors("FishBowl Water", Color.FromArgb(250, 247, 255), Color.FromArgb(5, 31, 78), Color.FromArgb(3, 13, 38), Color.FromArgb(12, 59, 122), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Library Graphite", Color.FromArgb(241, 241, 245), Color.FromArgb(45, 45, 48), Color.FromArgb(30, 30, 32), Color.FromArgb(34, 34, 36), Color.FromArgb(167, 167, 178)),
 			new ThemeColors("Aquarium Ocean", Color.FromArgb(241, 247, 255), Color.FromArgb(14, 26, 43), Color.FromArgb(9, 21, 29), Color.FromArgb(16, 36, 47), Color.FromArgb(160, 184, 195)),
 			new ThemeColors("Aquarium Midnight", Color.FromArgb(241, 247, 255), Color.FromArgb(20, 22, 37), Color.FromArgb(12, 14, 22), Color.FromArgb(22, 30, 43), Color.FromArgb(160, 184, 195)),
 			new ThemeColors("Aquarium Slate", Color.FromArgb(241, 247, 255), Color.FromArgb(32, 40, 53), Color.FromArgb(27, 35, 43), Color.FromArgb(34, 46, 58), Color.FromArgb(160, 184, 195)),

@@ -9,8 +9,66 @@ using System.Windows.Forms;
 
 namespace EmulatorHub
 {
+    public sealed class ReferencePlatformGallery : FishBowlDialog
+    {
+        public ReferencePlatformGallery(Dictionary<string, int> platforms, Action<string> choose)
+        {
+            Text = "FishBowl · Platform library"; Width = 1120; Height = 760; MinimumSize = new Size(820, 600);
+            BackColor = FishBowlPalette.ThemeBottom; ForeColor = FishBowlPalette.ThemeInk;
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = BackColor };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 186)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            var sidebar = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18, 24, 10, 20), FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, BackColor = FishBowlPalette.ThemeTop };
+            sidebar.Controls.Add(new Label { Text = "GAME LIBRARY", AutoSize = true, ForeColor = ForeColor, Margin = new Padding(0, 0, 0, 22) });
+            var back = ExperienceUi.Button("Back to games", Close); back.Width = 150; sidebar.Controls.Add(back);
+            var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
+            var heading = new Label { Text = "Game Library  ·  " + platforms.Count + " platforms", Dock = DockStyle.Top, Height = 65, Font = new Font("Segoe UI", 23, FontStyle.Bold), ForeColor = ForeColor };
+            var search = new TextBox { Dock = DockStyle.Top, AccessibleName = "Search platforms" };
+            var tiles = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(0, 20, 0, 0), BackColor = BackColor, WrapContents = true };
+            Action render = delegate {
+                foreach (Control old in tiles.Controls.Cast<Control>().ToArray()) { tiles.Controls.Remove(old); old.Dispose(); }
+                foreach (var platform in platforms.OrderBy(p => p.Key).Where(p => p.Key.IndexOf(search.Text, StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    string name = platform.Key;
+                    var tile = new ReferencePlatformTile { Text = name + "\n" + platform.Value + (platform.Value == 1 ? " game" : " games"), AccessibleName = "Open " + name + " platform", Width = 220, Height = 220, Margin = new Padding(0, 0, 18, 18), Font = new Font("Segoe UI", 16, FontStyle.Bold) };
+                    tile.Click += delegate { choose(name); Close(); }; tiles.Controls.Add(tile);
+                }
+                if (tiles.Controls.Count == 0) tiles.Controls.Add(new Label { Text = platforms.Count == 0 ? "Add your games to create platform collections. No games or emulators are bundled." : "No matching platforms.", AutoSize = true, MaximumSize = new Size(500, 0), ForeColor = FishBowlPalette.ThemeSubtle });
+            };
+            search.TextChanged += delegate { render(); };
+            body.Controls.Add(tiles); body.Controls.Add(search); body.Controls.Add(heading);
+            layout.Controls.Add(sidebar, 0, 0); layout.Controls.Add(body, 1, 0); Controls.Add(layout); render();
+        }
+    }
+    public sealed class ReferencePlatformTile : Button
+    {
+        bool hover;
+        public ReferencePlatformTile() { FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true); }
+        protected override void OnMouseEnter(EventArgs e) { hover = true; base.OnMouseEnter(e); Invalidate(); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; base.OnMouseLeave(e); Invalidate(); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; e.Graphics.Clear(FishBowlPalette.ThemeBottom);
+            var bounds = new Rectangle(2, 2, Width - 5, Height - 5);
+            using (var path = new GraphicsPath())
+            {
+                int diameter = 48; path.AddArc(bounds.X, bounds.Y, diameter, diameter, 180, 90); path.AddArc(bounds.Right - diameter, bounds.Y, diameter, diameter, 270, 90); path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90); path.AddArc(bounds.X, bounds.Bottom - diameter, diameter, diameter, 90, 90); path.CloseFigure();
+                using (var fill = new SolidBrush(FishBowlPalette.ThemeSurface)) e.Graphics.FillPath(fill, path);
+                using (var brush = new LinearGradientBrush(bounds, hover || Focused ? FishBowlPalette.IconAccent : FishBowlPalette.ThemeSurface, hover || Focused ? Color.Cyan : FishBowlPalette.ThemeSubtle, 45f))
+                using (var pen = new Pen(brush, hover || Focused ? 3 : 1)) e.Graphics.DrawPath(pen, path);
+            }
+            TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(16, 20, Width - 32, Height - 40), FishBowlPalette.ThemeInk, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
+        }
+    }
     public static class UiPolishTools
     {
+        public static void ApplyReferenceLibraryStyle(LibraryData data)
+        {
+            if (data.Theme == null) data.Theme = new ThemeSettings();
+            if (data.Cosmetics == null) data.Cosmetics = new CosmeticSettings();
+            data.Theme.Name = "Library Graphite"; data.Theme.AccentColor = "Amethyst";
+            data.Cosmetics.CustomPalette = false; data.Cosmetics.CornerRadius = 24;
+            data.Cosmetics.BackgroundStyle = "Plain";
+        }
         public static void ApplyAquariumStyle(LibraryData data)
         {
             if (data.Theme == null) data.Theme = new ThemeSettings();
