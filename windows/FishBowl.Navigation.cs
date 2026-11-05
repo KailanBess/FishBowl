@@ -125,6 +125,7 @@ namespace EmulatorHub {
   static void WireItems(ToolStrip strip){foreach(ToolStripMenuItem item in strip.Items.OfType<ToolStripMenuItem>()){if(!wired.Add(item))continue;item.DropDownOpening+=delegate{Register(item.DropDown);WireItems(item.DropDown);};item.Disposed+=delegate{wired.Remove(item);};}}
   public static void Attach(Form form){foreach(var strip in NextUi.Descendants(form).OfType<MenuStrip>()){if(attached.Add(strip)){WireItems(strip);strip.Disposed+=delegate{attached.Remove(strip);};}}foreach(var control in NextUi.Descendants(form))if(control.ContextMenuStrip!=null)Register(control.ContextMenuStrip);}
   static bool Read(out State state,out int device){state=default(State);device=-1;for(uint i=0;i<4;i++){uint result=1;try{result=Get(i,out state);}catch(DllNotFoundException){try{result=GetOld(i,out state);}catch(DllNotFoundException){try{result=GetLegacy(i,out state);}catch(DllNotFoundException){return false;}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}if(result==0){device=(int)i;return true;}}return false;}
+  internal static bool HasConnectedController(){ State state; int device; return Read(out state, out device); }
   public static void Reset(){input.Sample(false,-1,0,0,0,0,false);}
   public static bool CanNavigate(Form active,IntPtr foreground) {
    if(active==null||active.IsDisposed||!active.IsHandleCreated||active is ControllerLauncher||foreground==IntPtr.Zero||!IsWindowEnabled(active.Handle))return false;
@@ -161,3 +162,4 @@ namespace EmulatorHub {
   }
  }
 }
+

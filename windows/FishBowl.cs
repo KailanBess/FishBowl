@@ -9944,6 +9944,66 @@ namespace EmulatorHub
 			return library.Emulators.FirstOrDefault((EmulatorProfile item) => item.Id == (string.IsNullOrWhiteSpace(game.PreferredEmulatorId) ? game.EmulatorId : game.PreferredEmulatorId)) ?? ((library.Emulators.Count == 1) ? library.Emulators[0] : null);
 		}
 
+        private void ShowPlatformSetup()
+        {
+            if (library.Games.Count == 0)
+            {
+                MessageBox.Show(this, "Add a game to check its platform setup.", "FishBowl");
+                return;
+            }
+            using (var dialog = new NextDialog("Platform setup", 820, 560))
+            {
+                var selected = SelectedGame();
+                var platforms = library.Games.Select(ConsoleName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name);
+                var platform = NextDialog.Choice(platforms, selected == null ? consoleChoice.SelectedItem as string : ConsoleName(selected));
+                var title = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Title" };
+                var details = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical };
+                var fields = NextDialog.Fields(dialog.Body);
+                NextDialog.Field(fields, "Platform", platform);
+                NextDialog.Field(fields, "Game to check", title);
+                NextDialog.Field(fields, "Setup results", details, 280);
+                Action check = delegate
+                {
+                    var game = title.SelectedItem as GameEntry;
+                    if (game == null) return;
+                    var profile = NextData.LaunchEmulator(library, game);
+                    var results = new List<string>();
+                    results.Add(profile == null ? "Emulator: assign an emulator to this game." : "Emulator: " + profile.Name);
+                    try { GameSessions.Validate(library, game); results.Add("Launch inputs: game path and launch settings are available."); }
+                    catch (Exception ex) { results.Add("Launch inputs: " + ex.Message); }
+                    if (profile != null)
+                    {
+                        foreach (var item in EmulatorHealth.Check(profile, library).Where(item => item.Name == "Firmware / BIOS" || item.Name == "Chosen firmware folder"))
+                            results.Add(item.Name + ": " + item.Status + ". " + item.Detail);
+                    }
+                    var controller = (library.ControllerProfiles ?? new List<ControllerProfile>()).FirstOrDefault(item => item.Id == game.ControllerProfileId);
+                    results.Add(controller == null ? "Controller profile: choose a profile or configure input in the emulator." : "Controller profile: " + controller.Name);
+                    results.Add(NavigationController.HasConnectedController() ? "XInput controller detected. Confirm mapping in the emulator." : "No XInput controller detected. Check your controller connection or emulator input settings.");
+                    details.Lines = results.ToArray();
+                };
+                Action selectGames = delegate
+                {
+                    title.DataSource = library.Games.Where(game => string.Equals(ConsoleName(game), platform.SelectedItem as string, StringComparison.OrdinalIgnoreCase)).OrderBy(game => game.Title).ToList();
+                    if (selected != null && title.Items.Contains(selected)) title.SelectedItem = selected;
+                    check();
+                };
+                platform.SelectedIndexChanged += delegate { selectGames(); };
+                title.SelectedIndexChanged += delegate { check(); };
+                selectGames();
+                dialog.Action("Check again", check);
+                dialog.Action("Test launch", delegate
+                {
+                    var game = title.SelectedItem as GameEntry;
+                    if (game == null) return;
+                    try { GameSessions.Validate(library, game); }
+                    catch (Exception ex) { MessageBox.Show(dialog, ex.Message, "Setup needs attention"); return; }
+                    ExperienceTools.Launch(dialog, library, game);
+                    RefreshGames();
+                });
+                dialog.Action("Close", dialog.Close);
+                dialog.ShowDialog(this);
+            }
+        }
 		private void AddGame()
 		{
 			GameEntry gameEntry = new GameEntry();
@@ -10470,6 +10530,7 @@ namespace EmulatorHub
 			});
 			AddActionGroup(bar, "Library tools", delegate(ContextMenuStrip menu)
 			{
+                GroupAction(menu, "Platform setup…", ShowPlatformSetup, false);
 				GroupAction(menu, "List / artwork view", ToggleGameView);
 				GroupAction(menu, "Game setup and media...", delegate { WindowsGameTools.Open(this, library, SelectedGame(), ReloadLibrary); }, true);
                 GroupAction(menu, "PC imports and play history...", delegate { WindowsGameTools.OpenLibrary(this, library, ReloadLibrary); });
@@ -34278,4 +34339,6 @@ namespace EmulatorHub
 		}
 	}
 }
+
+
 
