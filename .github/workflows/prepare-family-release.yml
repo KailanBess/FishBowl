@@ -2,6 +2,9 @@ name: Review and queue Aquarium family release
 on:
   push:
     branches: ['release/aquarium-family-1.29.5']
+concurrency:
+  group: family-release-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
   pull-requests: write
@@ -42,11 +45,12 @@ jobs:
           foreach ($workflow in @('build.yml','overflow-audit.yml')) {
             $deadline=[DateTime]::UtcNow.AddMinutes(55)
             do {
-              $json=gh run list --workflow $workflow --commit $env:GITHUB_SHA --event push --json databaseId,status,conclusion --limit 10
+              $json=gh run list --workflow $workflow --commit $env:GITHUB_SHA --json databaseId,status,conclusion --limit 10
               if ($LASTEXITCODE -ne 0) { throw 'Could not verify source workflow status.' }
               $runs=@($json | ConvertFrom-Json)
               $run=$runs | Sort-Object databaseId -Descending | Select-Object -First 1
               if ($run -and $run.status -eq 'completed') {
+                if ($run.conclusion -eq 'cancelled') { Start-Sleep -Seconds 15; continue }
                 if ($run.conclusion -ne 'success') { throw "Release source failed $workflow ($($run.conclusion)). PR remains unmerged." }
                 break
               }
@@ -54,7 +58,7 @@ jobs:
               Start-Sleep -Seconds 15
             } while ($true)
           }
-          gh pr merge $head --merge --delete-branch
+          gh pr merge $head --merge --delete-branch --match-head-commit $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { throw 'Normal repository approval/merge rules blocked the release. No override was attempted.' }
           gh workflow run release.yml --ref main -f version=1.29.5
           if ($LASTEXITCODE -ne 0) { throw 'Reviewed PR merged, but release dispatch failed.' }
