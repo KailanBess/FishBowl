@@ -50,6 +50,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-05 (release integrity):** generate cross-platform release notes before hashing the Windows metadata. Publication no longer edits RELEASE-NOTES.md after SHA256SUMS.txt was generated/verified. Windows archive/source and metadata digests now remain unchanged through upload. No runtime behavior changed.
+
 - **2026-11-05 (release audit):** the Windows audit contained hardcoded 1.29.4 app and installer expectations. Updated both to the paired 1.29.5 release contract and run that audit first for quicker feedback, followed by the unchanged full regression suite. No product behavior or shared schema changed; CI and publication remain gated.
 
 - **2026-11-05 (release gate):** PR #46 was created by the maintainer. Linux build/core/schema and Windows overflow checks pass, but the complete Windows regression job failed. Publication remains blocked. Added bounded, inert-fixture stdout/stderr annotations to identify the failing test without weakening or skipping tests; Windows app code and Linux behavior are unchanged.

@@ -90,11 +90,5 @@ jobs:
           (cd "$folder" && sha256sum --check SHA256SUMS.txt)
           linux="packages/FishBowl-release-linux-x64"
           (cd "$linux" && sha256sum --check SHA256SUMS-linux.txt)
-          cat >> "$folder/RELEASE-NOTES.md" <<EOF
-
-          ## Linux
-
-          Download **FishBowl-$version-x86_64.AppImage**, make it executable (\`chmod +x\`, or Properties → Allow executing as program) and run it. **FishBowl-$version-linux-x64.tar.gz** holds the same program as a plain folder. SHA256SUMS-linux.txt covers both.
-          EOF
           gh release create "v$version" "$folder/FishBowl-$version.zip" "$folder/FishBowl-$version-Source.zip" "$linux/FishBowl-$version-linux-x64.tar.gz" "$linux/FishBowl-$version-x86_64.AppImage" "$linux/SHA256SUMS-linux.txt" "$folder/SHA256SUMS.txt" "$folder/BUILD-INFO.json" "$folder/RELEASE-NOTES.md" --target "$GITHUB_SHA" --draft --title "FishBowl v$version" --notes-file "$folder/RELEASE-NOTES.md"
           gh release edit "v$version" --draft=false --latest
