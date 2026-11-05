@@ -15,6 +15,8 @@ _Last updated: 2026-11-05, coordinated release preparation._
 
 ## Open pull requests
 
+- [#46: FishBowl 1.29.5 Aquarium family release](https://github.com/KailanBess/FishBowl/pull/46), branch `release/aquarium-family-1.29.5`, targets `main`. Prepared Windows/Linux release packages; normal source checks and approvals must pass before merge/publication.
+
 - [#38: Linux profiles, launch options and settings](https://github.com/KailanBess/FishBowl/pull/38), branch `parity/profiles-2`, targets `main` (see Linux work). #36 and #37 are merged.
 
 Required checks must pass before merging. Distribute executables through Releases or passing workflow artifacts.
@@ -48,7 +50,7 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
-- **2026-11-05 (both packages):** prepared 1.29.5 on `release/aquarium-family-1.29.5`, with paired Windows installer/app and Linux package metadata. No Linux behavior or shared schema changes. Release automation opens a pull request, waits for the existing Build and text-audit workflows, merges only if normal repository rules permit, then dispatches the release workflow from main. Windows and Linux release jobs must both pass before publication. Linux Release build, shared/core checks and 229 schema checks pass. The build reports the existing unawaited SaveMonitor call warning (CS4014); native browser/emulator/controller acceptance remains open. No game, firmware or emulator binaries are packaged. The initial release-preparation Actions run failed before merge; GitHub reports that Actions cannot create pull requests; a maintainer must create the prepared release PR. Preparation now accepts push/PR check runs, cancels stale preparation runs and requires an exact tested head when merging. Public job summaries/error annotations retain failure details.
+- **2026-11-05 (both packages):** prepared 1.29.5 on `release/aquarium-family-1.29.5`, with paired Windows installer/app and Linux package metadata. No Linux behavior or shared schema changes. Release automation opens a pull request, waits for the existing Build and text-audit workflows, merges only if normal repository rules permit, then dispatches the release workflow from main. Windows and Linux release jobs must both pass before publication. Linux Release build, shared/core checks and 229 schema checks pass. The build reports the existing unawaited SaveMonitor call warning (CS4014); native browser/emulator/controller acceptance remains open. No game, firmware or emulator binaries are packaged. The initial release-preparation Actions run failed before merge; GitHub reports that Actions cannot create pull requests; the maintainer created release PR #46 and preparation is being retried against its checked head. Preparation now accepts push/PR check runs, cancels stale preparation runs and requires an exact tested head when merging. Public job summaries/error annotations retain failure details.
 
 - **2026-11-04 (Windows):** added an opt-in Aquarium family preset in Appearance and accessibility, with Ocean/Midnight/Slate themes and Mint/Blue/Coral accents. The preset uses rounded, harmonized surfaces and retains text size, density, motion, library data and existing themes. Windows UI only; Linux sources and shared schema are unchanged. Original conversation images were search references, so this matches the Aquarium family palette rather than claiming pixel-identical mockups. Build and theme regression checks are recorded in the pull request; native visual review remains required.
 
