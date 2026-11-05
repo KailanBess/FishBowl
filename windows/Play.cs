@@ -91,6 +91,11 @@ namespace EmulatorHub
         [DllImport("user32.dll")] internal static extern bool ShowWindow(IntPtr window, int command);
         [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(IntPtr window);
         [DllImport("user32.dll")] internal static extern IntPtr SetFocus(IntPtr window);
+        [DllImport("user32.dll")] internal static extern IntPtr GetFocus();
+        [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] internal static extern bool IsChild(IntPtr parent, IntPtr child);
+        [DllImport("user32.dll")] internal static extern bool AttachThreadInput(uint caller, uint target, bool attach);
+        [DllImport("kernel32.dll")] internal static extern uint GetCurrentThreadId();
         [DllImport("user32.dll")] internal static extern bool ShowWindowAsync(IntPtr window, int command);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] internal static extern bool SetProp(IntPtr window, string name, IntPtr value);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] internal static extern IntPtr GetProp(IntPtr window, string name);
@@ -438,8 +443,38 @@ namespace EmulatorHub
         protected override void OnLocationChanged(EventArgs e) { base.OnLocationChanged(e);ResizeGame(); }
         protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e);ResizeGame(); }
         protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e);ResizeGame(); }
-        protected override void OnEnter(EventArgs e) { base.OnEnter(e); if (IsAttached && !PlayNative.IsHungAppWindow(window)) PlayNative.SetFocus(window); }
-        protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (IsAttached && !PlayNative.IsHungAppWindow(window)) PlayNative.SetFocus(window); }
+        public bool FocusGame()
+        {
+            if (!Visible || !IsAttached || !PlayNative.IsWindowVisible(window) ||
+                !PlayNative.IsWindowEnabled(window) || PlayNative.IsHungAppWindow(window)) return false;
+
+            // An owned renderer is still a top-level window with its own input queue.
+            if (anchored)
+            {
+                return PlayNative.GetForegroundWindow() == window || PlayNative.SetForegroundWindow(window);
+            }
+
+            uint processId;
+            uint rendererThread = PlayNative.GetWindowThreadProcessId(window, out processId);
+            uint callerThread = PlayNative.GetCurrentThreadId();
+            if (rendererThread == 0) return false;
+            bool attachedInput = rendererThread != callerThread;
+            if (attachedInput && !PlayNative.AttachThreadInput(callerThread, rendererThread, true)) return false;
+            try
+            {
+                var focused = PlayNative.GetFocus();
+                if (focused != window && !PlayNative.IsChild(window, focused)) PlayNative.SetFocus(window);
+                focused = PlayNative.GetFocus();
+                return focused == window || PlayNative.IsChild(window, focused);
+            }
+            finally
+            {
+                if (attachedInput) PlayNative.AttachThreadInput(callerThread, rendererThread, false);
+            }
+        }
+
+        protected override void OnEnter(EventArgs e) { base.OnEnter(e); FocusGame(); }
+        protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); FocusGame(); }
         protected override void DestroyHandle() { if(!Restore(false)) throw new InvalidOperationException("The game window could not be detached safely."); base.DestroyHandle(); }
         protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); if (!transitioning && window != IntPtr.Zero && !disposing) Embed(); }
         protected override void WndProc(ref Message message)
@@ -536,6 +571,18 @@ namespace EmulatorHub
             shareButton = ExperienceUi.Button("Share session", ShareSelected);
             moreButton = ExperienceUi.Button("More", delegate { });
             var menu = new ContextMenuStrip(); NavigationController.Register(menu);
+            var focusGame = menu.Items.Add("Focus game", null, delegate
+            {
+                var selected = Selected();
+                if (selected == null || selected.External) return;
+                selected.Notice = selected.Host.FocusGame() ? null : "Click the game or use Open in window to give the emulator focus.";
+                RefreshStatus();
+            });
+            menu.Opening += delegate
+            {
+                var selected = Selected();
+                focusGame.Enabled = selected != null && !selected.External && selected.Host.IsAttached;
+            };
             menu.Items.Add("Session details", null, delegate { SessionDetails(); });
             menu.Items.Add("Game view settings", null, delegate { GameViewSettings(); });
             moreButton.ContextMenuStrip = menu;
@@ -776,7 +823,7 @@ namespace EmulatorHub
             if (selected == null) status.Text = "Launch a game or emulator to show it here.";
             else if (!string.IsNullOrEmpty(selected.Notice)) status.Text = selected.Title + ": " + selected.Notice;
             else if (selected.External) status.Text = selected.Title + " is open in its own window. Return to Play brings the same game back.";
-            else if (selected.Host.IsAttached) status.Text = selected.Title + " is running in Play. Switching menus keeps it running.";
+            else if (selected.Host.IsAttached) status.Text = selected.Title + " is running in Play. Click the game or use More → Focus game for input.";
             else if ((DateTime.UtcNow - selected.Added).TotalSeconds > 20) status.Text = selected.Title + ": " + (selected.Host.LastError ?? "No compatible game window is available yet. Finish any emulator startup dialog, then choose Show in Play; Open in window keeps the session available.");
             else status.Text = "Waiting for " + selected.Title + " to open its game window...";
         }

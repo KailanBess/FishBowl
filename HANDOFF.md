@@ -2,7 +2,7 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-10-08, browser viewport fitting._
+_Last updated: 2026-11-05, coordinated release preparation._
 
 ## Current state
 
@@ -14,6 +14,8 @@ _Last updated: 2026-10-08, browser viewport fitting._
 | Issues | [Issue #34](https://github.com/KailanBess/FishBowl/issues/34) tracks automatic browser fitting. Issues #23/#27/#31/#32 are implemented through merged PR #25. |
 
 ## Open pull requests
+
+- [#46: FishBowl 1.29.5 Aquarium family release](https://github.com/KailanBess/FishBowl/pull/46), branch `release/aquarium-family-1.29.5`, targets `main`. Prepared Windows/Linux release packages; normal source checks and approvals must pass before merge/publication.
 
 - [#38: Linux profiles, launch options and settings](https://github.com/KailanBess/FishBowl/pull/38), branch `parity/profiles-2`, targets `main` (see Linux work). #36 and #37 are merged.
 
@@ -48,6 +50,13 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-05 (release integrity):** generate cross-platform release notes before hashing the Windows metadata. Publication no longer edits RELEASE-NOTES.md after SHA256SUMS.txt was generated/verified. Windows archive/source and metadata digests now remain unchanged through upload. No runtime behavior changed.
+
+- **2026-11-05 (release audit):** the Windows audit contained hardcoded 1.29.4 app and installer expectations. Updated both to the paired 1.29.5 release contract and run that audit first for quicker feedback, followed by the unchanged full regression suite. No product behavior or shared schema changed; CI and publication remain gated.
+
+- **2026-11-05 (release gate):** PR #46 was created by the maintainer. Linux build/core/schema and Windows overflow checks pass, but the complete Windows regression job failed. Publication remains blocked. Added bounded, inert-fixture stdout/stderr annotations to identify the failing test without weakening or skipping tests; Windows app code and Linux behavior are unchanged.
+
+- **2026-11-05 (both packages):** prepared 1.29.5 on `release/aquarium-family-1.29.5`, with paired Windows installer/app and Linux package metadata. No Linux behavior or shared schema changes. Release automation opens a pull request, waits for the existing Build and text-audit workflows, merges only if normal repository rules permit, then dispatches the release workflow from main. Windows and Linux release jobs must both pass before publication. Linux Release build, shared/core checks and 229 schema checks pass. The build reports the existing unawaited SaveMonitor call warning (CS4014); native browser/emulator/controller acceptance remains open. No game, firmware or emulator binaries are packaged. The initial release-preparation Actions run failed before merge; GitHub reports that Actions cannot create pull requests; the maintainer created release PR #46 and preparation is being retried against its checked head. Preparation now accepts push/PR check runs, cancels stale preparation runs and requires an exact tested head when merging. Public job summaries/error annotations retain failure details.
 - **2026-11-04 (Windows hosting readiness correction):** defer the Aquarium workspace marker until after the first Shown cycle, preventing Aquarium from reparenting a form while WinForms is still initializing its top-level state. Handle recreation republishes readiness after initialization. No shared/Linux data or code changes.
 
 - **2026-11-04 (Windows Aquarium hosting):** opt-in AQUARIUM_HOSTED workspace registration marks only MainForm, selects compatible DPI mode before UI startup and permits a smaller embedded workspace. Existing standalone startup and saved data are unchanged. Aquarium hosts only the marked main workspace; startup/sign-in dialogs are not adopted. No Linux or shared-schema changes. Parent lifecycle/DPI and physical controller compatibility need native checks.
@@ -90,3 +99,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 2026-11-04: Follow-up to #45: the WinForms workspace now handles cooperative visibility messages using Form.Show/Hide so child controls are restored after native parenting. Aquarium opts in through a window property. Windows-only adapter change; shared schema and Linux are unchanged.
 2026-11-05 (Windows): Game Library > Library tools > Platform setup combines launch validation, firmware folder availability, controller profile and XInput detection with an explicit test launch. Physical controller and emulator verification remain manual. Shared library schema and Linux files were not edited.
 
+
+2026-11-05 (Windows, #47): Play offers More > Focus game. Owned renderers receive a native foreground activation request and child renderers use the correct input queue. Hidden and detached viewports refuse focus. Eden keyboard and controller acceptance remains manual.

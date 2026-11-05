@@ -1,3 +1,10 @@
+# Windows 1.29.5 Aquarium family release
+
+- Adds Aquarium Ocean, Midnight and Slate themes and Mint, Blue and Coral accents.
+- The optional family preset preserves personal text size, spacing and motion choices.
+- Includes the existing browser fitting, game library and safe session shutdown features.
+- Linux keeps its existing behavior with matching package version metadata. No games, firmware or emulators are included.
+
 # Windows 1.29.4 browser sizing
 
 - Browser windows fit the Web viewport automatically and follow FishBowl movement, resizing and fullscreen. Browser-native geometry changes and maximization are corrected without manual adjustment.

@@ -53,13 +53,17 @@ Download **FishBowl-$version.zip** for the Windows app. Extract it, keep the six
 
 **FishBowl-$version-Source.zip** contains source code for contributors. Build instructions are in its README; it does not include compiled executables. The Linux archive is a separate executable build.
 
-This version adds a Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. It adds running-game exit confirmation and graceful shutdown, plus saved game-only view adjustments. The existing UI style remains in place. Browser and renderer compatibility vary; external-window fallback is available.
+This release includes an optional Aquarium family appearance preset while retaining personal customization. It includes the Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. It adds running-game exit confirmation and graceful shutdown, plus saved game-only view adjustments. The existing UI style remains in place. Browser and renderer compatibility vary; external-window fallback is available.
 
 Before upgrading, use Library > Backup and transfer > Export FishBowl settings and retain the previous app folder. Close FishBowl, extract the new app into a separate folder, and keep your existing data location. For portable mode, copy portable.flag and FishBowlData while FishBowl is closed. The installer updates the app without intentionally replacing library data. Emulator programs and game files remain separate.
 
 To roll back, close FishBowl and reopen the previous app version. If data recovery is required, use the exported settings or Library restore points and review the restore preview. Do not overwrite an active portable data folder.
 
 Physical controllers, audio and two-device remote streaming require live tests. Renderer and monitor compatibility vary; use Open in window when needed. See docs/PLAY-VALIDATION.md in the Source archive.
+
+## Linux
+
+Download **FishBowl-$version-x86_64.AppImage**, make it executable with chmod +x (or Properties > Allow executing as program), and run it. **FishBowl-$version-linux-x64.tar.gz** contains the same self-contained application as a plain folder. SHA256SUMS-linux.txt covers both packages. No game, firmware or emulator binaries are included.
 
 Source commit: $commit. BUILD-INFO.json records the matching version and source commit. SHA256SUMS.txt covers both Windows archives and the release metadata.
 "@ | Set-Content -LiteralPath (Join-Path $output 'RELEASE-NOTES.md') -Encoding UTF8
