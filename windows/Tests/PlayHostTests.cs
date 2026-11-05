@@ -159,8 +159,9 @@ class PlayHostTests
                     var up = down; up.Data.Keyboard.Flags = 2;
                     Check(SendInput(2, new[] { down, up }, Marshal.SizeOf(typeof(Input))) == 2, "native keyboard events delivered");
                     Check(Until(delegate { var caption = new System.Text.StringBuilder(256); GetWindowText(window, caption, caption.Capacity); return caption.ToString() == "Keyboard received: F9"; }), "foreign renderer actually receives keyboard event");
+                    Console.WriteLine("::notice title=Native Play keyboard delivery::A real keyboard event reached the verified foreign renderer after Play activated its owned top-level window.");
                 }
-                else Console.WriteLine("MANUAL CHECK REQUIRED: this test desktop denied foreground activation; live keyboard delivery was not tested.");
+                else Console.WriteLine("::warning title=Native Play keyboard delivery needs desktop check::This test desktop denied foreground activation. Focus guards ran, but real keyboard delivery still needs an interactive Windows check.");
                 Check(host.TryDetach(), "keyboard hand-off preserves normal detach");
                 Check(!host.FocusGame(), "detached emulator is not reactivated by old host");
                 owner.Close();
