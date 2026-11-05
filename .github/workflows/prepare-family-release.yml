@@ -1,0 +1,64 @@
+name: Review and queue Aquarium family release
+on:
+  push:
+    branches: ['release/aquarium-family-1.29.5']
+concurrency:
+  group: family-release-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+jobs:
+  prepare:
+    if: github.repository == 'KailanBess/FishBowl'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+      - name: Open the required pull request and wait for source checks
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          trap {
+            $escaped=$_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=FishBowl release diagnostics::$escaped"
+            break
+          }
+          $head=$env:GITHUB_REF_NAME
+          $existing=gh pr list --head $head --base main --state open --json number --jq '.[0].number'
+          if ($LASTEXITCODE -ne 0) { 'Could not inspect release pull requests; check repository Actions permissions.' | Add-Content $env:GITHUB_STEP_SUMMARY; throw 'Could not inspect release pull requests.' }
+          if (!$existing) {
+            @'
+          Affects Windows and Linux package metadata. Releases the merged Windows Aquarium appearance with matching 1.29.5 app/installer/Linux versions. Linux behavior and shared library schema are unchanged. No games, firmware or emulator binaries are included.
+
+          The existing Build and normal/compact overflow workflows must pass before merge. Release packaging repeats Windows regression/overflow checks and Linux build/core/schema checks. Publication uses the reviewed main source and checksummed Windows ZIP/source archive and Linux AppImage/tarball. Normal branch protection and approval requirements remain enforced.
+          '@ | Set-Content /tmp/fishbowl-release-pr.md
+            $prOutput=gh pr create --base main --head $head --title 'Release FishBowl 1.29.5 for the Aquarium family' --body-file /tmp/fishbowl-release-pr.md 2>&1
+            $prOutput | Write-Host
+            if ($LASTEXITCODE -ne 0) { $escaped=($prOutput -join "`n").Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'); Write-Host "::error title=FishBowl pull request blocked::$escaped" }
+            if ($LASTEXITCODE -ne 0) { "## Release pull-request preparation failed`n$($prOutput -join [Environment]::NewLine)" | Add-Content $env:GITHUB_STEP_SUMMARY }
+            if ($LASTEXITCODE -ne 0) { throw 'Pull-request creation failed. Enable the repository option allowing Actions to create pull requests, or create this branch PR manually.' }
+          }
+          foreach ($workflow in @('build.yml','overflow-audit.yml')) {
+            $deadline=[DateTime]::UtcNow.AddMinutes(55)
+            do {
+              $json=gh run list --workflow $workflow --commit $env:GITHUB_SHA --json databaseId,status,conclusion --limit 10
+              if ($LASTEXITCODE -ne 0) { throw 'Could not verify source workflow status.' }
+              $runs=@($json | ConvertFrom-Json)
+              $run=$runs | Sort-Object databaseId -Descending | Select-Object -First 1
+              if ($run -and $run.status -eq 'completed') {
+                if ($run.conclusion -eq 'cancelled') { Start-Sleep -Seconds 15; continue }
+                if ($run.conclusion -ne 'success') { throw "Release source failed $workflow ($($run.conclusion)). PR remains unmerged." }
+                break
+              }
+              if ([DateTime]::UtcNow -ge $deadline) { throw 'Source checks timed out. PR remains unmerged.' }
+              Start-Sleep -Seconds 15
+            } while ($true)
+          }
+          gh pr merge $head --merge --delete-branch --match-head-commit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Normal repository approval/merge rules blocked the release. No override was attempted.' }
+          gh workflow run release.yml --ref main -f version=1.29.5
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed PR merged, but release dispatch failed.' }

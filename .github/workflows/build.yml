@@ -38,6 +38,9 @@ jobs:
       - name: Build released Windows source with the .NET Framework compiler
         shell: pwsh
         run: ./windows/Build.ps1
+      - name: Check release version, installer and large-library audit first
+        shell: pwsh
+        run: '& "./windows/Run Tests.ps1" -Only AuditTests'
       - name: Run Windows regression tests
         shell: pwsh
         run: '& "./windows/Run Tests.ps1"'

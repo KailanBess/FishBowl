@@ -16,8 +16,17 @@ function Invoke-FixtureTest([string]$Executable, [string[]]$TestArguments) {
  $finished = $process.WaitForExit($timeout)
  if (-not $finished) { $process.Kill(); $process.WaitForExit() }
  foreach ($log in @($stdout,$stderr)) { if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log | Write-Output } }
- if (-not $finished) { throw ((Split-Path -Leaf $Executable) + ' timed out; see the fixture logs.') }
- if ($process.ExitCode -ne 0) { throw ((Split-Path -Leaf $Executable) + ' failed with exit code ' + $process.ExitCode) }
+ if (-not $finished -or $process.ExitCode -ne 0) {
+  $reason = (Split-Path -Leaf $Executable) + $(if (-not $finished) { ' timed out; see the fixture logs.' } else { ' failed with exit code ' + $process.ExitCode })
+  if ($env:GITHUB_ACTIONS -eq 'true') {
+   $tail = @($stdout,$stderr) | Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { Get-Content -LiteralPath $_ -Tail 30 }
+   $details = $reason + [Environment]::NewLine + ($tail -join [Environment]::NewLine)
+   if ($details.Length -gt 6000) { $details = $reason + [Environment]::NewLine + $details.Substring($details.Length - 5500) }
+   $escaped = $details.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+   Write-Host "::error title=Windows regression fixture failed::$escaped"
+  }
+  throw $reason
+ }
 }
 $executed = @()
 Push-Location $fixture
