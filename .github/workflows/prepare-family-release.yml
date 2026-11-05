@@ -19,6 +19,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          trap {
+            $escaped=$_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "::error title=FishBowl release diagnostics::$escaped"
+            break
+          }
           $head=$env:GITHUB_REF_NAME
           $existing=gh pr list --head $head --base main --state open --json number --jq '.[0].number'
           if ($LASTEXITCODE -ne 0) { 'Could not inspect release pull requests; check repository Actions permissions.' | Add-Content $env:GITHUB_STEP_SUMMARY; throw 'Could not inspect release pull requests.' }
@@ -30,6 +35,7 @@ jobs:
           '@ | Set-Content /tmp/fishbowl-release-pr.md
             $prOutput=gh pr create --base main --head $head --title 'Release FishBowl 1.29.5 for the Aquarium family' --body-file /tmp/fishbowl-release-pr.md 2>&1
             $prOutput | Write-Host
+            if ($LASTEXITCODE -ne 0) { $escaped=($prOutput -join "`n").Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'); Write-Host "::error title=FishBowl pull request blocked::$escaped" }
             if ($LASTEXITCODE -ne 0) { "## Release pull-request preparation failed`n$($prOutput -join [Environment]::NewLine)" | Add-Content $env:GITHUB_STEP_SUMMARY }
             if ($LASTEXITCODE -ne 0) { throw 'Pull-request creation failed. Enable the repository option allowing Actions to create pull requests, or create this branch PR manually.' }
           }
