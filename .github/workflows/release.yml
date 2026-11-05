@@ -66,7 +66,7 @@ jobs:
             artifacts/*.AppImage
             artifacts/SHA256SUMS-linux.txt
   publish:
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
@@ -82,8 +82,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_REF_TYPE" != tag ]; then version="$REQUESTED_VERSION"; fi
           folder="packages/FishBowl-release-windows"
           (cd "$folder" && sha256sum --check SHA256SUMS.txt)
           linux="packages/FishBowl-release-linux-x64"
@@ -94,4 +96,5 @@ jobs:
 
           Download **FishBowl-$version-x86_64.AppImage**, make it executable (\`chmod +x\`, or Properties → Allow executing as program) and run it. **FishBowl-$version-linux-x64.tar.gz** holds the same program as a plain folder. SHA256SUMS-linux.txt covers both.
           EOF
-          gh release create "$GITHUB_REF_NAME" "$folder/FishBowl-$version.zip" "$folder/FishBowl-$version-Source.zip" "$linux/FishBowl-$version-linux-x64.tar.gz" "$linux/FishBowl-$version-x86_64.AppImage" "$linux/SHA256SUMS-linux.txt" "$folder/SHA256SUMS.txt" "$folder/BUILD-INFO.json" "$folder/RELEASE-NOTES.md" --draft --title "FishBowl $GITHUB_REF_NAME" --notes-file "$folder/RELEASE-NOTES.md"
+          gh release create "v$version" "$folder/FishBowl-$version.zip" "$folder/FishBowl-$version-Source.zip" "$linux/FishBowl-$version-linux-x64.tar.gz" "$linux/FishBowl-$version-x86_64.AppImage" "$linux/SHA256SUMS-linux.txt" "$folder/SHA256SUMS.txt" "$folder/BUILD-INFO.json" "$folder/RELEASE-NOTES.md" --target "$GITHUB_SHA" --draft --title "FishBowl v$version" --notes-file "$folder/RELEASE-NOTES.md"
+          gh release edit "v$version" --draft=false --latest

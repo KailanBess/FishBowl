@@ -2,7 +2,7 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-10-08, browser viewport fitting._
+_Last updated: 2026-11-05, coordinated release preparation._
 
 ## Current state
 
@@ -47,6 +47,8 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+
+- **2026-11-05 (both packages):** prepared 1.29.5 on `release/aquarium-family-1.29.5`, with paired Windows installer/app and Linux package metadata. No Linux behavior or shared schema changes. Release automation opens a pull request, waits for the existing Build and text-audit workflows, merges only if normal repository rules permit, then dispatches the release workflow from main. Windows and Linux release jobs must both pass before publication. Linux Release build, shared/core checks and 229 schema checks pass. The build reports the existing unawaited SaveMonitor call warning (CS4014); native browser/emulator/controller acceptance remains open. No game, firmware or emulator binaries are packaged.
 
 - **2026-11-04 (Windows):** added an opt-in Aquarium family preset in Appearance and accessibility, with Ocean/Midnight/Slate themes and Mint/Blue/Coral accents. The preset uses rounded, harmonized surfaces and retains text size, density, motion, library data and existing themes. Windows UI only; Linux sources and shared schema are unchanged. Original conversation images were search references, so this matches the Aquarium family palette rather than claiming pixel-identical mockups. Build and theme regression checks are recorded in the pull request; native visual review remains required.
 
