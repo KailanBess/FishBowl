@@ -264,7 +264,7 @@ class PlayHostTests
                                 }
                             } catch(Exception error) { detailError=error; } finally { dialog.Close(); }
                         };
-                        closeDetails.Start();NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="More").ContextMenuStrip.Items[0].PerformClick();
+                        closeDetails.Start();NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="More").ContextMenuStrip.Items.Cast<ToolStripItem>().Single(i=>i.Text=="Session details").PerformClick();
                     }
                     NextUi.TextPercent=oldText;if(detailError!=null)throw detailError;
                 }

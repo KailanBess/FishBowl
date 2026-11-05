@@ -566,6 +566,8 @@ namespace EmulatorHub
             shareButton = ExperienceUi.Button("Share session", ShareSelected);
             moreButton = ExperienceUi.Button("More", delegate { });
             var menu = new ContextMenuStrip(); NavigationController.Register(menu);
+            menu.Items.Add("Session details", null, delegate { SessionDetails(); });
+            menu.Items.Add("Game view settings", null, delegate { GameViewSettings(); });
             menu.Items.Add("Focus game keyboard", null, delegate {
                 // Run after the menu closes so it cannot immediately take focus back.
                 BeginInvoke(new MethodInvoker(delegate {
@@ -575,8 +577,6 @@ namespace EmulatorHub
                         status.Text = "Click inside the game to use its keyboard controls. If input still does not work, use Open in window and check the emulator's keyboard mappings.";
                 }));
             });
-            menu.Items.Add("Session details", null, delegate { SessionDetails(); });
-            menu.Items.Add("Game view settings", null, delegate { GameViewSettings(); });
             moreButton.ContextMenuStrip = menu;
             moreButton.Click += delegate { menu.Show(moreButton, new Point(0, moreButton.Height)); };
             moreButton.Disposed += delegate { menu.Dispose(); };
