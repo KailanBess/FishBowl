@@ -29,3 +29,11 @@ Use Open in window for renderer-specific problems. Session details under More ex
 Windows 1.29.3 uses owned renderer viewports, retained process handles and cached clipping geometry during active-game navigation. Compare repeated Play/Web/Home switches with a live game, including busy renderers, window resizing, focus/input, fullscreen and mixed-DPI monitors. Plain confirmation recognition is deliberately limited to exact known English wording and two expected buttons; additional save/warning text and unknown/localized prompts require user review. Standard Windows dialogs use bounded native text reads; other providers use background UI Automation. No ordinary emulator is force terminated.
 
 The exact Azahar confirmation wording is based on its [upstream ConfirmClose implementation](https://github.com/azahar-emu/azahar/blob/master/src/citra_qt/citra_qt.cpp). Additional text or different buttons still require review.
+
+### Windows keyboard focus (Eden and other preserved renderers)
+
+Play keeps Qt/SDL renderers as separate owned windows. Focusing the Play viewport now activates that renderer through Windows rather than calling `SetFocus` across unrelated input queues. A newly attached selected game receives this hand-off only while its FishBowl window is foreground. Periodic placement/session updates do not reactivate it or steal focus from other applications.
+
+If keyboard controls stop responding, choose **More → Focus game keyboard**, then try the configured game keys. If needed, choose **Open in window** and check the same keys there and when launching the emulator directly. If they fail outside FishBowl too, review the emulator's keyboard mapping and whether it pauses while inactive. FishBowl does not overwrite emulator input settings.
+
+Native acceptance: launch an independently installed Eden, confirm configured keyboard controls in Play, click a FishBowl control and return focus using the new menu action, switch sections, toggle fullscreen, and Alt+Tab to another application. Confirm the game does not take focus back during timer updates. Repeat with **Open in window**. Generated Windows fixtures cover focus guards and owned-window activation where the desktop allows it; they do not establish Eden compatibility.

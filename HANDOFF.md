@@ -2,7 +2,7 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-11-05, coordinated release preparation._
+_Last updated: 2026-11-05, Windows Play keyboard-focus fix._
 
 ## Current state
 
@@ -49,6 +49,8 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+
+- **2026-11-05 (Windows Play input):** investigating keyboard controls not reaching Eden inside Play. Preserved Qt/SDL top-level renderers now receive native foreground activation instead of cross-thread `SetFocus` when the viewport is focused. Initial selected-window attachment and explicit Show in Play hand off keyboard focus only while FishBowl/the renderer is foreground. Added **More → Focus game keyboard** recovery, without changing emulator mappings, saved data or Linux. Normal timer/layout refreshes never request activation. Native Eden keyboard/fullscreen/Alt+Tab acceptance remains open; see `docs/PLAY-VALIDATION.md`. Windows sources and the native keyboard fixture compile with C# 5 against .NET Framework 4.8 references. Native Windows regression/overflow checks run on GitHub for branch `fix/eden-play-keyboard-focus`; actual Eden acceptance remains required before claiming compatibility. This is a proposed Windows-only fix, not a published release.
 
 - **2026-11-05 (release integrity):** generate cross-platform release notes before hashing the Windows metadata. Publication no longer edits RELEASE-NOTES.md after SHA256SUMS.txt was generated/verified. Windows archive/source and metadata digests now remain unchanged through upload. No runtime behavior changed.
 

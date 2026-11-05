@@ -91,6 +91,15 @@ namespace EmulatorHub
         [DllImport("user32.dll")] internal static extern bool ShowWindow(IntPtr window, int command);
         [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(IntPtr window);
         [DllImport("user32.dll")] internal static extern IntPtr SetFocus(IntPtr window);
+        [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] internal static extern bool IsChild(IntPtr parent, IntPtr child);
+        [StructLayout(LayoutKind.Sequential)] internal struct GuiThreadInfo
+        {
+            internal int Size, Flags;
+            internal IntPtr Active, Focus, Capture, MenuOwner, MoveSize, Caret;
+            internal Rect CaretBounds;
+        }
+        [DllImport("user32.dll")] internal static extern bool GetGUIThreadInfo(uint thread, ref GuiThreadInfo info);
         [DllImport("user32.dll")] internal static extern bool ShowWindowAsync(IntPtr window, int command);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] internal static extern bool SetProp(IntPtr window, string name, IntPtr value);
         [DllImport("user32.dll", CharSet=CharSet.Unicode)] internal static extern IntPtr GetProp(IntPtr window, string name);
@@ -438,8 +447,29 @@ namespace EmulatorHub
         protected override void OnLocationChanged(EventArgs e) { base.OnLocationChanged(e);ResizeGame(); }
         protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e);ResizeGame(); }
         protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e);ResizeGame(); }
-        protected override void OnEnter(EventArgs e) { base.OnEnter(e); if (IsAttached && !PlayNative.IsHungAppWindow(window)) PlayNative.SetFocus(window); }
-        protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (IsAttached && !PlayNative.IsHungAppWindow(window)) PlayNative.SetFocus(window); }
+        public bool FocusGame()
+        {
+            Form owner = FindForm();
+            if (!IsAttached || !Visible || !Enabled || owner == null || !owner.Enabled ||
+                owner.WindowState == FormWindowState.Minimized || !PlayNative.IsWindowVisible(window) ||
+                !PlayNative.IsWindowEnabled(window) || PlayNative.IsHungAppWindow(window)) return false;
+            IntPtr foreground = PlayNative.GetForegroundWindow();
+            // Activation is a user hand-off from this viewport, never a background focus grab.
+            if (foreground != owner.Handle && foreground != window && !PlayNative.IsChild(window, foreground)) return false;
+            if (anchored)
+            {
+                // A preserved Qt/SDL renderer is a separate top-level window. SetFocus from
+                // FishBowl's thread cannot activate it. Let its own thread restore child focus.
+                return PlayNative.SetForegroundWindow(window);
+            }
+            PlayNative.SetFocus(window);
+            uint process;
+            uint thread = PlayNative.GetWindowThreadProcessId(window, out process);
+            var info = new PlayNative.GuiThreadInfo { Size = Marshal.SizeOf(typeof(PlayNative.GuiThreadInfo)) };
+            return PlayNative.GetGUIThreadInfo(thread, ref info) && (info.Focus == window || PlayNative.IsChild(window, info.Focus));
+        }
+        protected override void OnEnter(EventArgs e) { base.OnEnter(e); FocusGame(); }
+        protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); FocusGame(); }
         protected override void DestroyHandle() { if(!Restore(false)) throw new InvalidOperationException("The game window could not be detached safely."); base.DestroyHandle(); }
         protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); if (!transitioning && window != IntPtr.Zero && !disposing) Embed(); }
         protected override void WndProc(ref Message message)
@@ -536,6 +566,15 @@ namespace EmulatorHub
             shareButton = ExperienceUi.Button("Share session", ShareSelected);
             moreButton = ExperienceUi.Button("More", delegate { });
             var menu = new ContextMenuStrip(); NavigationController.Register(menu);
+            menu.Items.Add("Focus game keyboard", null, delegate {
+                // Run after the menu closes so it cannot immediately take focus back.
+                BeginInvoke(new MethodInvoker(delegate {
+                    if (IsDisposed) return;
+                    var selected = Selected();
+                    if (selected != null && !selected.Host.FocusGame())
+                        status.Text = "Click inside the game to use its keyboard controls. If input still does not work, use Open in window and check the emulator's keyboard mappings.";
+                }));
+            });
             menu.Items.Add("Session details", null, delegate { SessionDetails(); });
             menu.Items.Add("Game view settings", null, delegate { GameViewSettings(); });
             moreButton.ContextMenuStrip = menu;
@@ -572,7 +611,7 @@ namespace EmulatorHub
             IntPtr window=PlayNative.Find(selected.Known,selected.Title);
             var identity=selected.Known.FirstOrDefault(p=>PlayNative.Matches(window,p.Pid,p.StartedUtcTicks));
             if(identity!=null)selected.Host.AttachWindow(window,identity.Pid,identity.StartedUtcTicks);
-            HideFrontend(selected);ShowSelected();RefreshStatus();
+            HideFrontend(selected);ShowSelected();RefreshStatus();selected.Host.FocusGame();
         }
         public void ShareSession() { ShareSelected(); }
         void ShareSelected() {
@@ -830,7 +869,11 @@ namespace EmulatorHub
                     {
                         uint pid; PlayNative.GetWindowThreadProcessId(candidate, out pid);
                         var identity = session.Known.First(p => p.Pid == pid && keys.Contains(p.Key));
-                        session.Host.AttachWindow(candidate, identity.Pid, identity.StartedUtcTicks);
+                        if (session.Host.AttachWindow(candidate, identity.Pid, identity.StartedUtcTicks) && session == Selected())
+                        {
+                            HideFrontend(session);
+                            session.Host.FocusGame();
+                        }
                     }
                 }
                 HideFrontend(session);

@@ -33,6 +33,14 @@ class PlayHostTests
     [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr window);
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr window, System.Text.StringBuilder text, int capacity);
+    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
+    [StructLayout(LayoutKind.Sequential)] struct KeyboardInput { public ushort Key, Scan; public uint Flags, Time; public UIntPtr Extra; }
+    [StructLayout(LayoutKind.Sequential)] struct MouseInput { public int X, Y; public uint Data, Flags, Time; public UIntPtr Extra; }
+    [StructLayout(LayoutKind.Explicit)] struct InputData { [FieldOffset(0)] public KeyboardInput Keyboard; [FieldOffset(0)] public MouseInput Mouse; }
+    [StructLayout(LayoutKind.Sequential)] struct Input { public uint Type; public InputData Data; }
+    [DllImport("user32.dll")] static extern uint SendInput(uint count, Input[] input, int size);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window, uint message, IntPtr wparam, IntPtr lparam);
     [DllImport("user32.dll", EntryPoint="GetWindowLongW")] static extern int GetWindowLong(IntPtr window, int index);
     [StructLayout(LayoutKind.Sequential)] struct Rect { public int Left, Top, Right, Bottom; }
@@ -87,9 +95,14 @@ class PlayHostTests
             Application.EnableVisualStyles();
             using (var form = new Form { Text = "Native Play Fixture", StartPosition = FormStartPosition.Manual, Bounds = new Rectangle(-3500, -3500, 640, 480), ShowInTaskbar=true, FormBorderStyle=FormBorderStyle.SizableToolWindow })
             {
+                form.KeyPreview = true;
+                form.KeyDown += delegate(object sender, KeyEventArgs e) {
+                    if(e.KeyCode == Keys.F9) { form.Text = "Keyboard received: F9"; e.SuppressKeyPress = true; }
+                };
                 if(args.Contains("--region")) form.Region = new Region(new Rectangle(0,0,500,350));
                 if(args.Contains("--minsize")) form.MinimumSize = new Size(1000,750);
                 form.Controls.Add(new Label { Text = "Native cross-process game window", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter });
+                if(args.Contains("--keyboard")) form.Controls.Add(new TextBox { Text = "Keyboard fixture", Dock = DockStyle.Top, TabIndex = 0 });
                 Application.Run(form);
             }
             return 0;
@@ -108,8 +121,56 @@ class PlayHostTests
             responder.Start();main.Close();
         }
     }
+    static void KeyboardFocus()
+    {
+        var process = Child(" --keyboard"); IntPtr window = Find(process.Id);
+        try
+        {
+            using(var owner = new Form { Text = "Play keyboard fixture", StartPosition = FormStartPosition.Manual, Bounds = new Rectangle(60,60,800,600) })
+            using(var host = new PlayWindowHost { PreserveRendererWindow = true })
+            {
+                owner.Controls.Add(host); owner.Show(); Pump(80);
+                Check(!host.FocusGame(), "no keyboard activation without a verified game");
+                Check(host.AttachWindow(window, process.Id, process.StartTime.ToUniversalTime().Ticks) && host.IsAnchored, "keyboard fixture uses preserved owned top-level renderer");
+                host.Visible = false; Pump(40);
+                Check(!host.FocusGame(), "hidden Play viewport cannot take keyboard focus");
+                host.Visible = true; owner.Enabled = false; Pump(40);
+                Check(!host.FocusGame(), "modal/disabled FishBowl cannot activate renderer");
+                owner.Enabled = true; Pump(40);
+                using(var other = new Form { Text = "Other application fixture" })
+                {
+                    other.Show(); SetForegroundWindow(other.Handle); Pump(80);
+                    if(GetForegroundWindow() == other.Handle)
+                    {
+                        Check(!host.FocusGame() && GetForegroundWindow() == other.Handle, "another foreground window is never displaced by game focus");
+                        typeof(PlayWindowHost).GetMethod("RefreshPlacement", Private).Invoke(host, null); Pump(40);
+                        Check(GetForegroundWindow() == other.Handle, "placement refresh does not steal keyboard focus");
+                    }
+                    other.Close();
+                }
+                owner.Activate(); SetForegroundWindow(owner.Handle); Pump(80);
+                if(GetForegroundWindow() == owner.Handle)
+                {
+                    Check(host.FocusGame(), "preserved renderer accepts native foreground activation");
+                    Check(Until(delegate { return GetForegroundWindow() == window; }), "renderer becomes foreground instead of FishBowl's input queue");
+                    // Real keyboard events go only to this verified, focused fixture window.
+                    Check(GetForegroundWindow() == window, "keyboard destination remains the owned fixture");
+                    var down = new Input { Type = 1, Data = new InputData { Keyboard = new KeyboardInput { Key = (ushort)Keys.F9 } } };
+                    var up = down; up.Data.Keyboard.Flags = 2;
+                    Check(SendInput(2, new[] { down, up }, Marshal.SizeOf(typeof(Input))) == 2, "native keyboard events delivered");
+                    Check(Until(delegate { var caption = new System.Text.StringBuilder(256); GetWindowText(window, caption, caption.Capacity); return caption.ToString() == "Keyboard received: F9"; }), "foreign renderer actually receives keyboard event");
+                }
+                else Console.WriteLine("MANUAL CHECK REQUIRED: this test desktop denied foreground activation; live keyboard delivery was not tested.");
+                Check(host.TryDetach(), "keyboard hand-off preserves normal detach");
+                Check(!host.FocusGame(), "detached emulator is not reactivated by old host");
+                owner.Close();
+            }
+        }
+        finally { Stop(process, window); }
+    }
     static void Run()
     {
+        KeyboardFocus();
         var process = Child(); IntPtr window = Find(process.Id); long start = process.StartTime.ToUniversalTime().Ticks;
         IntPtr originalParent=GetParent(window);
         int style = GetWindowLong(window, -16), extended = GetWindowLong(window, -20);
@@ -153,6 +214,8 @@ class PlayHostTests
                 Check(Until(delegate { return NextUi.Descendants(play).OfType<PlayWindowHost>().Any(h=>h.IsAttached); }), "main ShowPlay discovers real launched native window");
                 var host=NextUi.Descendants(play).OfType<PlayWindowHost>().Single(h=>h.IsAttached);
                 Check(!NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Show in Play").Enabled,"attached session disables unnecessary retry");
+                var more = NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="More");
+                Check(more.ContextMenuStrip.Items.Cast<ToolStripItem>().Any(i=>i.Text=="Focus game keyboard"), "Play exposes explicit keyboard-focus recovery without adding toolbar clutter");
                 var footer=(Control)Field(main,"workspaceFooter");
                 foreach(int index in new[]{0,1,2,3}) {
                     tabs.SelectedIndex=index; Pump(40);
