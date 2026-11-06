@@ -104,4 +104,4 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 
 - **2026-11-06 (Windows library layout):** moved workspace navigation to a left rail and added a wide-window Library summary with live game, filter and emulator counts and the existing folder scan action. The Library toolbar exposes the existing list/artwork switch. Saved views, launch routing, customization and the shared library format are preserved. Native Eden input remains a separate verification item.
 
-- **2026-11-06 (Windows toolbar):** keep the list/artwork switch in Library tools so the removal button fits at standard text size. The library toolbar wraps on narrow Windows displays and grows to fit the extra row.
+- **2026-11-06 (Windows toolbar):** keep the list/artwork switch in Library tools so the removal button fits at standard text size. The library toolbar wraps on narrow Windows displays and grows to fit the extra row. Platform browsing is available under Library tools.
