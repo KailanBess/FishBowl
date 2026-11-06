@@ -742,8 +742,8 @@ namespace EmulatorHub
 			splitContainer.SplitterWidth = 8;
 			splitContainer.BackColor = top;
 			splitContainer.Panel1MinSize = 450;
-			splitContainer.Panel2MinSize = 370;
-			splitContainer.SplitterDistance = 770;
+			splitContainer.Panel2MinSize = 290;
+			splitContainer.SplitterDistance = 910;
 			SplitContainer splitContainer2 = (emulatorSplit = splitContainer);
 			emulatorInformation = BuildInformationPanel();
 			splitContainer2.Panel1.Controls.Add(emulatorList);
@@ -4696,7 +4696,9 @@ namespace EmulatorHub
 			TabPage tabPage6 = tabPage5;
 			var playPage = new TabPage("Play") { BackColor = bottom };
             var webPage = new TabPage("Web") { BackColor = bottom };
-            workspaceNavigation.TabPages.AddRange(new TabPage[5] { tabPage2, tabPage4, tabPage6, playPage, webPage });
+                        var settingsPage = new TabPage("Settings") { BackColor = bottom };
+            settingsPage.Controls.Add(BuildSettingsDashboard());
+            workspaceNavigation.TabPages.AddRange(new[] { tabPage2, tabPage4, tabPage6, playPage, webPage, settingsPage });
             browserSurface=new BrowserSurface(library,ToggleFullScreen) { Dock=DockStyle.Fill };webPage.Controls.Add(browserSurface);
             playSurface = new PlaySurface(library, ToggleFullScreen) { Dock = DockStyle.Fill };
             playPage.Controls.Add(playSurface);
@@ -4786,6 +4788,44 @@ namespace EmulatorHub
         private bool dashboardMenuOpen;
         private Button dashboardLibraryTools;
         private Label dashboardSectionTitle;
+        private Control BuildSettingsDashboard()
+        {
+            var grid = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14),
+                AccessibleName = "Settings categories", Tag = "FishBowl wrapped toolbar"
+            };
+            AddSettingsCard(grid, "General", "Startup, backups and launch preferences", ShowSettings);
+            AddSettingsCard(grid, "Appearance", "Themes, colors, window styling and layout", ShowAppearanceHub);
+            AddSettingsCard(grid, "Accessibility", "Text size, contrast and motion", ShowLiveAppearanceCore);
+            AddSettingsCard(grid, "Controllers", "Input, navigation and controller profiles", ShowControllerCenter);
+            AddSettingsCard(grid, "Web browser", "Choose the browser used by the Web workspace", delegate
+            {
+                using (var dialog = new BrowserSettingsDialog(library)) dialog.ShowDialog(this);
+            });
+            return grid;
+        }
+
+        private static void AddSettingsCard(FlowLayoutPanel grid, string title, string description, Action open)
+        {
+            var card = new TableLayoutPanel
+            {
+                Width = 236, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(12), Margin = new Padding(6),
+                ColumnCount = 1, RowCount = 3, BackColor = FishBowlPalette.ThemeSurface
+            };
+            card.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 212));
+            for (int row = 0; row < 3; row++) card.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            card.Controls.Add(new Label { Text = title, AutoSize = true, Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold) }, 0, 0);
+            card.Controls.Add(new Label { Text = description, AutoSize = true, MaximumSize = new Size(206, 0), Margin = new Padding(3, 6, 3, 8) }, 0, 1);
+            var button = ExperienceUi.Button("Open " + title, open);
+            button.AutoSize = true;
+            button.MaximumSize = new Size(208, 0);
+            button.AutoEllipsis = true;
+            card.Controls.Add(button, 0, 2);
+            grid.Controls.Add(card);
+        }
+
         private void BuildDashboardShell(AquariumFrame workspace)
         {
             dashboardRail = new FlowLayoutPanel
@@ -4794,7 +4834,7 @@ namespace EmulatorHub
                 WrapContents = false, AutoScroll = true, Padding = new Padding(4, 8, 4, 8),
                 AccessibleName = "FishBowl workspace rail", Tag = "FishBowl wrapped toolbar"
             };
-            string[] glyphs = { "⌂", "◇", "▦", "▷", "◎" };
+            string[] glyphs = { "⌂", "◇", "▦", "▷", "◎", "⚙" };
             foreach (TabPage page in workspaceNavigation.TabPages)
             {
                 TabPage destination = page;
@@ -4804,7 +4844,7 @@ namespace EmulatorHub
                     workspaceNavigation.SelectedIndex = workspaceNavigation.TabPages.IndexOf(destination);
                 }).Tag = destination;
             }
-            AddDashboardDestination("⚙", "Settings", ShowSettings);
+
             AddDashboardDestination("⌕", "Search", OpenCommandSearch);
             AddDashboardDestination("⋯", "Menu", delegate
             {
@@ -23132,10 +23172,18 @@ namespace EmulatorHub
 		private void LayoutCardsCore()
 		{
 			float num = Math.Max(0.5f, visualScale * Math.Min(1.5f, Math.Max(1f, (float)NextUi.TextPercent / 100f)));
+            bool showSideSummary = ClientSize.Width >= 960;
+            summary.Dock = showSideSummary ? DockStyle.Right : DockStyle.Top;
+            summary.AutoSize = !showSideSummary;
+            summary.FlowDirection = showSideSummary ? FlowDirection.TopDown : FlowDirection.LeftToRight;
+            summary.WrapContents = !showSideSummary;
+            summary.Width = showSideSummary ? 245 : ClientSize.Width;
+            summary.Padding = new Padding(12);
+            summary.BackColor = FishBowlPalette.ThemeTop;
 			foreach (Button item in summary.Controls.OfType<Button>())
 			{
 				item.AutoSize = false;
-				int available = Math.Max(1, ClientSize.Width - summary.Padding.Horizontal - item.Margin.Horizontal);
+				int available = Math.Max(1, summary.ClientSize.Width - summary.Padding.Horizontal - item.Margin.Horizontal);
 				item.MinimumSize = new Size(Math.Min(ControlDensityTools.Choose(108, 140, 152), available), ControlDensityTools.Choose(30, 42, 48));
 				item.MaximumSize = new Size(available, 0);
 				item.AutoEllipsis = true;
@@ -23143,7 +23191,7 @@ namespace EmulatorHub
 				item.Height = Math.Max(ControlDensityTools.Choose(30, 42, 48), item.Font.Height + ControlDensityTools.Choose(10, 16, 20));
 			}
 			int num2 = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
-			int num3 = Math.Max(1, Math.Min(ControlDensityTools.Choose(3, 2, 2), num2 / (int)(ControlDensityTools.Choose(330, 430, 460) * num)));
+			int num3 = Math.Max(1, Math.Min(3, num2 / (int)(ControlDensityTools.Choose(240, 265, 310) * num)));
 			foreach (Control control3 in cards.Controls)
 			{
 				control3.Padding = new Padding(ControlDensityTools.Choose(12, 22, 28));
@@ -26798,8 +26846,18 @@ namespace EmulatorHub
 			base.StartPosition = FormStartPosition.CenterParent;
 			BackColor = FishBowlPalette.DeepSeaSurface;
 			ForeColor = FishBowlPalette.ThemeInk;
-			base.Controls.Add(Body);
-			base.Controls.Add(Actions);
+            var heading = new Label
+            {
+                Text = title, AccessibleName = title, Dock = DockStyle.Top, AutoSize = true,
+                Padding = new Padding(16, 9, 12, 9), Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
+                BackColor = FishBowlPalette.ThemeTop, ForeColor = FishBowlPalette.ThemeInk
+            };
+            TextChanged += delegate { heading.Text = Text; heading.AccessibleName = Text; };
+            Body.BackColor = FishBowlPalette.ThemeBottom;
+            Actions.Padding = new Padding(10, 4, 10, 4);
+            base.Controls.Add(Body);
+            base.Controls.Add(Actions);
+            base.Controls.Add(heading);
 		}
 
         protected override void SetVisibleCore(bool value)

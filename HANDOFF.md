@@ -119,3 +119,7 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - 2026-11-06: Rebuilt the Windows workspace chrome for every theme. The sidebar links to the existing Home, Emulators, Library, Play, Web and Settings features. The Library uses compact game cards with status badges, a search and view strip, and a summary based on the local collection. Existing view and appearance settings are retained. Linux shell remains separate.
 
 - 2026-11-06: Replaced the full-width promotional banner with a compact optional brand strip and moved Library search, scope, list/grid and filters into the Library heading. Other workspaces use a single shared section heading. The Library and native Play/Web controls retain their existing behavior.
+
+- 2026-11-06: Added a Windows Settings workspace with categorized cards, moved Home summary actions into a right column at wider sizes, and gave the Emulators workspace a narrower details inspector. Settings editors, emulator actions, and saved preferences continue to use the existing implementations.
+- Play and Web use the dashboard command strip spacing and a right-hand status inspector on wide windows, with a bottom status line on narrow or fullscreen layouts.
+- Shared Windows detail and settings dialogs based on NextDialog now use a compact title strip and matching workspace surfaces.

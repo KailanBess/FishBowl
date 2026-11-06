@@ -150,7 +150,7 @@ class PlayHostTests
             {
                 main.ShowInTaskbar=false; main.StartPosition=FormStartPosition.Manual; main.Location=new Point(-4000,-4000); main.Show(); Pump(150);
                 var tabs=(TabControl)Field(main,"workspaceNavigation");
-                Check(tabs.TabCount==5 && tabs.TabPages[3].Text=="Play", "main workspace includes persistent Play section");
+                Check(tabs.TabCount==6 && tabs.TabPages[3].Text=="Play", "main workspace includes persistent Play section");
                 var emptyPlay=(PlaySurface)Field(main,"playSurface");
                 Check(NextUi.Descendants(emptyPlay).OfType<Button>().All(b=>!b.Enabled),"empty Play disables actions that require a session: "+string.Join(", ",NextUi.Descendants(emptyPlay).OfType<Button>().Select(b=>b.Text+"="+b.Enabled))+" sessions="+emptyPlay.HasSessions);
                 typeof(MainForm).GetMethod("ShowPlay",Private).Invoke(main,new object[]{process,"Native fixture",new List<SessionProcess>()});
