@@ -6,11 +6,56 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
+[assembly: System.Reflection.AssemblyMetadata("AquariumWorkspace", "1")]
+
+namespace EmulatorHub {
+internal static class AquariumWorkspace
+{
+ internal static bool Enabled { get { return Environment.GetEnvironmentVariable("AQUARIUM_HOSTED") == "1"; } }
+ [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern bool SetProp(IntPtr window,string name,IntPtr value);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern uint RegisterWindowMessage(string name);
+ [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr window);
+ [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window,int show);
+ internal static void Prepare(){if(Enabled)SetProcessDpiAwarenessContext(new IntPtr(-4));}
+ internal static void Register(Form form,Func<bool> canShow = null)
+ {
+  if(!Enabled)return;
+  var bridge=new VisibilityBridge(form,canShow);
+  bool ready=false;
+  Action mark=delegate {if(!form.IsDisposed&&form.IsHandleCreated){SetProp(form.Handle,"Aquarium.Workspace.ManagedVisibility.v1",new IntPtr(1));SetProp(form.Handle,"Aquarium.Workspace.v1",new IntPtr(1));}};
+  form.HandleCreated+=delegate {bridge.Bind();if(ready)form.BeginInvoke(mark);};
+  form.HandleDestroyed+=delegate {bridge.ReleaseHandle();};
+  form.Shown+=delegate {form.MinimumSize=new System.Drawing.Size(640,400);form.WindowState=FormWindowState.Normal;if(GetParent(form.Handle)==IntPtr.Zero)ShowWindow(form.Handle,0);form.BeginInvoke((Action)delegate{ready=true;mark();});};
+  if(form.IsHandleCreated)bridge.Bind();
+ }
+ sealed class VisibilityBridge:NativeWindow
+ {
+  readonly Form form;readonly Func<bool> canShow;
+  static readonly uint message=RegisterWindowMessage("Aquarium.Workspace.Visibility.v1");
+  internal VisibilityBridge(Form form,Func<bool> canShow){this.form=form;this.canShow=canShow;}
+  internal void Bind(){AssignHandle(form.Handle);}
+  protected override void WndProc(ref Message m)
+  {
+   if((uint)m.Msg==message){
+    if(!form.IsDisposed&&GetParent(form.Handle)!=IntPtr.Zero){
+     if(m.WParam==IntPtr.Zero)form.Hide();
+     else if(canShow==null||canShow()){form.Show();form.PerformLayout();form.Invalidate(true);form.Update();}
+    }
+    m.Result=new IntPtr(1);return;
+   }
+   base.WndProc(ref m);
+  }
+ }
+}
+}
+
 namespace EmulatorHub {
  public static class WindowsAppearance {
   public static void Open(IWin32Window owner, LibraryData data, Action refresh, Action fonts, Action cosmetics) {
    using(var dialog=new NextDialog("Appearance and accessibility",760,580)) {
     var fields=NextDialog.Fields(dialog.Body);
+    NextDialog.Field(fields,"Reference library",ExperienceUi.Button("Use platform library style",delegate{UiPolishTools.ApplyReferenceLibraryStyle(data);Store.Save(data);refresh();}));
     NextDialog.Field(fields,"Aquarium family",ExperienceUi.Button("Use Aquarium style",delegate{UiPolishTools.ApplyAquariumStyle(data);Store.Save(data);refresh();}));
     NextDialog.Field(fields,"Theme, accent and Home",ExperienceUi.Button("Appearance and Home",delegate{UiPolishTools.Open(dialog,data,refresh);}));
     NextDialog.Field(fields,"Text and layout",ExperienceUi.Button("Live appearance and accessibility",fonts));
@@ -80,6 +125,7 @@ namespace EmulatorHub {
   static void WireItems(ToolStrip strip){foreach(ToolStripMenuItem item in strip.Items.OfType<ToolStripMenuItem>()){if(!wired.Add(item))continue;item.DropDownOpening+=delegate{Register(item.DropDown);WireItems(item.DropDown);};item.Disposed+=delegate{wired.Remove(item);};}}
   public static void Attach(Form form){foreach(var strip in NextUi.Descendants(form).OfType<MenuStrip>()){if(attached.Add(strip)){WireItems(strip);strip.Disposed+=delegate{attached.Remove(strip);};}}foreach(var control in NextUi.Descendants(form))if(control.ContextMenuStrip!=null)Register(control.ContextMenuStrip);}
   static bool Read(out State state,out int device){state=default(State);device=-1;for(uint i=0;i<4;i++){uint result=1;try{result=Get(i,out state);}catch(DllNotFoundException){try{result=GetOld(i,out state);}catch(DllNotFoundException){try{result=GetLegacy(i,out state);}catch(DllNotFoundException){return false;}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}if(result==0){device=(int)i;return true;}}return false;}
+  internal static bool HasConnectedController(){ State state; int device; return Read(out state, out device); }
   public static void Reset(){input.Sample(false,-1,0,0,0,0,false);}
   public static bool CanNavigate(Form active,IntPtr foreground) {
    if(active==null||active.IsDisposed||!active.IsHandleCreated||active is ControllerLauncher||foreground==IntPtr.Zero||!IsWindowEnabled(active.Handle))return false;
@@ -116,3 +162,4 @@ namespace EmulatorHub {
   }
  }
 }
+

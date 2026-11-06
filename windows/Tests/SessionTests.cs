@@ -120,7 +120,7 @@ class SessionTests
             string childSource = Path.Combine(directory, "Child.cs");
             string launcher = Path.Combine(directory, "Launcher.exe");
             string launcherSource = Path.Combine(directory, "Launcher.cs");
-            File.WriteAllText(childSource, "class Child { static void Main(){System.Threading.Thread.Sleep(1800);} }");
+            File.WriteAllText(childSource, "class Child { static void Main(){string release=System.Reflection.Assembly.GetExecutingAssembly().Location+\".release\";var clock=System.Diagnostics.Stopwatch.StartNew();while(!System.IO.File.Exists(release)&&clock.Elapsed.TotalSeconds<30)System.Threading.Thread.Sleep(25);} }");
             File.WriteAllText(launcherSource, "using System.Diagnostics;class Launcher {static void Main(string[] args){Process.Start(new ProcessStartInfo{FileName=args[0],UseShellExecute=false,CreateNoWindow=true});System.Threading.Thread.Sleep(100);}}");
             string compiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe");
             foreach (string source in new[] { childSource, launcherSource })
@@ -136,16 +136,30 @@ class SessionTests
             var process = Process.Start(new ProcessStartInfo { FileName = launcher, Arguments = "\"" + child + "\"", UseShellExecute = false, CreateNoWindow = true });
             using (var tracker = SessionLedger.Start(directory, session, process, before))
             {
-                bool followedChild = false;
                 var clock = Stopwatch.StartNew();
-                while (!tracker.Finished && clock.Elapsed.TotalSeconds < 8)
+                TimeSpan? launcherExitObserved = null;
+                try
+                {
+                    while (!tracker.Finished && clock.Elapsed.TotalSeconds < 12)
+                    {
+                        tracker.Poll();
+                        if (process.HasExited && !launcherExitObserved.HasValue) launcherExitObserved = clock.Elapsed;
+                        if (launcherExitObserved.HasValue && clock.Elapsed - launcherExitObserved.Value >= TimeSpan.FromSeconds(3)) break;
+                        System.Threading.Thread.Sleep(50);
+                    }
+                    Check(launcherExitObserved.HasValue && clock.Elapsed - launcherExitObserved.Value >= TimeSpan.FromSeconds(3) &&
+                        !tracker.Finished && tracker.Seconds >= 2,
+                        "actual launcher exits while verified child remains tracked");
+                }
+                finally { File.WriteAllText(child + ".release", "exit"); }
+
+                clock.Restart();
+                while (!tracker.Finished && clock.Elapsed.TotalSeconds < 15)
                 {
                     tracker.Poll();
-                    if (process.HasExited && !tracker.Finished && clock.Elapsed.TotalMilliseconds < 1400) followedChild = true;
-                    System.Threading.Thread.Sleep(100);
+                    System.Threading.Thread.Sleep(50);
                 }
-                Check(followedChild, "actual launcher exits while verified child remains tracked");
-                Check(tracker.Finished && tracker.Seconds >= 1, "actual child handoff finishes after child lifetime");
+                Check(tracker.Finished, "actual child handoff finishes after child lifetime");
                 SessionLedger.Apply(library, tracker, true); SessionLedger.Commit(tracker);
                 Check(library.Games[0].TotalPlaySeconds == 40 + session.Seconds, "actual process completion adds one total");
             }

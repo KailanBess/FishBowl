@@ -16,7 +16,7 @@ namespace EmulatorHub {
     dialog.Action("Close", dialog.Close); dialog.ShowDialog(owner);
    }
   }
-  static void Setup(IWin32Window owner, LibraryData library, GameEntry game, Action refresh) {
+  public static void Setup(IWin32Window owner, LibraryData library, GameEntry game, Action refresh) {
    using(NextDialog d = new NextDialog("Game setup", 850, 680)) {
     TableLayoutPanel table = NextDialog.Fields(d.Body);
     List<EmulatorProfile> emulators = library.Emulators ?? new List<EmulatorProfile>();

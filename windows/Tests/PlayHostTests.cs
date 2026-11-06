@@ -27,6 +27,7 @@ class PlayHostTests
     static readonly BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
     static object Field(object target, string name) { return target.GetType().GetField(name, Private).GetValue(target); }
     delegate bool WindowCallback(IntPtr window, IntPtr data);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool EnumWindows(WindowCallback callback, IntPtr data);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr window, uint command);
@@ -125,15 +126,19 @@ class PlayHostTests
                 Check(host.AttachWindow(window, process.Id, start), "verified foreign HWND embeds");
                 Check(host.IsAttached && GetParent(window) == host.Handle, "native parent becomes live Play viewport");
                 Check((GetWindowLong(window,-16) & 0x40000000) != 0, "native hosted window has child style");
+                if (GetForegroundWindow() == form.Handle)
+                    Check(host.FocusGame(), "visible Play viewport can focus a verified foreign renderer");
                 form.ClientSize = new Size(900,650); Pump(80);
                 Rect client; GetClientRect(window, out client);
                 Check(client.Right-client.Left == host.ClientSize.Width && client.Bottom-client.Top == host.ClientSize.Height, "foreign client resizes to viewport");
                 host.RecreateNativeHandle(); Pump(100);
                 Check(host.IsAttached && GetParent(window) == host.Handle && !process.HasExited, "viewport handle recreation preserves native window and process");
                 host.Visible = false; Pump(80); Check(!process.HasExited, "hidden Play viewport leaves game process running");
+                Check(!host.FocusGame(), "hidden Play viewport refuses focus");
                 host.Visible = true; Pump(80); Check(host.IsAttached, "returning to Play retains attachment");
                 host.Detach(); Pump(80);
                 Check(GetParent(window) == originalParent && !host.IsAttached, "Open in window restores top-level parent");
+                Check(!host.FocusGame(), "detached viewport cannot focus the former renderer");
                 Check(GetWindowLong(window,-16) == style && GetWindowLong(window,-20) == extended, "detach restores exact native styles");
                 Rect restored; GetWindowRect(window,out restored);
                 Check(restored.Left == original.Left && restored.Top == original.Top && restored.Right == original.Right && restored.Bottom == original.Bottom, "detach restores original native placement");

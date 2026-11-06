@@ -57,6 +57,13 @@ Merged/closed branches should be deleted after checking their pull request and a
 - **2026-11-05 (release gate):** PR #46 was created by the maintainer. Linux build/core/schema and Windows overflow checks pass, but the complete Windows regression job failed. Publication remains blocked. Added bounded, inert-fixture stdout/stderr annotations to identify the failing test without weakening or skipping tests; Windows app code and Linux behavior are unchanged.
 
 - **2026-11-05 (both packages):** prepared 1.29.5 on `release/aquarium-family-1.29.5`, with paired Windows installer/app and Linux package metadata. No Linux behavior or shared schema changes. Release automation opens a pull request, waits for the existing Build and text-audit workflows, merges only if normal repository rules permit, then dispatches the release workflow from main. Windows and Linux release jobs must both pass before publication. Linux Release build, shared/core checks and 229 schema checks pass. The build reports the existing unawaited SaveMonitor call warning (CS4014); native browser/emulator/controller acceptance remains open. No game, firmware or emulator binaries are packaged. The initial release-preparation Actions run failed before merge; GitHub reports that Actions cannot create pull requests; the maintainer created release PR #46 and preparation is being retried against its checked head. Preparation now accepts push/PR check runs, cancels stale preparation runs and requires an exact tested head when merging. Public job summaries/error annotations retain failure details.
+- **2026-11-04 (Windows hosting readiness correction):** defer the Aquarium workspace marker until after the first Shown cycle, preventing Aquarium from reparenting a form while WinForms is still initializing its top-level state. Handle recreation republishes readiness after initialization. No shared/Linux data or code changes.
+
+- **2026-11-04 (Windows Aquarium hosting):** opt-in AQUARIUM_HOSTED workspace registration marks only MainForm, selects compatible DPI mode before UI startup and permits a smaller embedded workspace. Existing standalone startup and saved data are unchanged. Aquarium hosts only the marked main workspace; startup/sign-in dialogs are not adopted. No Linux or shared-schema changes. Parent lifecycle/DPI and physical controller compatibility need native checks.
+
+- **2026-11-04 (Windows library essentials):** surfaced per-game launch/controller setup, local cover selection, save/configuration backups and a controller-navigation guide in the existing library menus. Existing path repair, profile, backup and XInput navigation implementations are reused. No shared schema or Linux files changed. Physical controller/emulator compatibility remains a native check.
+
+- **2026-11-04 (Windows reference-layout pass):** added a Platforms entry in the Windows Game Library that opens a searchable rounded-tile platform gallery. Counts come from existing game entries; choosing a tile filters the existing library and switches to artwork view. Existing launch, saves, controller and library logic remain intact. No Linux files or shared schema changes. The gallery is the first layout pass; the complete shell/sidebar migration remains follow-up work.
 
 - **2026-11-04 (Windows):** added an opt-in Aquarium family preset in Appearance and accessibility, with Ocean/Midnight/Slate themes and Mint/Blue/Coral accents. The preset uses rounded, harmonized surfaces and retains text size, density, motion, library data and existing themes. Windows UI only; Linux sources and shared schema are unchanged. Original conversation images were search references, so this matches the Aquarium family palette rather than claiming pixel-identical mockups. Build and theme regression checks are recorded in the pull request; native visual review remains required.
 
@@ -83,3 +90,22 @@ Merged/closed branches should be deleted after checking their pull request and a
 - **2026-10-07:** audited GitHub issues, pull requests and workflow status; confirmed zero open issues and two distinct pending pull requests. Refreshed release/shutdown/browser and shared-source documentation, archived historical notes and expanded ignore rules. Copilot workflow approval and native compatibility checks remain explicit.
 - **2026-10-07:** synchronized PR #25 with latest main shared game/living-room extraction, retaining `FishBowl.Browser.cs`, `FishBowl.Games.cs` and `FishBowl.LivingRoom.cs` in the Windows build.
 - **2026-10-07:** PR #29 merged Library/Home/living-room work; PR #28 retains additional save/backup changes. Windows 1.29.1 browser rendering fix is tracked by closed issues #23/#27 and pending PR #25.
+
+
+
+
+Tracked hosting readiness defect: #45. Windows navigation and reference-layout fixtures pass; Linux and shared data are unchanged.
+
+2026-11-04: Follow-up to #45: the WinForms workspace now handles cooperative visibility messages using Form.Show/Hide so child controls are restored after native parenting. Aquarium opts in through a window property. Windows-only adapter change; shared schema and Linux are unchanged.
+2026-11-05 (Windows): Game Library > Library tools > Platform setup combines launch validation, firmware folder availability, controller profile and XInput detection with an explicit test launch. Physical controller and emulator verification remain manual. Shared library schema and Linux files were not edited.
+
+
+2026-11-05 (Windows, #47): Play offers More > Focus game. Owned renderers receive a native foreground activation request and child renderers use the correct input queue. Hidden and detached viewports refuse focus. Eden keyboard and controller acceptance remains manual.
+
+- **2026-11-06 (Windows library layout):** moved workspace navigation to a left rail and added a wide-window Library summary with live game, filter and emulator counts and the existing folder scan action. The Library toolbar exposes the existing list/artwork switch. Saved views, launch routing, customization and the shared library format are preserved. Native Eden input remains a separate verification item.
+
+- **2026-11-06 (Windows toolbar):** keep the list/artwork switch in Library tools so the removal button fits at standard text size. The library toolbar wraps on narrow Windows displays and grows to fit the extra row. Platform browsing is available under Library tools.
+
+- **2026-11-06 (Windows session fixture):** hold the generated child process until the test verifies tracking beyond the launcher grace period. Release it explicitly and check that the session finishes. Session tracking code and shared schema are unchanged.
+
+- **2026-11-06 (1.29.6 release):** prepare matching Windows app/installer and Linux package versions for the reviewed library redesign. Linux behavior and the shared library format are preserved. Release packaging runs the existing Windows and Linux checks before publishing.

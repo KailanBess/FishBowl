@@ -6,10 +6,10 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 
 | Platform | Version | Status |
 | --- | --- | --- |
-| Windows | 1.29.5 | Windows app ZIP with installer |
-| Linux | 1.29.5 | Linux AppImage; testing on more Linux desktops is welcome |
+| Windows | 1.29.6 | Windows app ZIP with installer |
+| Linux | 1.29.6 | Linux AppImage; testing on more Linux desktops is welcome |
 
-**What's new in 1.29.5:** Aquarium family themes and an opt-in appearance preset join the existing browser fitting and Linux features below. Personal settings and library compatibility are retained.
+**What's new in 1.29.6:** Windows adds a library navigation rail, searchable game cards, a live library summary and platform setup. Linux release packaging and the shared library format remain compatible.
 
 Included features:
 - **Windows:** a Web workspace that uses your installed Firefox (Edge and Chrome can be chosen instead), with separate browser profiles. Browser windows fit the Web area automatically. Play adds game-only view adjustments, and asks before closing running games so emulators can shut down normally. See [Browser setup](docs/BROWSER.md) and [Play validation](docs/PLAY-VALIDATION.md).

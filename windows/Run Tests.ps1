@@ -31,7 +31,7 @@ function Invoke-FixtureTest([string]$Executable, [string[]]$TestArguments) {
 $executed = @()
 Push-Location $fixture
 try {
- foreach ($testName in @('BrowserTests','PlayExitTests','PlayHostTests','PlayLaunchTests','SessionTests','NavigationTests','RemotePlayTests','GameToolsTests','ControlDensityTests','ColorHarmonyTests','UiPolishTests','IntegrationExpansionTests','ExpansionVisualTests','ThemeTests','LibraryRecoveryTests','LibraryEditTests','RemovalTests','IntegrationTests','NextRegressionTests','RecognitionTests','AzaharStorageTests','VisualRegressionTests','VisualMatrixTests','EmulatorEditorTests','SmoothUiTests','PopupCloseTests','PopupPositionTests','PopupAnimationTests')) {
+ foreach ($testName in @('ReferenceLayoutTests','BrowserTests','PlayExitTests','PlayHostTests','PlayLaunchTests','SessionTests','NavigationTests','RemotePlayTests','GameToolsTests','ControlDensityTests','ColorHarmonyTests','UiPolishTests','IntegrationExpansionTests','ExpansionVisualTests','ThemeTests','LibraryRecoveryTests','LibraryEditTests','RemovalTests','IntegrationTests','NextRegressionTests','RecognitionTests','AzaharStorageTests','VisualRegressionTests','VisualMatrixTests','EmulatorEditorTests','SmoothUiTests','PopupCloseTests','PopupPositionTests','PopupAnimationTests')) {
   if ($Only -and $testName -notin $Only) { continue }
   $executed += $testName
   Write-Output "Running $testName"

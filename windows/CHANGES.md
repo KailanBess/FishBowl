@@ -1,3 +1,9 @@
+# Windows 1.29.6
+
+- Add a left navigation rail and a searchable library with game cards and live library counts.
+- Group platform setup and view options under Library tools.
+- Add Aquarium workspace support and a Play action to focus the verified game renderer.
+
 # Windows 1.29.5 Aquarium family release
 
 - Adds Aquarium Ocean, Midnight and Slate themes and Mint, Blue and Coral accents.

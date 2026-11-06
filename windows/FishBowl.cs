@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.5.0")]
+[assembly: AssemblyFileVersion("1.29.6.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.5.0")]
+[assembly: AssemblyVersion("1.29.6.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.5";
+		private const string FishBowlVersion = "1.29.6";
 
-		private const string FishBowlTitleVersion = "1.29.5";
+		private const string FishBowlTitleVersion = "1.29.6";
 
 		private Icon ownedAppIcon;
 
@@ -314,12 +314,13 @@ namespace EmulatorHub
 
 		public MainForm(bool isolatedPreview)
 		{
+            AquariumWorkspace.Register(this);
 			MainForm mainForm = this;
 			DoubleBuffered = true;
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.29.5";
+			Text = "FishBowl 1.29.6";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -405,11 +406,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.5" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.6" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.5";
+						library.Theme.LastSeenBuild = "1.29.6";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -3412,7 +3413,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.5"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.6"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3420,7 +3421,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.5"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.6"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3428,7 +3429,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.5"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.6"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3833,6 +3834,7 @@ namespace EmulatorHub
 
 		private void SaveWindowLayout()
 		{
+            if (AquariumWorkspace.Enabled) return;
 			try
 			{
 				FormWindowState formWindowState = (fullScreen ? savedWindowState : base.WindowState);
@@ -4680,6 +4682,8 @@ namespace EmulatorHub
 				LegacyHeaders = true,
 				RoomyHeaders = true,
                 PreferredColumns = 5,
+                Alignment = TabAlignment.Left,
+                Appearance = TabAppearance.Normal,
 				Font = new Font(DisplayFont, 12f, FontStyle.Bold)
 			};
 			TabPage tabPage = new TabPage("Home");
@@ -9694,6 +9698,7 @@ namespace EmulatorHub
 		private bool fittingHeader;
 
 		private Panel detailPane;
+        private Label librarySummary;
 
 		private PictureBox detailCover;
 
@@ -9742,7 +9747,7 @@ namespace EmulatorHub
 			});
 			panel.Controls.Add(new Label
 			{
-				Text = "Manage games without changing your emulators.",
+				Text = "Search, filter, and launch your collection.",
 				ForeColor = Color.FromArgb(174, 176, 186),
 				Font = new Font("Bahnschrift", 8f),
 				AutoSize = true,
@@ -9787,11 +9792,17 @@ namespace EmulatorHub
 				Height = 58,
 				BackColor = Color.FromArgb(47, 48, 56),
 				Padding = new Padding(14, 8, 14, 6),
-				WrapContents = false,
+				WrapContents = true,
 				AutoScroll = false
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
+			flowLayoutPanel.Tag = "FishBowl wrapped toolbar";
 			BuildCompactActions(flowLayoutPanel);
+            flowLayoutPanel.Layout += delegate
+            {
+                int height = Math.Max(48, flowLayoutPanel.GetPreferredSize(new Size(flowLayoutPanel.ClientSize.Width, 0)).Height);
+                if (flowLayoutPanel.Height != height) flowLayoutPanel.Height = height;
+            };
 			base.Controls.Add(flowLayoutPanel);
 			games.Dock = DockStyle.Fill;
 			games.View = View.Details;
@@ -9811,6 +9822,7 @@ namespace EmulatorHub
 			{
 				LaunchGame();
 			};
+            games.Name = "FishBowlLibraryGames";
 			games.AccessibleName = "FishBowl game list";
             ContextMenuStrip gameMenu = CompactMenus.Menu();
             gameMenu.Items.Add("Launch", null, delegate { LaunchGame(); });
@@ -9935,6 +9947,66 @@ namespace EmulatorHub
 			return library.Emulators.FirstOrDefault((EmulatorProfile item) => item.Id == (string.IsNullOrWhiteSpace(game.PreferredEmulatorId) ? game.EmulatorId : game.PreferredEmulatorId)) ?? ((library.Emulators.Count == 1) ? library.Emulators[0] : null);
 		}
 
+        private void ShowPlatformSetup()
+        {
+            if (library.Games.Count == 0)
+            {
+                MessageBox.Show(this, "Add a game to check its platform setup.", "FishBowl");
+                return;
+            }
+            using (var dialog = new NextDialog("Platform setup", 820, 560))
+            {
+                var selected = SelectedGame();
+                var platforms = library.Games.Select(ConsoleName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name);
+                var platform = NextDialog.Choice(platforms, selected == null ? consoleChoice.SelectedItem as string : ConsoleName(selected));
+                var title = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Title" };
+                var details = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical };
+                var fields = NextDialog.Fields(dialog.Body);
+                NextDialog.Field(fields, "Platform", platform);
+                NextDialog.Field(fields, "Game to check", title);
+                NextDialog.Field(fields, "Setup results", details, 280);
+                Action check = delegate
+                {
+                    var game = title.SelectedItem as GameEntry;
+                    if (game == null) return;
+                    var profile = NextData.LaunchEmulator(library, game);
+                    var results = new List<string>();
+                    results.Add(profile == null ? "Emulator: assign an emulator to this game." : "Emulator: " + profile.Name);
+                    try { GameSessions.Validate(library, game); results.Add("Launch inputs: game path and launch settings are available."); }
+                    catch (Exception ex) { results.Add("Launch inputs: " + ex.Message); }
+                    if (profile != null)
+                    {
+                        foreach (var item in EmulatorHealth.Check(profile, library).Where(item => item.Name == "Firmware / BIOS" || item.Name == "Chosen firmware folder"))
+                            results.Add(item.Name + ": " + item.Status + ". " + item.Detail);
+                    }
+                    var controller = (library.ControllerProfiles ?? new List<ControllerProfile>()).FirstOrDefault(item => item.Id == game.ControllerProfileId);
+                    results.Add(controller == null ? "Controller profile: choose a profile or configure input in the emulator." : "Controller profile: " + controller.Name);
+                    results.Add(NavigationController.HasConnectedController() ? "XInput controller detected. Confirm mapping in the emulator." : "No XInput controller detected. Check your controller connection or emulator input settings.");
+                    details.Lines = results.ToArray();
+                };
+                Action selectGames = delegate
+                {
+                    title.DataSource = library.Games.Where(game => string.Equals(ConsoleName(game), platform.SelectedItem as string, StringComparison.OrdinalIgnoreCase)).OrderBy(game => game.Title).ToList();
+                    if (selected != null && title.Items.Contains(selected)) title.SelectedItem = selected;
+                    check();
+                };
+                platform.SelectedIndexChanged += delegate { selectGames(); };
+                title.SelectedIndexChanged += delegate { check(); };
+                selectGames();
+                dialog.Action("Check again", check);
+                dialog.Action("Test launch", delegate
+                {
+                    var game = title.SelectedItem as GameEntry;
+                    if (game == null) return;
+                    try { GameSessions.Validate(library, game); }
+                    catch (Exception ex) { MessageBox.Show(dialog, ex.Message, "Setup needs attention"); return; }
+                    ExperienceTools.Launch(dialog, library, game);
+                    RefreshGames();
+                });
+                dialog.Action("Close", dialog.Close);
+                dialog.ShowDialog(this);
+            }
+        }
 		private void AddGame()
 		{
 			GameEntry gameEntry = new GameEntry();
@@ -9967,6 +10039,17 @@ namespace EmulatorHub
             RefreshGames();
         }
 
+        private void ChooseLocalCover()
+        {
+            var game = SelectedGame(); if (game == null) return;
+            using (var picker = new OpenFileDialog { Title = "Choose local cover art", Filter = "Cover image|*.png;*.jpg;*.jpeg;*.bmp" })
+            {
+                if (picker.ShowDialog(this) != DialogResult.OK) return;
+                using (var image = Image.FromFile(picker.FileName))
+                    if (image.Width > 16000 || image.Height > 16000) throw new IOException("Image dimensions are too large.");
+                game.ArtworkPath = picker.FileName; Store.Save(library); RefreshGames();
+            }
+        }
 		private void EditGame()
 		{
 			GameEntry gameEntry = SelectedGame();
@@ -10412,6 +10495,8 @@ namespace EmulatorHub
 			AddActionGroup(bar, "Game actions", delegate(ContextMenuStrip menu)
 			{
 				GroupAction(menu, "Edit game", EditGame, true);
+                GroupAction(menu, "Per-game launch and controller profile", delegate { WindowsGameTools.Setup(this, library, SelectedGame(), ReloadLibrary); }, true);
+                GroupAction(menu, "Choose local cover art", ChooseLocalCover, true);
 				GroupAction(menu, "Remove selected games from FishBowl", RemoveGames, true);
                 GroupAction(menu, "Identify game and retain icon", delegate
                 {
@@ -10448,7 +10533,15 @@ namespace EmulatorHub
 			});
 			AddActionGroup(bar, "Library tools", delegate(ContextMenuStrip menu)
 			{
+                GroupAction(menu, "Platform setup…", ShowPlatformSetup, false);
 				GroupAction(menu, "List / artwork view", ToggleGameView);
+                GroupAction(menu, "Platforms", delegate {
+                var platforms = library.Games.GroupBy(g => ConsoleName(g)).ToDictionary(g => g.Key, g => g.Count());
+                using (var gallery = new ReferencePlatformGallery(platforms, delegate(string platform) {
+                    consoleChoice.SelectedItem = platform; artworkView = true;
+                    library.Experience.LibraryView = "Artwork"; RefreshGames(); Store.Save(library);
+                })) gallery.ShowDialog(this);
+                });
 				GroupAction(menu, "Game setup and media...", delegate { WindowsGameTools.Open(this, library, SelectedGame(), ReloadLibrary); }, true);
                 GroupAction(menu, "PC imports and play history...", delegate { WindowsGameTools.OpenLibrary(this, library, ReloadLibrary); });
                 GroupAction(menu, "Integrations...", delegate { IntegrationTools.Open(this, library, ReloadLibrary); });
@@ -10474,6 +10567,8 @@ namespace EmulatorHub
 				GroupAction(menu, "Sync folders", SyncFolders);
 				GroupAction(menu, "Find duplicates", ShowDuplicates);
 				GroupAction(menu, "Repair game paths", RepairGames);
+                GroupAction(menu, "Save and configuration backups", delegate { ExperienceTools.Backups(this, library); ReloadLibrary(); });
+                GroupAction(menu, "Controller navigation guide", delegate { using (var guide = new ResultsDialog("Controller navigation", new[] { "D-pad or left stick: move focus", "A: activate focused control", "B: back or close dialog", "LB / RB: switch tabs", "Start: open menu", "Per-game controller profiles are reminders/settings; configure emulator mappings in the emulator itself." })) guide.ShowDialog(this); });
                 GroupAction(menu, "Undo removal", delegate { ExperienceTools.UndoRemoval(this, library); ReloadLibrary(); });
                 GroupAction(menu, "Cleanup artwork", delegate { ExperienceTools.CleanupArtwork(this, library); ReloadLibrary(); });
 				GroupAction(menu, "Export current view to CSV", delegate
@@ -10969,6 +11064,7 @@ namespace EmulatorHub
 				}
 			}
 			UpdateSelectionCommands();
+            UpdateDetailPane();
 			RememberNavigation();
 		}
 
@@ -11002,6 +11098,34 @@ namespace EmulatorHub
 			}
 			LoadVisibleArtwork();
 		}
+
+        internal static void PaintGameCard(ListView list, DrawListViewItemEventArgs e)
+        {
+            Rectangle card = Rectangle.Inflate(e.Bounds, -3, -2);
+            if (card.Width < 10 || card.Height < 10) { e.DrawDefault = true; return; }
+            Color background = e.Item.Selected ? CosmeticRuntime.Selection : FishBowlPalette.ThemeSurface;
+            using (var fill = new SolidBrush(background))
+            using (var outline = new Pen(e.Item.Selected ? FishBowlPalette.IconAccent : FishBowlHighlights.Blend(background, 28)))
+            using (var shape = FishBowlVisuals.Round(card, 6f))
+            {
+                e.Graphics.FillPath(fill, shape);
+                e.Graphics.DrawPath(outline, shape);
+            }
+            Rectangle label = new Rectangle(card.Left + 6, card.Bottom - list.Font.Height - 5,
+                Math.Max(1, card.Width - 12), list.Font.Height + 2);
+            ImageList images = list.LargeImageList;
+            if (images != null && e.Item.ImageIndex >= 0 && e.Item.ImageIndex < images.Images.Count)
+            {
+                int size = Math.Min(images.ImageSize.Width, Math.Min(card.Width - 12, label.Top - card.Top - 8));
+                if (size > 0)
+                    images.Draw(e.Graphics, card.Left + (card.Width - size) / 2, card.Top + 4, size, size, e.Item.ImageIndex);
+            }
+            FishBowlText.DrawText(e.Graphics, e.Item.Text, list.Font, label,
+                FishBowlPalette.EnsureReadable(list.ForeColor, background),
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            if (e.Item.Focused && list.Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(card, -2, -2));
+        }
 
 		public static Bitmap MakeThumbnail(string path, string title, int size)
 		{
@@ -11294,6 +11418,16 @@ namespace EmulatorHub
 			};
 			detailPane.Controls.Add(detailText);
 			detailPane.Controls.Add(detailCover);
+            var summaryPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4, 4, 4, 12)
+            };
+            summaryPanel.Controls.Add(new Label { Text = "Library summary", AutoSize = true, Font = new Font(Font, FontStyle.Bold) });
+            librarySummary = new Label { AutoSize = true, AccessibleName = "Library summary counts" };
+            summaryPanel.Controls.Add(librarySummary);
+            AddButton(summaryPanel, "Scan folders", SyncFolders);
+            detailPane.Controls.Add(summaryPanel);
 			Panel panel = new Panel();
 			panel.Dock = DockStyle.Fill;
 			Panel panel2 = panel;
@@ -11334,7 +11468,12 @@ namespace EmulatorHub
 			{
 				return;
 			}
-			detailPane.Visible = library.Cosmetics != null && library.Cosmetics.DetailPreview && base.ClientSize.Width >= 900;
+            detailPane.Visible = games.Parent.ClientSize.Width >= 900;
+            bool showDetails = library.Cosmetics != null && library.Cosmetics.DetailPreview && SelectedGame() != null;
+            detailText.Visible = showDetails;
+            detailCover.Visible = showDetails;
+            librarySummary.Text = string.Format("{0:N0} games\n{1:N0} visible\n{2:N0} emulator profiles",
+                library.Games.Count, games.Items.Count, library.Emulators.Count);
 			GameEntry gameEntry = SelectedGame();
 			string text = ((gameEntry == null) ? "" : (gameEntry.Id + "|" + gameEntry.Title + "|" + gameEntry.ConsoleLabel + "|" + gameEntry.Genre + "|" + gameEntry.ArtworkPath + "|" + Immersion.ArtworkStamp(gameEntry.ArtworkPath) + "|" + gameEntry.Description));
 			if (text == detailStamp)
@@ -15826,7 +15965,14 @@ namespace EmulatorHub
 			fittingTabs = true;
 			try
 			{
-				int num = ((PreferredColumns > 0 && base.TabPages.Count > 0) ? Math.Max(190, base.TabPages.Cast<TabPage>().Max((TabPage page) => TextRenderer.MeasureText(page.Text, Font).Width + 32)) : 190);
+				if (Alignment == TabAlignment.Left)
+                {
+                    int railWidth = Math.Max(104, TabPages.Cast<TabPage>().Select(page => TextRenderer.MeasureText(page.Text, Font).Width + 26).DefaultIfEmpty(104).Max());
+                    var railSize = new Size(Math.Max(44, Font.Height + 18), railWidth);
+                    if (ItemSize != railSize) ItemSize = railSize;
+                    return;
+                }
+                int num = ((PreferredColumns > 0 && base.TabPages.Count > 0) ? Math.Max(190, base.TabPages.Cast<TabPage>().Max((TabPage page) => TextRenderer.MeasureText(page.Text, Font).Width + 32)) : 190);
 				int num2 = ((PreferredColumns > 0) ? Math.Min(PreferredColumns, Math.Max(1, base.ClientSize.Width / num)) : ((ManagementPages && base.ClientSize.Width >= 900) ? 6 : 3));
 				int num3 = Math.Max(100, (base.ClientSize.Width - (num2 - 1) * 10 - 8) / num2);
 				if (base.ItemSize.Width != num3 || base.ItemSize.Height != Math.Max(RoomyHeaders ? 44 : 36, Font.Height + (RoomyHeaders ? 22 : 14)))
@@ -15924,7 +16070,10 @@ namespace EmulatorHub
 				{
 					using (SolidBrush brush2 = new SolidBrush(Color.FromArgb((int)(120f + 135f * SectionMotion.For(this).Progress), AccentColor)))
 					{
-						e.Graphics.FillRectangle(brush2, rectangle.Left + 7, rectangle.Bottom - 3, Math.Max(1, rectangle.Width - 14), 2);
+						if (Alignment == TabAlignment.Left)
+                            e.Graphics.FillRectangle(brush2, rectangle.Left, rectangle.Top + 3, 3, Math.Max(1, rectangle.Height - 6));
+                        else
+                            e.Graphics.FillRectangle(brush2, rectangle.Left + 7, rectangle.Bottom - 3, Math.Max(1, rectangle.Width - 14), 2);
 					}
 				}
 				int num = rectangle.Left + 8;
@@ -16495,7 +16644,10 @@ namespace EmulatorHub
 				};
 				list.DrawItem += delegate(object sender, DrawListViewItemEventArgs e)
 				{
-					e.DrawDefault = list.View != View.Details || list.CheckBoxes || list.SmallImageList != null;
+                    if (list.Name == "FishBowlLibraryGames" && list.View == View.LargeIcon && !SystemInformation.HighContrast)
+                        GameLibraryDialog.PaintGameCard(list, e);
+                    else
+                        e.DrawDefault = list.View != View.Details || list.CheckBoxes || list.SmallImageList != null;
 				};
 				list.DrawSubItem += delegate(object sender, DrawListViewSubItemEventArgs e)
 				{
@@ -17220,6 +17372,7 @@ namespace EmulatorHub
 		[STAThread]
 		private static void Main()
 		{
+            AquariumWorkspace.Prepare();
 			FishBowlJumpList.Initialize();
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);
@@ -26644,7 +26797,7 @@ namespace EmulatorHub
 
 		public static void Responsive(FlowLayoutPanel bar)
 		{
-			if (bar.Tag as string== "FishBowl overflow")
+			if (bar.Tag as string == "FishBowl overflow" || bar.Tag as string == "FishBowl wrapped toolbar")
 			{
 				return;
 			}
@@ -33762,6 +33915,7 @@ namespace EmulatorHub
 		{
 
 			new ThemeColors("FishBowl Water", Color.FromArgb(250, 247, 255), Color.FromArgb(5, 31, 78), Color.FromArgb(3, 13, 38), Color.FromArgb(12, 59, 122), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Library Graphite", Color.FromArgb(241, 241, 245), Color.FromArgb(45, 45, 48), Color.FromArgb(30, 30, 32), Color.FromArgb(34, 34, 36), Color.FromArgb(167, 167, 178)),
 			new ThemeColors("Aquarium Ocean", Color.FromArgb(241, 247, 255), Color.FromArgb(14, 26, 43), Color.FromArgb(9, 21, 29), Color.FromArgb(16, 36, 47), Color.FromArgb(160, 184, 195)),
 			new ThemeColors("Aquarium Midnight", Color.FromArgb(241, 247, 255), Color.FromArgb(20, 22, 37), Color.FromArgb(12, 14, 22), Color.FromArgb(22, 30, 43), Color.FromArgb(160, 184, 195)),
 			new ThemeColors("Aquarium Slate", Color.FromArgb(241, 247, 255), Color.FromArgb(32, 40, 53), Color.FromArgb(27, 35, 43), Color.FromArgb(34, 46, 58), Color.FromArgb(160, 184, 195)),
@@ -34252,3 +34406,6 @@ namespace EmulatorHub
 		}
 	}
 }
+
+
+

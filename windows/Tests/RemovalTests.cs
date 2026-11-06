@@ -100,7 +100,7 @@ class RemovalTests
                 Check(remove.Visible && remove.Parent.ClientRectangle.Contains(remove.Bounds),"Emulator removal fits toolbar at "+percent+"% text");
                 navigation.SelectedIndex=2;Application.DoEvents();
                 var gameRemove=NextUi.Descendants(main).OfType<Button>().First(b=>b.Text=="Remove game");
-                Check(gameRemove.Visible && gameRemove.Parent.ClientRectangle.Contains(gameRemove.Bounds),"Game removal fits toolbar at "+percent+"% text");
+                Check(gameRemove.Visible && gameRemove.Parent.ClientRectangle.Contains(gameRemove.Bounds),"Game removal fits toolbar at "+percent+"% text; button="+gameRemove.Bounds+" visible="+gameRemove.Visible+" parent="+gameRemove.Parent.ClientRectangle+" parent visible="+gameRemove.Parent.Visible+" page="+navigation.DisplayRectangle);
                 using(var image=new Bitmap(main.Width,main.Height)){main.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save("Removal-library-"+percent+".png");}
                 navigation.SelectedIndex=1;Application.DoEvents();
                 using(var image=new Bitmap(main.Width,main.Height)){main.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save("Removal-emulators-"+percent+".png");}
