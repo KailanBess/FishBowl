@@ -3719,7 +3719,7 @@ namespace EmulatorHub
 			ColorHarmony.Configure(library.Theme.ColorHarmony, CosmeticRuntime.Current.CustomPalette, library.Theme.Name, pink);
 			FishBowlPalette.Configure(ink, top, bottom, surface, subtle, blue, pink);
 			FishBowlBranding.Configure(library.Theme.AppIconColor, blue, pink);
-            ApplyGalleryShell();
+            ApplyDashboardShell();
 		}
 
 		private void ApplyVisualScale()
@@ -3747,6 +3747,7 @@ namespace EmulatorHub
                 workspaceShell.RowStyles[4].Height = savedPlayRows[2];
                 immersivePlayChrome = false;
             }
+            ApplyDashboardShell();
         }
 
         private void ToggleFullScreen()
@@ -4779,102 +4780,92 @@ namespace EmulatorHub
 				}
 			};
             var workspace = new AquariumFrame(workspaceNavigation);
-            BuildGalleryShell(workspace);
+            BuildDashboardShell(workspace);
             return workspace;
 		}
 
-        private FlowLayoutPanel galleryRail;
-        private FlowLayoutPanel galleryCommands;
-        private bool galleryMenuOpen;
-        private bool galleryToolsOpen;
-        private Button galleryLibraryTools;
-        private float previousMenuHeight;
-        private float previousBannerHeight;
-
-        private void BuildGalleryShell(AquariumFrame workspace)
+        private FlowLayoutPanel dashboardRail;
+        private FlowLayoutPanel dashboardCommands;
+        private bool dashboardMenuOpen;
+        private bool dashboardToolsOpen;
+        private Button dashboardLibraryTools;
+        private void BuildDashboardShell(AquariumFrame workspace)
         {
-            galleryRail = new FlowLayoutPanel
+            dashboardRail = new FlowLayoutPanel
             {
-                Dock = DockStyle.Left, Width = 156, FlowDirection = FlowDirection.TopDown,
-                WrapContents = false, AutoScroll = true, Padding = new Padding(12, 16, 8, 8),
-                Visible = false, AccessibleName = "FishBowl workspace rail", Tag = "FishBowl wrapped toolbar"
+                Dock = DockStyle.Left, Width = 94, FlowDirection = FlowDirection.TopDown,
+                WrapContents = false, AutoScroll = true, Padding = new Padding(4, 8, 4, 8),
+                AccessibleName = "FishBowl workspace rail", Tag = "FishBowl wrapped toolbar"
             };
-            galleryRail.Controls.Add(new Label
-            {
-                Text = "FishBowl", AutoSize = true, Font = new Font(DisplayFont, 17f, FontStyle.Bold),
-                Margin = new Padding(8, 8, 8, 20)
-            });
+            string[] glyphs = { "⌂", "◇", "▦", "▷", "◎" };
             foreach (TabPage page in workspaceNavigation.TabPages)
             {
                 TabPage destination = page;
-                string label = page.Text == "Library" ? "My Games" : page.Text;
-                var button = ExperienceUi.Button(label, delegate { workspaceNavigation.SelectedIndex = workspaceNavigation.TabPages.IndexOf(destination); });
-                button.Tag = destination;
-                button.Width = 126;
-                galleryRail.Controls.Add(button);
+                int index = workspaceNavigation.TabPages.IndexOf(page);
+                AddDashboardDestination(glyphs[index], page.Text, delegate
+                {
+                    workspaceNavigation.SelectedIndex = workspaceNavigation.TabPages.IndexOf(destination);
+                }).Tag = destination;
             }
-
-            galleryCommands = new FlowLayoutPanel
+            AddDashboardDestination("⚙", "Settings", ShowSettings);
+            AddDashboardDestination("⋯", "Menu", delegate
             {
-                Dock = DockStyle.Top, Height = 52, WrapContents = false, Padding = new Padding(12, 4, 8, 4),
-                Visible = false, AccessibleName = "FishBowl commands"
-            };
-            galleryCommands.Controls.Add(ExperienceUi.Button("Search", OpenCommandSearch));
-            galleryCommands.Controls.Add(ExperienceUi.Button("Settings", ShowSettings));
-            galleryCommands.Controls.Add(ExperienceUi.Button("Menu", delegate
-            {
-                galleryMenuOpen = !galleryMenuOpen;
-                UpdateWorkspaceChrome();
-            }));
-            galleryLibraryTools = ExperienceUi.Button("Library tools", delegate
-            {
-                galleryToolsOpen = !galleryToolsOpen;
-                ApplyGalleryShell();
+                dashboardMenuOpen = !dashboardMenuOpen;
+                ApplyDashboardShell();
             });
-            galleryCommands.Controls.Add(galleryLibraryTools);
-            workspace.Controls.Add(galleryCommands);
-            workspace.Controls.Add(galleryRail);
+
+            dashboardCommands = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = true, Padding = new Padding(12, 4, 8, 4),
+                AccessibleName = "FishBowl workspace commands", Tag = "FishBowl wrapped toolbar"
+            };
+            dashboardCommands.Controls.Add(ExperienceUi.Button("Search commands", OpenCommandSearch));
+            dashboardLibraryTools = ExperienceUi.Button("Filters and actions", delegate
+            {
+                dashboardToolsOpen = !dashboardToolsOpen;
+                ApplyDashboardShell();
+            });
+            dashboardCommands.Controls.Add(dashboardLibraryTools);
+            workspace.Controls.Add(dashboardCommands);
+            workspace.Controls.Add(dashboardRail);
         }
 
-        private void ApplyGalleryShell()
+        private Button AddDashboardDestination(string glyph, string label, Action action)
         {
-            if (galleryRail == null || workspaceShell == null) return;
-            bool gallery = library.Theme.Name == "Gallery Night" && !SystemInformation.HighContrast;
-            var tabs = (FishBowlTabs)workspaceNavigation;
-            bool wasGallery = tabs.GalleryHeaders;
-            tabs.GalleryHeaders = gallery;
-            galleryRail.Visible = gallery;
-            galleryCommands.Visible = gallery;
-            galleryLibraryTools.Visible = gallery && workspaceNavigation.SelectedIndex == 2;
-            if (embeddedLibrary != null) embeddedLibrary.SetGalleryMode(gallery, galleryToolsOpen);
-            if (!gallery)
+            var button = new Button
             {
-                if (wasGallery)
-                {
-                    workspaceShell.RowStyles[0].Height = previousMenuHeight;
-                    workspaceShell.RowStyles[1].Height = library.Theme.ShowBanner ? previousBannerHeight : 0;
-                }
-                return;
-            }
-            if (!wasGallery)
-            {
-                previousMenuHeight = workspaceShell.RowStyles[0].Height;
-                previousBannerHeight = workspaceShell.RowStyles[1].Height;
-            }
-            workspaceShell.RowStyles[0].Height = galleryMenuOpen ? Math.Max(28, previousMenuHeight) : 0;
-            workspaceShell.RowStyles[1].Height = 0;
-            galleryRail.BackColor = FishBowlPalette.ThemeBottom;
-            galleryRail.ForeColor = FishBowlPalette.ThemeInk;
-            galleryCommands.BackColor = FishBowlPalette.ThemeTop;
-            foreach (Button button in galleryRail.Controls.OfType<Button>())
+                Text = glyph + "\n" + label, AccessibleName = label, Size = new Size(80, 61),
+                Margin = new Padding(0, 0, 0, 3), FlatStyle = FlatStyle.Flat,
+                CausesValidation = false, UseVisualStyleBackColor = false
+            };
+            button.Click += delegate { action(); };
+            dashboardRail.Controls.Add(button);
+            return button;
+        }
+
+        private void ApplyDashboardShell()
+        {
+            if (dashboardRail == null || workspaceShell == null) return;
+            bool visible = !fullScreen || (workspaceNavigation.SelectedIndex != 3 && workspaceNavigation.SelectedIndex != 4);
+            ((FishBowlTabs)workspaceNavigation).HideWorkspaceHeaders = true;
+            dashboardRail.Visible = dashboardCommands.Visible = visible;
+            dashboardLibraryTools.Visible = workspaceNavigation.SelectedIndex == 2;
+            if (embeddedLibrary != null) embeddedLibrary.SetDashboardMode(dashboardToolsOpen);
+            workspaceShell.RowStyles[0].Height = visible && dashboardMenuOpen ? 28 : 0;
+            dashboardRail.BackColor = FishBowlPalette.ThemeBottom;
+            dashboardCommands.BackColor = FishBowlPalette.ThemeTop;
+            foreach (Button button in dashboardRail.Controls.OfType<Button>())
             {
                 bool active = button.Tag == workspaceNavigation.SelectedTab;
+                button.Height = Math.Max(61, button.Font.Height * 2 + 10);
                 button.BackColor = active ? CosmeticRuntime.Selection : FishBowlPalette.ThemeBottom;
                 button.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, button.BackColor);
+                button.FlatAppearance.BorderSize = active ? 1 : 0;
+                button.FlatAppearance.BorderColor = CosmeticRuntime.Focus(button.BackColor);
                 button.AccessibleDescription = active ? "Current workspace" : "";
             }
         }
-
         internal void OpenWeb(string url)
         {
             if(browserSurface==null || IsDisposed) return;
@@ -4984,7 +4975,7 @@ namespace EmulatorHub
 		{
 			if (workspaceNavigation != null)
 			{
-                ApplyGalleryShell();
+                ApplyDashboardShell();
 				bool flag = workspaceNavigation.SelectedIndex == 1;
 				if (primaryToolbar != null)
 				{
@@ -9893,7 +9884,7 @@ namespace EmulatorHub
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
 			flowLayoutPanel.Tag = "FishBowl wrapped toolbar";
-            galleryLibraryToolbar = flowLayoutPanel;
+            dashboardLibraryToolbar = flowLayoutPanel;
 			BuildCompactActions(flowLayoutPanel);
             flowLayoutPanel.Layout += delegate
             {
@@ -10722,15 +10713,23 @@ namespace EmulatorHub
             } finally { fittingEmbeddedViewport = false; }
         }
 
-        private FlowLayoutPanel galleryLibraryToolbar;
-        private bool galleryCompactLibrary;
+        private FlowLayoutPanel dashboardLibraryToolbar;
+        private bool compactDashboardHeader;
+        private Button dashboardViewButton;
 
-        public void SetGalleryMode(bool enabled, bool expanded)
+        public void SetDashboardMode(bool expanded)
         {
-            bool compact = enabled && !expanded;
-            if (galleryCompactLibrary == compact) return;
-            galleryCompactLibrary = compact;
-            if (galleryLibraryToolbar != null) galleryLibraryToolbar.Visible = !compact;
+            bool compact = !expanded;
+            if (compactDashboardHeader == compact) return;
+            compactDashboardHeader = compact;
+            if (dashboardViewButton == null)
+            {
+                dashboardViewButton = ExperienceUi.Button("List / Grid", ToggleGameView);
+                dashboardViewButton.AccessibleName = "Switch between list and game cards";
+                search.Parent.Controls.Add(dashboardViewButton);
+            }
+            dashboardViewButton.Visible = compact;
+            if (dashboardLibraryToolbar != null) dashboardLibraryToolbar.Visible = !compact;
             FitLibraryHeader();
         }
 
@@ -10756,15 +10755,23 @@ namespace EmulatorHub
 				{
 					return;
 				}
-                list[0].Visible = list[1].Visible = flowLayoutPanel.Visible = !galleryCompactLibrary;
-                if (galleryCompactLibrary)
+                list[0].Visible = list[1].Visible = flowLayoutPanel.Visible = !compactDashboardHeader;
+                if (compactDashboardHeader)
                 {
                     int width = Math.Max(160, panel.ClientSize.Width - 36);
-                    search.Location = new Point(18, 10);
-                    search.Width = Math.Max(80, Math.Min(360, width * 2 / 3 - 12));
-                    scope.Location = new Point(search.Right + 10, 10);
-                    scope.Width = Math.Max(65, Math.Min(170, width - search.Width - 10));
-                    panel.Height = Math.Max(search.Bottom, scope.Bottom) + 12;
+                    list[0].Visible = true;
+                    list[0].Location = new Point(18, 10);
+                    int top = list[0].Bottom + 8;
+                    dashboardViewButton.Width = TextRenderer.MeasureText(dashboardViewButton.Text, dashboardViewButton.Font).Width + 26;
+                    dashboardViewButton.Height = Math.Max(34, dashboardViewButton.Font.Height + 12);
+                    dashboardViewButton.Location = new Point(18, top);
+                    scope.Location = new Point(dashboardViewButton.Right + 8, top);
+                    scope.Width = Math.Max(80, Math.Min(170, (width - dashboardViewButton.Width) / 2));
+                    int remainder = width - (scope.Right - 18) - 8;
+                    search.Location = remainder >= 100 ? new Point(scope.Right + 8, top)
+                        : new Point(18, Math.Max(scope.Bottom, dashboardViewButton.Bottom) + 6);
+                    search.Width = Math.Min(330, remainder >= 100 ? remainder : width);
+                    panel.Height = Math.Max(search.Bottom, Math.Max(scope.Bottom, dashboardViewButton.Bottom)) + 12;
                     return;
                 }
 				int num = Math.Max(200, panel.ClientSize.Width - panel.Padding.Horizontal - flowLayoutPanel.Padding.Horizontal - 8);
@@ -11225,7 +11232,7 @@ namespace EmulatorHub
             int preferred = Math.Max(148, library.Experience.ArtworkSize + 90);
             int columns = Math.Max(1, Math.Min(3, available / preferred));
             int width = Math.Max(128, available / columns);
-            var size = new Size(width, Math.Max(games.Font.Height + 28, width * 9 / 16));
+            var size = new Size(width, Math.Max(games.Font.Height + 28, Math.Min(118, width * 2 / 5)));
             if (games.TileSize != size) games.TileSize = size;
         }
 
@@ -11243,24 +11250,34 @@ namespace EmulatorHub
                 {
                     e.Graphics.SetClip(shape, CombineMode.Intersect);
                     using (var fill = new SolidBrush(background)) e.Graphics.FillRectangle(fill, card);
+                    int inset = 10;
+                    int imageSize = Math.Min(56, Math.Min(card.Width / 4, card.Height - 16));
+                    var imageBounds = new Rectangle(card.Right - imageSize - inset, card.Top + 8, imageSize, imageSize);
                     ImageList images = list.LargeImageList;
-                    if (images != null && e.Item.ImageIndex > 0 && e.Item.ImageIndex < images.Images.Count)
+                    if (images != null && e.Item.ImageIndex >= 0 && e.Item.ImageIndex < images.Images.Count)
                     {
                         using (Image cover = images.Images[e.Item.ImageIndex])
-                        {
-                            float cropHeight = Math.Min(cover.Height, cover.Width * (float)card.Height / card.Width);
-                            var source = new RectangleF(0, (cover.Height - cropHeight) / 2, cover.Width, cropHeight);
-                            e.Graphics.DrawImage(cover, card, source, GraphicsUnit.Pixel);
-                        }
+                            e.Graphics.DrawImage(cover, imageBounds);
                     }
-                    using (var fade = new LinearGradientBrush(card, Color.FromArgb(20, Color.Black),
-                        Color.FromArgb(226, Color.Black), LinearGradientMode.Vertical))
-                        e.Graphics.FillRectangle(fade, card);
 
-                    var title = new Rectangle(card.Left + 12, card.Bottom - list.Font.Height - 12,
-                        Math.Max(1, card.Width - 24), list.Font.Height + 4);
-                    FishBowlText.DrawText(e.Graphics, e.Item.Text, list.Font, title, Color.White,
-                        TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    Color ink = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, background);
+                    var flags = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+                    var title = new Rectangle(card.Left + inset, card.Top + 9,
+                        Math.Max(1, imageBounds.Left - card.Left - inset * 2), list.Font.Height + 2);
+                    FishBowlText.DrawText(e.Graphics, e.Item.Text, list.Font, title, ink, flags);
+
+                    var game = e.Item.Tag as GameEntry;
+                    string platform = game == null || string.IsNullOrWhiteSpace(game.ConsoleLabel)
+                        ? "Game" : game.ConsoleLabel;
+                    string status = e.Item.SubItems[3].Text == "Missing" ? "Missing file" : platform;
+                    var badge = new Rectangle(card.Left + inset, card.Bottom - list.Font.Height - 9,
+                        Math.Max(1, Math.Min(title.Width, TextRenderer.MeasureText(status, list.Font).Width + 10)), list.Font.Height + 3);
+                    Color accent = FishBowlPalette.EnsureReadable(CosmeticRuntime.Focus(background), background);
+                    using (var badgeShape = FishBowlVisuals.Round(badge, 7))
+                    using (var border = new Pen(accent))
+                        e.Graphics.DrawPath(border, badgeShape);
+                    FishBowlText.DrawText(e.Graphics, status, list.Font, Rectangle.Inflate(badge, -4, 0),
+                        accent, flags | TextFormatFlags.VerticalCenter);
                 }
                 finally { e.Graphics.Restore(state); }
                 using (var outline = new Pen(e.Item.Selected ? CosmeticRuntime.Focus(background) :
@@ -11562,10 +11579,16 @@ namespace EmulatorHub
                 Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4, 4, 4, 12)
             };
-            summaryPanel.Controls.Add(new Label { Text = "Collection", AutoSize = true, Font = new Font(Font, FontStyle.Bold) });
+            summaryPanel.Controls.Add(new Label { Text = "Library summary", AutoSize = true, Font = new Font(Font, FontStyle.Bold) });
             librarySummary = new Label { AutoSize = true, AccessibleName = "Library summary counts" };
             summaryPanel.Controls.Add(librarySummary);
             AddButton(summaryPanel, "Scan folders", SyncFolders);
+            var scanButton = summaryPanel.Controls.OfType<Button>().Single();
+            summaryPanel.Layout += delegate
+            {
+                int available = Math.Max(1, summaryPanel.ClientSize.Width - summaryPanel.Padding.Horizontal - scanButton.Margin.Horizontal);
+                scanButton.MaximumSize = new Size(available, 0);
+            };
             detailPane.Controls.Add(summaryPanel);
 			Panel panel = new Panel();
 			panel.Dock = DockStyle.Fill;
@@ -11607,7 +11630,7 @@ namespace EmulatorHub
 			{
 				return;
 			}
-            detailPane.Visible = games.Parent.ClientSize.Width >= 900;
+            detailPane.Visible = games.Parent.ClientSize.Width >= 790;
             bool showDetails = library.Cosmetics != null && library.Cosmetics.DetailPreview && SelectedGame() != null;
             detailText.Visible = showDetails;
             detailCover.Visible = showDetails;
@@ -16034,14 +16057,14 @@ namespace EmulatorHub
 
 		private bool nativeHeaders;
 
-        private bool galleryHeaders;
-        public bool GalleryHeaders
+        private bool hideWorkspaceHeaders;
+        public bool HideWorkspaceHeaders
         {
-            get { return galleryHeaders; }
+            get { return hideWorkspaceHeaders; }
             set
             {
-                if (galleryHeaders == value) return;
-                galleryHeaders = value;
+                if (hideWorkspaceHeaders == value) return;
+                hideWorkspaceHeaders = value;
                 FitTabs();
                 Invalidate();
             }
@@ -16117,7 +16140,7 @@ namespace EmulatorHub
 			fittingTabs = true;
 			try
 			{
-                if (galleryHeaders)
+                if (hideWorkspaceHeaders)
                 {
                     var hiddenSize = new Size(1, 1);
                     if (ItemSize != hiddenSize) ItemSize = hiddenSize;
@@ -16210,7 +16233,7 @@ namespace EmulatorHub
 				e.Graphics.FillRectangle(brush, base.ClientRectangle);
 				e.Graphics.Restore(gstate);
 			}
-            if (galleryHeaders) return;
+            if (hideWorkspaceHeaders) return;
 			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 			for (int i = 0; i < base.TabPages.Count; i++)
 			{
