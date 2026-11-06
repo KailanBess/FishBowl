@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.6.0")]
+[assembly: AssemblyFileVersion("1.29.7.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.6.0")]
+[assembly: AssemblyVersion("1.29.7.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.6";
+		private const string FishBowlVersion = "1.29.7";
 
-		private const string FishBowlTitleVersion = "1.29.6";
+		private const string FishBowlTitleVersion = "1.29.7";
 
 		private Icon ownedAppIcon;
 
@@ -320,7 +320,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.29.6";
+			Text = "FishBowl 1.29.7";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -406,11 +406,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.6" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.7" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.6";
+						library.Theme.LastSeenBuild = "1.29.7";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -3413,7 +3413,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.6"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.7"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3421,7 +3421,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.6"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.7"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3429,7 +3429,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.6"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.7"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
