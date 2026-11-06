@@ -39,6 +39,16 @@ class FluidTests {
    var list = (ListView)Field(library, "games");
    Check(list.Items.Count == 60 && list.View == View.Tile && list.TileSize.Width > list.TileSize.Height, "gallery shows real library items in landscape cards");
    Render(gallery, "gallery-night-library.png");
+   var tools = commands.Controls.OfType<Button>().Single(button => button.Text == "Library tools");
+   var toolbar = NextUi.Descendants(library).OfType<FlowLayoutPanel>().Single(panel => panel.Name == "FishBowlToolbar");
+   Check(!toolbar.Visible, "gallery keeps the original toolbar tucked away");
+   tools.PerformClick();
+   Pump(80);
+   Check(toolbar.Visible && toolbar.Controls.OfType<Button>().Any(button => button.Text == "Remove game" && button.Visible),
+    "gallery tools reveals the original game actions");
+   tools.PerformClick();
+   Pump(80);
+   Check(!toolbar.Visible, "gallery tools closes without changing the active workspace");
    gallery.Close();
   }
   d.Theme.Name = "FishBowl Water";
