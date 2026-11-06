@@ -1,3 +1,8 @@
+# Windows 1.29.7
+
+- Add the Gallery Night workspace shell and landscape artwork cards.
+- Keep the existing Library actions under Library tools.
+
 # Windows 1.29.6
 
 - Add a left navigation rail and a searchable library with game cards and live library counts.

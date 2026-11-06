@@ -109,3 +109,9 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - **2026-11-06 (Windows session fixture):** hold the generated child process until the test verifies tracking beyond the launcher grace period. Release it explicitly and check that the session finishes. Session tracking code and shared schema are unchanged.
 
 - **2026-11-06 (1.29.6 release):** prepare matching Windows app/installer and Linux package versions for the reviewed library redesign. Linux behavior and the shared library format are preserved. Release packaging runs the existing Windows and Linux checks before publishing.
+
+- **2026-11-06 (Windows artwork shell):** added shared Search and Settings shortcuts and icon navigation to the Windows workspaces. The Library artwork view now uses responsive landscape cards with a title overlay and the existing collection and selection panel. Gallery Night is available in the theme picker. Saved views, artwork size, density, navigation and emulation actions are retained. The right panel uses local collection data. Linux sources and the shared library schema are unchanged.
+
+- **2026-11-06 (Gallery Night shell):** the Windows Gallery Night preset now uses a separate workspace rail and command strip. My Games opens the existing library. The Menu command reveals the full menu bar. Other themes retain their familiar shell, and the workspace controls and saved data are shared.
+
+- **2026-11-06 (1.29.7 release):** prepare the tested Windows Gallery Night workspace shell with matching installer and Linux package versions. Linux behavior and shared library data are preserved.
