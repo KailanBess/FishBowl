@@ -20,6 +20,8 @@ class VisualMatrixTests
         if(type==typeof(string)){if(name=="folder")return Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);if(name=="source")return game.Path;if(name=="page")return "Setup checks";if(name=="version")return "1.3";if(name=="prefillExecutable")return emulator.Executable;if(name=="currentBackupFolder")return data.BackupFolder??"";return "A long example label to exercise clipping and layout";}
         if(type==typeof(bool))return false;if(type==typeof(int))return name=="width"?840:580;
         if(type==typeof(Action<GameEntry>))return new Action<GameEntry>(delegate{});
+        if(type==typeof(Dictionary<string,int>))return new Dictionary<string,int>{{"Fixture Console A",2},{"Fixture Console B",1}};
+        if(type==typeof(Action<string>))return new Action<string>(delegate{});
         if(type.IsGenericType){Type element=type.GetGenericArguments()[0];var list=(IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(element));if(element==typeof(GameEntry))list.Add(game);if(element==typeof(EmulatorProfile))list.Add(emulator);if(element==typeof(string))list.Add(name=="paths"?game.Path:name=="extensions"?".png":"Long example row / text for layout review");return list;}
         if(parameter.IsOptional)return parameter.DefaultValue;throw new Exception("No fixture for "+type.Name);
     }
