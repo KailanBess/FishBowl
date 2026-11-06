@@ -23,8 +23,9 @@ class VisualRegressionTests
         {
             Show(main);
             var tabs = (TabControl)typeof(MainForm).GetField("workspaceNavigation", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
-            Check(tabs.TabPages.Cast<TabPage>().Select(page=>page.Text).SequenceEqual(new[]{"Home","Emulators","Library","Play","Web"}),"Five primary workspaces preserve original page order and append Web");
-            Check(tabs.SizeMode == TabSizeMode.Fixed && Enumerable.Range(0,tabs.TabCount).All(index=>tabs.GetTabRect(index).Width >= TextRenderer.MeasureText(tabs.TabPages[index].Text,tabs.Font).Width+20),"All workspace headers including Play retain readable width");
+            Check(tabs.TabPages.Cast<TabPage>().Select(page=>page.Text).SequenceEqual(new[]{"Home","Emulators","Library","Play","Web","Settings"}),"Six workspaces preserve page order and append Settings");
+            var rail = (FlowLayoutPanel)typeof(MainForm).GetField("dashboardRail", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
+            Check(((FishBowlTabs)tabs).HideWorkspaceHeaders && tabs.TabPages.Cast<TabPage>().All(page => rail.Controls.OfType<Button>().Any(button => button.AccessibleName == page.Text && button.Width >= TextRenderer.MeasureText(page.Text, button.Font).Width)), "The dashboard rail exposes readable labels for all workspaces");
             var home = (HomeSurface)typeof(MainForm).GetField("homeSurface", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
             for (int i = 0; i < 60; i++)
             {
