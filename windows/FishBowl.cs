@@ -539,6 +539,16 @@ namespace EmulatorHub
 				AutoSize = true,
 				Location = new Point(86, 43)
 			});
+            var shellCommands = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false };
+            shellCommands.Controls.Add(ExperienceUi.Button("Search FishBowl", OpenCommandSearch));
+            shellCommands.Controls.Add(ExperienceUi.Button("Settings", ShowSettings));
+            panel2.Controls.Add(shellCommands);
+            panel2.Layout += delegate
+            {
+                int textRight = panel2.Controls.OfType<Label>().Max(label => label.Right);
+                bool show = panel2.ClientSize.Width >= textRight + shellCommands.GetPreferredSize(Size.Empty).Width + 24;
+                if (shellCommands.Visible != show) shellCommands.Visible = show;
+            };
 			tableLayoutPanel2.Controls.Add(panel2, 0, 1);
 			primaryToolbar = BuildPrimaryActions();
 			int num = ((library.Theme.ListDensity == "Compact") ? 40 : ((library.Theme.ListDensity == "Comfortable") ? 56 : 48));
@@ -11071,8 +11081,7 @@ namespace EmulatorHub
 		private void ApplyLazyArtwork()
 		{
 			UpdateDetailPane();
-			games.TileSize = new Size(Math.Max(130, library.Experience.ArtworkSize + 24), library.Experience.ArtworkSize + ((library.Cosmetics != null && library.Cosmetics.LibrarySpacing == "Compact") ? 32 : 55));
-			games.View = ((!artworkView) ? View.Details : View.LargeIcon);
+			games.View = artworkView ? View.Tile : View.Details;
 			ApplyHubSpacing();
 			int num = artworkView ? Math.Max(64, Math.Min(192, library.Experience.ArtworkSize)) : densityHeight;
             games.SmallImageList = artworkView ? densityImages : coverImages;
@@ -11099,32 +11108,57 @@ namespace EmulatorHub
 			LoadVisibleArtwork();
 		}
 
+        private void FitArtworkCards()
+        {
+            if (!artworkView) return;
+            int available = Math.Max(128, games.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 8);
+            int preferred = Math.Max(148, library.Experience.ArtworkSize + 90);
+            int columns = Math.Max(1, Math.Min(3, available / preferred));
+            int width = Math.Max(128, available / columns);
+            var size = new Size(width, Math.Max(games.Font.Height + 28, width * 9 / 16));
+            if (games.TileSize != size) games.TileSize = size;
+        }
+
         internal static void PaintGameCard(ListView list, DrawListViewItemEventArgs e)
         {
-            Rectangle card = Rectangle.Inflate(e.Bounds, -3, -2);
-            if (card.Width < 10 || card.Height < 10) { e.DrawDefault = true; return; }
+            int gap = CosmeticRuntime.Current.LibrarySpacing == "Compact" ? 3 : 7;
+            Rectangle card = Rectangle.Inflate(e.Bounds, -gap, -gap);
+            if (card.Width < 20 || card.Height < 20) { e.DrawDefault = true; return; }
             Color background = e.Item.Selected ? CosmeticRuntime.Selection : FishBowlPalette.ThemeSurface;
-            using (var fill = new SolidBrush(background))
-            using (var outline = new Pen(e.Item.Selected ? FishBowlPalette.IconAccent : FishBowlHighlights.Blend(background, 28)))
-            using (var shape = FishBowlVisuals.Round(card, 6f))
+            int radius = CosmeticRuntime.Current.ArtworkFrame == "Rounded" ? 16 : 8;
+            using (var shape = FishBowlVisuals.Round(card, radius))
             {
-                e.Graphics.FillPath(fill, shape);
-                e.Graphics.DrawPath(outline, shape);
+                GraphicsState state = e.Graphics.Save();
+                try
+                {
+                    e.Graphics.SetClip(shape, CombineMode.Intersect);
+                    using (var fill = new SolidBrush(background)) e.Graphics.FillRectangle(fill, card);
+                    ImageList images = list.LargeImageList;
+                    if (images != null && e.Item.ImageIndex > 0 && e.Item.ImageIndex < images.Images.Count)
+                    {
+                        using (Image cover = images.Images[e.Item.ImageIndex])
+                        {
+                            float cropHeight = Math.Min(cover.Height, cover.Width * (float)card.Height / card.Width);
+                            var source = new RectangleF(0, (cover.Height - cropHeight) / 2, cover.Width, cropHeight);
+                            e.Graphics.DrawImage(cover, card, source, GraphicsUnit.Pixel);
+                        }
+                    }
+                    using (var fade = new LinearGradientBrush(card, Color.FromArgb(20, Color.Black),
+                        Color.FromArgb(226, Color.Black), LinearGradientMode.Vertical))
+                        e.Graphics.FillRectangle(fade, card);
+
+                    var title = new Rectangle(card.Left + 12, card.Bottom - list.Font.Height - 12,
+                        Math.Max(1, card.Width - 24), list.Font.Height + 4);
+                    FishBowlText.DrawText(e.Graphics, e.Item.Text, list.Font, title, Color.White,
+                        TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                }
+                finally { e.Graphics.Restore(state); }
+                using (var outline = new Pen(e.Item.Selected ? CosmeticRuntime.Focus(background) :
+                    FishBowlHighlights.Blend(background, 28), e.Item.Selected ? 2f : 1f))
+                    e.Graphics.DrawPath(outline, shape);
             }
-            Rectangle label = new Rectangle(card.Left + 6, card.Bottom - list.Font.Height - 5,
-                Math.Max(1, card.Width - 12), list.Font.Height + 2);
-            ImageList images = list.LargeImageList;
-            if (images != null && e.Item.ImageIndex >= 0 && e.Item.ImageIndex < images.Images.Count)
-            {
-                int size = Math.Min(images.ImageSize.Width, Math.Min(card.Width - 12, label.Top - card.Top - 8));
-                if (size > 0)
-                    images.Draw(e.Graphics, card.Left + (card.Width - size) / 2, card.Top + 4, size, size, e.Item.ImageIndex);
-            }
-            FishBowlText.DrawText(e.Graphics, e.Item.Text, list.Font, label,
-                FishBowlPalette.EnsureReadable(list.ForeColor, background),
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
-                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            if (e.Item.Focused && list.Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(card, -2, -2));
+            if (e.Item.Focused && list.Focused)
+                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(card, -3, -3));
         }
 
 		public static Bitmap MakeThumbnail(string path, string title, int size)
@@ -11336,12 +11370,7 @@ namespace EmulatorHub
 				}
 				densityHeight = num2;
 			}
-			if (artworkView && games.IsHandleCreated)
-			{
-				int num3 = Math.Max(110, library.Experience.ArtworkSize + 32);
-				int num4 = library.Experience.ArtworkSize + ((library.Cosmetics != null && library.Cosmetics.LibrarySpacing == "Compact") ? 38 : 65);
-				SendMessage(games.Handle, 4149, IntPtr.Zero, new IntPtr((num4 << 16) | num3));
-			}
+            FitArtworkCards();
 		}
 
 		private void InitializeHubLibrary()
@@ -11423,7 +11452,7 @@ namespace EmulatorHub
                 Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4, 4, 4, 12)
             };
-            summaryPanel.Controls.Add(new Label { Text = "Library summary", AutoSize = true, Font = new Font(Font, FontStyle.Bold) });
+            summaryPanel.Controls.Add(new Label { Text = "Collection", AutoSize = true, Font = new Font(Font, FontStyle.Bold) });
             librarySummary = new Label { AutoSize = true, AccessibleName = "Library summary counts" };
             summaryPanel.Controls.Add(librarySummary);
             AddButton(summaryPanel, "Scan folders", SyncFolders);
@@ -15967,7 +15996,7 @@ namespace EmulatorHub
 			{
 				if (Alignment == TabAlignment.Left)
                 {
-                    int railWidth = Math.Max(104, TabPages.Cast<TabPage>().Select(page => TextRenderer.MeasureText(page.Text, Font).Width + 26).DefaultIfEmpty(104).Max());
+                    int railWidth = Math.Max(104, TabPages.Cast<TabPage>().Select(page => TextRenderer.MeasureText(page.Text, Font).Width + 50).DefaultIfEmpty(128).Max());
                     var railSize = new Size(Math.Max(44, Font.Height + 18), railWidth);
                     if (ItemSize != railSize) ItemSize = railSize;
                     return;
@@ -16077,6 +16106,16 @@ namespace EmulatorHub
 					}
 				}
 				int num = rectangle.Left + 8;
+                if (Alignment == TabAlignment.Left && PreferredColumns == 5)
+                {
+                    string[] icons = { "home", "settings", "library", "play", "link" };
+                    if (i < icons.Length)
+                    {
+                        using (Image icon = FishBowlVisuals.Icon(icons[i], 16, HeaderTextColor, AccentColor))
+                            e.Graphics.DrawImage(icon, new Rectangle(num, rectangle.Top + (rectangle.Height - 16) / 2, 16, 16));
+                        num += 22;
+                    }
+                }
 				if (base.ImageList != null && tabPage.ImageIndex >= 0 && tabPage.ImageIndex < base.ImageList.Images.Count)
 				{
 					e.Graphics.DrawImage(base.ImageList.Images[tabPage.ImageIndex], new Rectangle(num, rectangle.Top + (rectangle.Height - 18) / 2, 18, 18));
@@ -16644,7 +16683,7 @@ namespace EmulatorHub
 				};
 				list.DrawItem += delegate(object sender, DrawListViewItemEventArgs e)
 				{
-                    if (list.Name == "FishBowlLibraryGames" && list.View == View.LargeIcon && !SystemInformation.HighContrast)
+                    if (list.Name == "FishBowlLibraryGames" && list.View == View.Tile && !SystemInformation.HighContrast)
                         GameLibraryDialog.PaintGameCard(list, e);
                     else
                         e.DrawDefault = list.View != View.Details || list.CheckBoxes || list.SmallImageList != null;
@@ -33915,6 +33954,7 @@ namespace EmulatorHub
 		{
 
 			new ThemeColors("FishBowl Water", Color.FromArgb(250, 247, 255), Color.FromArgb(5, 31, 78), Color.FromArgb(3, 13, 38), Color.FromArgb(12, 59, 122), Color.FromArgb(224, 217, 233)),
+			new ThemeColors("Gallery Night", Color.FromArgb(245, 240, 255), Color.FromArgb(38, 31, 55), Color.FromArgb(21, 19, 31), Color.FromArgb(33, 29, 47), Color.FromArgb(190, 179, 207)),
 			new ThemeColors("Library Graphite", Color.FromArgb(241, 241, 245), Color.FromArgb(45, 45, 48), Color.FromArgb(30, 30, 32), Color.FromArgb(34, 34, 36), Color.FromArgb(167, 167, 178)),
 			new ThemeColors("Aquarium Ocean", Color.FromArgb(241, 247, 255), Color.FromArgb(14, 26, 43), Color.FromArgb(9, 21, 29), Color.FromArgb(16, 36, 47), Color.FromArgb(160, 184, 195)),
 			new ThemeColors("Aquarium Midnight", Color.FromArgb(241, 247, 255), Color.FromArgb(20, 22, 37), Color.FromArgb(12, 14, 22), Color.FromArgb(22, 30, 43), Color.FromArgb(160, 184, 195)),

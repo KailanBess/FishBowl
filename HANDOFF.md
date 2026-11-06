@@ -109,3 +109,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - **2026-11-06 (Windows session fixture):** hold the generated child process until the test verifies tracking beyond the launcher grace period. Release it explicitly and check that the session finishes. Session tracking code and shared schema are unchanged.
 
 - **2026-11-06 (1.29.6 release):** prepare matching Windows app/installer and Linux package versions for the reviewed library redesign. Linux behavior and the shared library format are preserved. Release packaging runs the existing Windows and Linux checks before publishing.
+
+- **2026-11-06 (Windows artwork shell):** added shared Search and Settings shortcuts and icon navigation to the Windows workspaces. The Library artwork view now uses responsive landscape cards with a title overlay and the existing collection and selection panel. Gallery Night is available in the theme picker. Saved views, artwork size, density, navigation and emulation actions are retained. The right panel uses local collection data. Linux sources and the shared library schema are unchanged.
