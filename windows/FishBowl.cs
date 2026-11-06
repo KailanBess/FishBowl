@@ -9792,11 +9792,16 @@ namespace EmulatorHub
 				Height = 58,
 				BackColor = Color.FromArgb(47, 48, 56),
 				Padding = new Padding(14, 8, 14, 6),
-				WrapContents = false,
+				WrapContents = true,
 				AutoScroll = false
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
 			BuildCompactActions(flowLayoutPanel);
+            flowLayoutPanel.Layout += delegate
+            {
+                int height = Math.Max(48, flowLayoutPanel.GetPreferredSize(new Size(flowLayoutPanel.ClientSize.Width, 0)).Height);
+                if (flowLayoutPanel.Height != height) flowLayoutPanel.Height = height;
+            };
             AddButton(flowLayoutPanel, "Platforms", delegate {
                 var platforms = library.Games.GroupBy(g => ConsoleName(g)).ToDictionary(g => g.Key, g => g.Count());
                 using (var gallery = new ReferencePlatformGallery(platforms, delegate(string platform) {
