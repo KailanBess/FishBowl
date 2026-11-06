@@ -495,7 +495,7 @@ namespace EmulatorHub
 			TableLayoutPanel tableLayoutPanel2 = tableLayoutPanel;
 			tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
-			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, library.Theme.ShowBanner ? 76 : 0));
+			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, library.Theme.ShowBanner ? 36 : 0));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, 0f));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, library.Theme.ShowStatusBar ? 58 : 0));
@@ -523,22 +523,19 @@ namespace EmulatorHub
 			};
 			panel2.Name = "FishBowlHeader";
 			panel2.Controls.Add(pictureBox2);
-			panel2.Controls.Add(new Label
-			{
-				Text = "FishBowl",
-				ForeColor = ink,
-				Font = new Font(DisplayFont, 18f, FontStyle.Bold),
-				AutoSize = true,
-				Location = new Point(84, 8)
-			});
-			panel2.Controls.Add(new Label
-			{
-				Text = "Your emulators, games and saves, organized together.",
-				ForeColor = subtle,
-				Font = new Font(DisplayFont, 9f),
-				AutoSize = true,
-				Location = new Point(86, 43)
-			});
+            panel2.Controls.Add(new Label
+            {
+                Text = "FishBowl",
+                ForeColor = ink,
+                Font = new Font(DisplayFont, 11f, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(44, 8)
+            });
+            panel2.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                using (var border = new Pen(FishBowlHighlights.Blend(panel2.BackColor, 28)))
+                    e.Graphics.DrawLine(border, 0, panel2.Height - 1, panel2.Width, panel2.Height - 1);
+            };
 			tableLayoutPanel2.Controls.Add(panel2, 0, 1);
 			primaryToolbar = BuildPrimaryActions();
 			int num = ((library.Theme.ListDensity == "Compact") ? 40 : ((library.Theme.ListDensity == "Comfortable") ? 56 : 48));
@@ -4787,8 +4784,8 @@ namespace EmulatorHub
         private FlowLayoutPanel dashboardRail;
         private FlowLayoutPanel dashboardCommands;
         private bool dashboardMenuOpen;
-        private bool dashboardToolsOpen;
         private Button dashboardLibraryTools;
+        private Label dashboardSectionTitle;
         private void BuildDashboardShell(AquariumFrame workspace)
         {
             dashboardRail = new FlowLayoutPanel
@@ -4808,6 +4805,7 @@ namespace EmulatorHub
                 }).Tag = destination;
             }
             AddDashboardDestination("⚙", "Settings", ShowSettings);
+            AddDashboardDestination("⌕", "Search", OpenCommandSearch);
             AddDashboardDestination("⋯", "Menu", delegate
             {
                 dashboardMenuOpen = !dashboardMenuOpen;
@@ -4820,13 +4818,13 @@ namespace EmulatorHub
                 WrapContents = true, Padding = new Padding(12, 4, 8, 4),
                 AccessibleName = "FishBowl workspace commands", Tag = "FishBowl wrapped toolbar"
             };
-            dashboardCommands.Controls.Add(ExperienceUi.Button("Search commands", OpenCommandSearch));
-            dashboardLibraryTools = ExperienceUi.Button("Filters and actions", delegate
+            dashboardSectionTitle = new Label
             {
-                dashboardToolsOpen = !dashboardToolsOpen;
-                ApplyDashboardShell();
-            });
-            dashboardCommands.Controls.Add(dashboardLibraryTools);
+                AutoSize = true, Font = new Font(DisplayFont, 15f, FontStyle.Bold),
+                Margin = new Padding(6, 8, 4, 8)
+            };
+            dashboardCommands.Controls.Add(dashboardSectionTitle);
+            dashboardLibraryTools = embeddedLibrary.BuildDashboardHeader();
             workspace.Controls.Add(dashboardCommands);
             workspace.Controls.Add(dashboardRail);
         }
@@ -4849,9 +4847,10 @@ namespace EmulatorHub
             if (dashboardRail == null || workspaceShell == null) return;
             bool visible = !fullScreen || (workspaceNavigation.SelectedIndex != 3 && workspaceNavigation.SelectedIndex != 4);
             ((FishBowlTabs)workspaceNavigation).HideWorkspaceHeaders = true;
-            dashboardRail.Visible = dashboardCommands.Visible = visible;
-            dashboardLibraryTools.Visible = workspaceNavigation.SelectedIndex == 2;
-            if (embeddedLibrary != null) embeddedLibrary.SetDashboardMode(dashboardToolsOpen);
+            dashboardRail.Visible = visible;
+            dashboardCommands.Visible = visible && workspaceNavigation.SelectedIndex != 2;
+            dashboardSectionTitle.Text = workspaceNavigation.SelectedTab == null ? "" : workspaceNavigation.SelectedTab.Text;
+            dashboardSectionTitle.ForeColor = FishBowlPalette.ThemeInk;
             workspaceShell.RowStyles[0].Height = visible && dashboardMenuOpen ? 28 : 0;
             dashboardRail.BackColor = FishBowlPalette.ThemeBottom;
             dashboardCommands.BackColor = FishBowlPalette.ThemeTop;
@@ -4875,7 +4874,7 @@ namespace EmulatorHub
             dashboardRail.SuspendLayout();
             try
             {
-                dashboardRail.Width = width + dashboardRail.Padding.Horizontal + SystemInformation.VerticalScrollBarWidth;
+                dashboardRail.Width = width + dashboardRail.Padding.Horizontal + SystemInformation.VerticalScrollBarWidth + 8;
                 foreach (Button button in buttons)
                 {
                     button.MinimumSize = Size.Empty;
@@ -6558,17 +6557,13 @@ namespace EmulatorHub
 			Control control = NextUi.Descendants(this).FirstOrDefault((Control c) => c.Name == "FishBowlHeader");
 			if (control != null)
 			{
-				Label title = control.Controls.OfType<Label>().FirstOrDefault((Label c) => c.Text == "FishBowl");
-				Label label = control.Controls.OfType<Label>().FirstOrDefault((Label c) => c != title);
-				PictureBox pictureBox = control.Controls.OfType<PictureBox>().FirstOrDefault();
-				if (title != null && label != null)
-				{
-					if (pictureBox != null) pictureBox.Size = new Size(ControlDensityTools.Choose(44, 60, 68), ControlDensityTools.Choose(44, 60, 68));
-                    int num = ((pictureBox == null) ? 64 : (pictureBox.Right + ControlDensityTools.Choose(8, 12, 16)));
-					title.Location = new Point(num, 8);
-					label.Location = new Point(num, Math.Max(ControlDensityTools.Choose(31, 43, 48), title.Bottom + 3));
-					workspaceShell.RowStyles[1].Height = (library.Theme.ShowBanner ? Math.Max(Math.Max(ControlDensityTools.Choose(56, 76, 84), label.Bottom + ControlDensityTools.Choose(6, 10, 12)), (pictureBox != null) ? (pictureBox.Bottom + 8) : 0) : 0);
-				}
+                Label title = control.Controls.OfType<Label>().First();
+                PictureBox mark = control.Controls.OfType<PictureBox>().First();
+                int height = Math.Max(36, title.Font.Height + 14);
+                mark.Size = new Size(24, 24);
+                mark.Location = new Point(10, (height - mark.Height) / 2);
+                title.Location = new Point(mark.Right + 8, (height - title.Height) / 2);
+                workspaceShell.RowStyles[1].Height = library.Theme.ShowBanner && !immersivePlayChrome ? height : 0;
 			}
 		}
 	}
@@ -10735,21 +10730,25 @@ namespace EmulatorHub
         private FlowLayoutPanel dashboardLibraryToolbar;
         private bool compactDashboardHeader;
         private Button dashboardViewButton;
+        private Button dashboardFiltersButton;
+        private bool dashboardEmbedded;
 
-        public void SetDashboardMode(bool expanded)
+        public Button BuildDashboardHeader()
         {
-            bool compact = !expanded;
-            if (compactDashboardHeader == compact) return;
-            compactDashboardHeader = compact;
-            if (dashboardViewButton == null)
+            dashboardEmbedded = true;
+            dashboardViewButton = ExperienceUi.Button("List / Grid", ToggleGameView);
+            dashboardViewButton.AccessibleName = "Switch between list and game cards";
+            dashboardFiltersButton = ExperienceUi.Button("Filters", delegate
             {
-                dashboardViewButton = ExperienceUi.Button("List / Grid", ToggleGameView);
-                dashboardViewButton.AccessibleName = "Switch between list and game cards";
-                search.Parent.Controls.Add(dashboardViewButton);
-            }
-            dashboardViewButton.Visible = compact;
-            if (dashboardLibraryToolbar != null) dashboardLibraryToolbar.Visible = !compact;
+                compactDashboardHeader = !compactDashboardHeader;
+                dashboardFiltersButton.AccessibleDescription = compactDashboardHeader ? "Collapsed" : "Expanded";
+                FitLibraryHeader();
+            });
+            search.Parent.Controls.Add(dashboardViewButton);
+            search.Parent.Controls.Add(dashboardFiltersButton);
+            compactDashboardHeader = true;
             FitLibraryHeader();
+            return dashboardFiltersButton;
         }
 
 		private void FitLibraryHeader()
@@ -10774,23 +10773,36 @@ namespace EmulatorHub
 				{
 					return;
 				}
-                list[0].Visible = list[1].Visible = flowLayoutPanel.Visible = !compactDashboardHeader;
-                if (compactDashboardHeader)
+                if (dashboardEmbedded)
                 {
-                    int width = Math.Max(160, panel.ClientSize.Width - 36);
-                    list[0].Visible = true;
-                    list[0].Location = new Point(18, 10);
-                    int top = list[0].Bottom + 8;
+                    var heading = list[0];
+                    list[1].Visible = false;
+                    flowLayoutPanel.Visible = !compactDashboardHeader;
+                    dashboardLibraryToolbar.Visible = !compactDashboardHeader;
+                    heading.Location = new Point(16, 12);
+                    heading.Text = "My Games";
+                    int right = panel.ClientSize.Width - 16;
                     dashboardViewButton.Width = TextRenderer.MeasureText(dashboardViewButton.Text, dashboardViewButton.Font).Width + 26;
-                    dashboardViewButton.Height = Math.Max(34, dashboardViewButton.Font.Height + 12);
-                    dashboardViewButton.Location = new Point(18, top);
-                    scope.Location = new Point(dashboardViewButton.Right + 8, top);
-                    scope.Width = Math.Max(80, Math.Min(170, (width - dashboardViewButton.Width) / 2));
-                    int remainder = width - (scope.Right - 18) - 8;
-                    search.Location = remainder >= 100 ? new Point(scope.Right + 8, top)
-                        : new Point(18, Math.Max(scope.Bottom, dashboardViewButton.Bottom) + 6);
-                    search.Width = Math.Min(330, remainder >= 100 ? remainder : width);
-                    panel.Height = Math.Max(search.Bottom, Math.Max(scope.Bottom, dashboardViewButton.Bottom)) + 12;
+                    dashboardFiltersButton.Width = TextRenderer.MeasureText(dashboardFiltersButton.Text, dashboardFiltersButton.Font).Width + 26;
+                    int rowHeight = Math.Max(34, dashboardViewButton.Font.Height + 12);
+                    dashboardViewButton.Height = dashboardFiltersButton.Height = rowHeight;
+                    search.Width = Math.Max(110, Math.Min(285, panel.ClientSize.Width / 4));
+                    scope.Width = Math.Max(105, Math.Min(165, panel.ClientSize.Width / 6));
+                    int controlWidth = search.Width + scope.Width + dashboardViewButton.Width + dashboardFiltersButton.Width + 24;
+                    int top = right - controlWidth >= heading.Right + 16 ? 10 : heading.Bottom + 8;
+                    search.Location = new Point(right - search.Width, top + (rowHeight - search.Height) / 2);
+                    dashboardViewButton.Location = new Point(search.Left - 8 - dashboardViewButton.Width, top);
+                    scope.Location = new Point(dashboardViewButton.Left - 8 - scope.Width, top + (rowHeight - scope.Height) / 2);
+                    dashboardFiltersButton.Location = new Point(scope.Left - 8 - dashboardFiltersButton.Width, top);
+                    int headerBottom = Math.Max(heading.Bottom, top + rowHeight) + 10;
+                    if (!compactDashboardHeader)
+                    {
+                        flowLayoutPanel.Top = headerBottom;
+                        flowLayoutPanel.Height = Math.Max(48, flowLayoutPanel.GetPreferredSize(
+                            new Size(flowLayoutPanel.ClientSize.Width, 0)).Height);
+                        headerBottom = flowLayoutPanel.Bottom + 8;
+                    }
+                    panel.Height = headerBottom;
                     return;
                 }
 				int num = Math.Max(200, panel.ClientSize.Width - panel.Padding.Horizontal - flowLayoutPanel.Padding.Horizontal - 8);
@@ -11653,8 +11665,9 @@ namespace EmulatorHub
             bool showDetails = library.Cosmetics != null && library.Cosmetics.DetailPreview && SelectedGame() != null;
             detailText.Visible = showDetails;
             detailCover.Visible = showDetails;
-            librarySummary.Text = string.Format("{0:N0} games\n{1:N0} visible\n{2:N0} emulator profiles",
-                library.Games.Count, games.Items.Count, library.Emulators.Count);
+            int missing = games.Items.Cast<ListViewItem>().Count(item => item.SubItems[3].Text == "Missing");
+            librarySummary.Text = string.Format("Games in library  {0:N0}\nShowing  {1:N0}\nMissing files in view  {2:N0}\nEmulator profiles  {3:N0}",
+                library.Games.Count, games.Items.Count, missing, library.Emulators.Count);
 			GameEntry gameEntry = SelectedGame();
 			string text = ((gameEntry == null) ? "" : (gameEntry.Id + "|" + gameEntry.Title + "|" + gameEntry.ConsoleLabel + "|" + gameEntry.Genre + "|" + gameEntry.ArtworkPath + "|" + Immersion.ArtworkStamp(gameEntry.ArtworkPath) + "|" + gameEntry.Description));
 			if (text == detailStamp)

@@ -117,3 +117,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - **2026-11-06 (1.29.7 release):** prepare the tested Windows Gallery Night workspace shell with matching installer and Linux package versions. Linux behavior and shared library data are preserved.
 
 - 2026-11-06: Rebuilt the Windows workspace chrome for every theme. The sidebar links to the existing Home, Emulators, Library, Play, Web and Settings features. The Library uses compact game cards with status badges, a search and view strip, and a summary based on the local collection. Existing view and appearance settings are retained. Linux shell remains separate.
+
+- 2026-11-06: Replaced the full-width promotional banner with a compact optional brand strip and moved Library search, scope, list/grid and filters into the Library heading. Other workspaces use a single shared section heading. The Library and native Play/Web controls retain their existing behavior.
