@@ -4858,13 +4858,31 @@ namespace EmulatorHub
             foreach (Button button in dashboardRail.Controls.OfType<Button>())
             {
                 bool active = button.Tag == workspaceNavigation.SelectedTab;
-                button.Height = Math.Max(61, button.Font.Height * 2 + 10);
+
                 button.BackColor = active ? CosmeticRuntime.Selection : FishBowlPalette.ThemeBottom;
                 button.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, button.BackColor);
                 button.FlatAppearance.BorderSize = active ? 1 : 0;
                 button.FlatAppearance.BorderColor = CosmeticRuntime.Focus(button.BackColor);
                 button.AccessibleDescription = active ? "Current workspace" : "";
             }
+        }
+        private void FitDashboardRail()
+        {
+            if (dashboardRail == null) return;
+            var buttons = dashboardRail.Controls.OfType<Button>().ToArray();
+            int width = buttons.Max(button => Math.Max(80,
+                TextRenderer.MeasureText(button.AccessibleName, button.Font).Width + 18));
+            dashboardRail.SuspendLayout();
+            try
+            {
+                dashboardRail.Width = width + dashboardRail.Padding.Horizontal + SystemInformation.VerticalScrollBarWidth;
+                foreach (Button button in buttons)
+                {
+                    button.MinimumSize = Size.Empty;
+                    button.Size = new Size(width, Math.Max(61, button.Font.Height * 2 + 10));
+                }
+            }
+            finally { dashboardRail.ResumeLayout(true); }
         }
         internal void OpenWeb(string url)
         {
@@ -5872,6 +5890,7 @@ namespace EmulatorHub
 			FishBowlHighlights.ReducedMotion = library.Enhancements.ReducedMotion;
 			FluidStyle.Configure(library);
             ControlDensityTools.Apply(this);
+            FitDashboardRail();
 			UpdateFluidHeader();
             if (embeddedLibrary != null) embeddedLibrary.FitEmbeddedViewport();
 			if (homeSurface != null)
