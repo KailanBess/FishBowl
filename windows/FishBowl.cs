@@ -11618,7 +11618,7 @@ namespace EmulatorHub
             summaryPanel.Layout += delegate
             {
                 int available = Math.Max(1, summaryPanel.ClientSize.Width - summaryPanel.Padding.Horizontal - scanButton.Margin.Horizontal);
-                scanButton.MaximumSize = new Size(available, 0);
+                scanButton.MaximumSize = new Size(Math.Min(available, detailPane.Width - detailPane.Padding.Horizontal - summaryPanel.Padding.Horizontal - scanButton.Margin.Horizontal), 0);
             };
             detailPane.Controls.Add(summaryPanel);
 			Panel panel = new Panel();
@@ -11666,7 +11666,7 @@ namespace EmulatorHub
             detailText.Visible = showDetails;
             detailCover.Visible = showDetails;
             int missing = games.Items.Cast<ListViewItem>().Count(item => item.SubItems[3].Text == "Missing");
-            librarySummary.Text = string.Format("Games in library  {0:N0}\nShowing  {1:N0}\nMissing files in view  {2:N0}\nEmulator profiles  {3:N0}",
+            librarySummary.Text = string.Format("Games  {0:N0}\nShowing  {1:N0}\nMissing files  {2:N0}\nEmulators  {3:N0}",
                 library.Games.Count, games.Items.Count, missing, library.Emulators.Count);
 			GameEntry gameEntry = SelectedGame();
 			string text = ((gameEntry == null) ? "" : (gameEntry.Id + "|" + gameEntry.Title + "|" + gameEntry.ConsoleLabel + "|" + gameEntry.Genre + "|" + gameEntry.ArtworkPath + "|" + Immersion.ArtworkStamp(gameEntry.ArtworkPath) + "|" + gameEntry.Description));
