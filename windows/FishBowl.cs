@@ -9796,6 +9796,7 @@ namespace EmulatorHub
 				AutoScroll = false
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
+			flowLayoutPanel.Tag = "FishBowl wrapped toolbar";
 			BuildCompactActions(flowLayoutPanel);
             flowLayoutPanel.Layout += delegate
             {
@@ -26796,7 +26797,7 @@ namespace EmulatorHub
 
 		public static void Responsive(FlowLayoutPanel bar)
 		{
-			if (bar.Tag as string== "FishBowl overflow")
+			if (bar.Tag as string == "FishBowl overflow" || bar.Tag as string == "FishBowl wrapped toolbar")
 			{
 				return;
 			}
