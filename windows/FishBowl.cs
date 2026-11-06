@@ -23324,12 +23324,12 @@ namespace EmulatorHub
             int preview = content.Any(item => !(item is Label)) ? 3 : 1;
             var extras = content.Skip(preview).ToArray();
             if (extras.Length == 0) return;
-            var toggle = ExperienceUi.Button("Show all (" + content.Length + ")", delegate { });
+            var toggle = ExperienceUi.Button("All (" + content.Length + ")", delegate { });
             toggle.AccessibleName = card.AccessibleName + " expand or collapse";
             Action apply = delegate {
                 bool expanded = expandedCards.Contains(card.AccessibleName);
                 foreach (var item in extras) { item.Visible = expanded; if (expanded) collapsedRows.Remove(item); else collapsedRows.Add(item); }
-                toggle.Text = expanded ? "Show less" : "Show all (" + content.Length + ")";
+                toggle.Text = expanded ? "Show less" : "All (" + content.Length + ")";
                 LayoutCards();
             };
             toggle.Click += delegate {
