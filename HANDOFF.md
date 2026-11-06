@@ -101,3 +101,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 
 
 2026-11-05 (Windows, #47): Play offers More > Focus game. Owned renderers receive a native foreground activation request and child renderers use the correct input queue. Hidden and detached viewports refuse focus. Eden keyboard and controller acceptance remains manual.
+
+- **2026-11-06 (Windows library layout):** moved workspace navigation to a left rail and added a wide-window Library summary with live game, filter and emulator counts and the existing folder scan action. The Library toolbar exposes the existing list/artwork switch. Saved views, launch routing, customization and the shared library format are preserved. Native Eden input remains a separate verification item.
