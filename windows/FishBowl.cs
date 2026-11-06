@@ -9802,13 +9802,6 @@ namespace EmulatorHub
                 int height = Math.Max(48, flowLayoutPanel.GetPreferredSize(new Size(flowLayoutPanel.ClientSize.Width, 0)).Height);
                 if (flowLayoutPanel.Height != height) flowLayoutPanel.Height = height;
             };
-            AddButton(flowLayoutPanel, "Platforms", delegate {
-                var platforms = library.Games.GroupBy(g => ConsoleName(g)).ToDictionary(g => g.Key, g => g.Count());
-                using (var gallery = new ReferencePlatformGallery(platforms, delegate(string platform) {
-                    consoleChoice.SelectedItem = platform; artworkView = true;
-                    library.Experience.LibraryView = "Artwork"; RefreshGames(); Store.Save(library);
-                })) gallery.ShowDialog(this);
-            });
 			base.Controls.Add(flowLayoutPanel);
 			games.Dock = DockStyle.Fill;
 			games.View = View.Details;
@@ -10541,6 +10534,13 @@ namespace EmulatorHub
 			{
                 GroupAction(menu, "Platform setup…", ShowPlatformSetup, false);
 				GroupAction(menu, "List / artwork view", ToggleGameView);
+                GroupAction(menu, "Platforms", delegate {
+                var platforms = library.Games.GroupBy(g => ConsoleName(g)).ToDictionary(g => g.Key, g => g.Count());
+                using (var gallery = new ReferencePlatformGallery(platforms, delegate(string platform) {
+                    consoleChoice.SelectedItem = platform; artworkView = true;
+                    library.Experience.LibraryView = "Artwork"; RefreshGames(); Store.Save(library);
+                })) gallery.ShowDialog(this);
+                });
 				GroupAction(menu, "Game setup and media...", delegate { WindowsGameTools.Open(this, library, SelectedGame(), ReloadLibrary); }, true);
                 GroupAction(menu, "PC imports and play history...", delegate { WindowsGameTools.OpenLibrary(this, library, ReloadLibrary); });
                 GroupAction(menu, "Integrations...", delegate { IntegrationTools.Open(this, library, ReloadLibrary); });
