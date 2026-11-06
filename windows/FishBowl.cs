@@ -539,16 +539,6 @@ namespace EmulatorHub
 				AutoSize = true,
 				Location = new Point(86, 43)
 			});
-            var shellCommands = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false };
-            shellCommands.Controls.Add(ExperienceUi.Button("Search FishBowl", OpenCommandSearch));
-            shellCommands.Controls.Add(ExperienceUi.Button("Settings", ShowSettings));
-            panel2.Controls.Add(shellCommands);
-            panel2.Layout += delegate
-            {
-                int textRight = panel2.Controls.OfType<Label>().Max(label => label.Right);
-                bool show = panel2.ClientSize.Width >= textRight + shellCommands.GetPreferredSize(Size.Empty).Width + 24;
-                if (shellCommands.Visible != show) shellCommands.Visible = show;
-            };
 			tableLayoutPanel2.Controls.Add(panel2, 0, 1);
 			primaryToolbar = BuildPrimaryActions();
 			int num = ((library.Theme.ListDensity == "Compact") ? 40 : ((library.Theme.ListDensity == "Comfortable") ? 56 : 48));
@@ -3729,6 +3719,7 @@ namespace EmulatorHub
 			ColorHarmony.Configure(library.Theme.ColorHarmony, CosmeticRuntime.Current.CustomPalette, library.Theme.Name, pink);
 			FishBowlPalette.Configure(ink, top, bottom, surface, subtle, blue, pink);
 			FishBowlBranding.Configure(library.Theme.AppIconColor, blue, pink);
+            ApplyGalleryShell();
 		}
 
 		private void ApplyVisualScale()
@@ -4787,8 +4778,102 @@ namespace EmulatorHub
 					EndWorkspaceTransition();
 				}
 			};
-			return new AquariumFrame(workspaceNavigation);
+            var workspace = new AquariumFrame(workspaceNavigation);
+            BuildGalleryShell(workspace);
+            return workspace;
 		}
+
+        private FlowLayoutPanel galleryRail;
+        private FlowLayoutPanel galleryCommands;
+        private bool galleryMenuOpen;
+        private bool galleryToolsOpen;
+        private Button galleryLibraryTools;
+        private float previousMenuHeight;
+        private float previousBannerHeight;
+
+        private void BuildGalleryShell(AquariumFrame workspace)
+        {
+            galleryRail = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Left, Width = 156, FlowDirection = FlowDirection.TopDown,
+                WrapContents = false, AutoScroll = true, Padding = new Padding(12, 16, 8, 8),
+                Visible = false, AccessibleName = "FishBowl workspace rail", Tag = "FishBowl wrapped toolbar"
+            };
+            galleryRail.Controls.Add(new Label
+            {
+                Text = "FishBowl", AutoSize = true, Font = new Font(DisplayFont, 17f, FontStyle.Bold),
+                Margin = new Padding(8, 8, 8, 20)
+            });
+            foreach (TabPage page in workspaceNavigation.TabPages)
+            {
+                TabPage destination = page;
+                string label = page.Text == "Library" ? "My Games" : page.Text;
+                var button = ExperienceUi.Button(label, delegate { workspaceNavigation.SelectedIndex = workspaceNavigation.TabPages.IndexOf(destination); });
+                button.Tag = destination;
+                button.Width = 126;
+                galleryRail.Controls.Add(button);
+            }
+
+            galleryCommands = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Top, Height = 52, WrapContents = false, Padding = new Padding(12, 4, 8, 4),
+                Visible = false, AccessibleName = "FishBowl commands"
+            };
+            galleryCommands.Controls.Add(ExperienceUi.Button("Search", OpenCommandSearch));
+            galleryCommands.Controls.Add(ExperienceUi.Button("Settings", ShowSettings));
+            galleryCommands.Controls.Add(ExperienceUi.Button("Menu", delegate
+            {
+                galleryMenuOpen = !galleryMenuOpen;
+                UpdateWorkspaceChrome();
+            }));
+            galleryLibraryTools = ExperienceUi.Button("Library tools", delegate
+            {
+                galleryToolsOpen = !galleryToolsOpen;
+                ApplyGalleryShell();
+            });
+            galleryCommands.Controls.Add(galleryLibraryTools);
+            workspace.Controls.Add(galleryCommands);
+            workspace.Controls.Add(galleryRail);
+        }
+
+        private void ApplyGalleryShell()
+        {
+            if (galleryRail == null || workspaceShell == null) return;
+            bool gallery = library.Theme.Name == "Gallery Night" && !SystemInformation.HighContrast;
+            var tabs = (FishBowlTabs)workspaceNavigation;
+            bool wasGallery = tabs.GalleryHeaders;
+            tabs.GalleryHeaders = gallery;
+            galleryRail.Visible = gallery;
+            galleryCommands.Visible = gallery;
+            galleryLibraryTools.Visible = gallery && workspaceNavigation.SelectedIndex == 2;
+            if (embeddedLibrary != null) embeddedLibrary.SetGalleryMode(gallery, galleryToolsOpen);
+            if (!gallery)
+            {
+                if (wasGallery)
+                {
+                    workspaceShell.RowStyles[0].Height = previousMenuHeight;
+                    workspaceShell.RowStyles[1].Height = library.Theme.ShowBanner ? previousBannerHeight : 0;
+                }
+                return;
+            }
+            if (!wasGallery)
+            {
+                previousMenuHeight = workspaceShell.RowStyles[0].Height;
+                previousBannerHeight = workspaceShell.RowStyles[1].Height;
+            }
+            workspaceShell.RowStyles[0].Height = galleryMenuOpen ? Math.Max(28, previousMenuHeight) : 0;
+            workspaceShell.RowStyles[1].Height = 0;
+            galleryRail.BackColor = FishBowlPalette.ThemeBottom;
+            galleryRail.ForeColor = FishBowlPalette.ThemeInk;
+            galleryCommands.BackColor = FishBowlPalette.ThemeTop;
+            foreach (Button button in galleryRail.Controls.OfType<Button>())
+            {
+                bool active = button.Tag == workspaceNavigation.SelectedTab;
+                button.BackColor = active ? CosmeticRuntime.Selection : FishBowlPalette.ThemeBottom;
+                button.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, button.BackColor);
+                button.AccessibleDescription = active ? "Current workspace" : "";
+            }
+        }
 
         internal void OpenWeb(string url)
         {
@@ -4899,6 +4984,7 @@ namespace EmulatorHub
 		{
 			if (workspaceNavigation != null)
 			{
+                ApplyGalleryShell();
 				bool flag = workspaceNavigation.SelectedIndex == 1;
 				if (primaryToolbar != null)
 				{
@@ -9807,6 +9893,7 @@ namespace EmulatorHub
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
 			flowLayoutPanel.Tag = "FishBowl wrapped toolbar";
+            galleryLibraryToolbar = flowLayoutPanel;
 			BuildCompactActions(flowLayoutPanel);
             flowLayoutPanel.Layout += delegate
             {
@@ -10635,6 +10722,18 @@ namespace EmulatorHub
             } finally { fittingEmbeddedViewport = false; }
         }
 
+        private FlowLayoutPanel galleryLibraryToolbar;
+        private bool galleryCompactLibrary;
+
+        public void SetGalleryMode(bool enabled, bool expanded)
+        {
+            bool compact = enabled && !expanded;
+            if (galleryCompactLibrary == compact) return;
+            galleryCompactLibrary = compact;
+            if (galleryLibraryToolbar != null) galleryLibraryToolbar.Visible = !compact;
+            FitLibraryHeader();
+        }
+
 		private void FitLibraryHeader()
 		{
 			if (fittingHeader || search.Parent == null)
@@ -10657,6 +10756,17 @@ namespace EmulatorHub
 				{
 					return;
 				}
+                list[0].Visible = list[1].Visible = flowLayoutPanel.Visible = !galleryCompactLibrary;
+                if (galleryCompactLibrary)
+                {
+                    int width = Math.Max(160, panel.ClientSize.Width - 36);
+                    search.Location = new Point(18, 10);
+                    search.Width = Math.Max(80, Math.Min(360, width * 2 / 3 - 12));
+                    scope.Location = new Point(search.Right + 10, 10);
+                    scope.Width = Math.Max(65, Math.Min(170, width - search.Width - 10));
+                    panel.Height = Math.Max(search.Bottom, scope.Bottom) + 12;
+                    return;
+                }
 				int num = Math.Max(200, panel.ClientSize.Width - panel.Padding.Horizontal - flowLayoutPanel.Padding.Horizontal - 8);
 				foreach (ComboBox item in flowLayoutPanel.Controls.OfType<ComboBox>())
 				{
@@ -15924,6 +16034,19 @@ namespace EmulatorHub
 
 		private bool nativeHeaders;
 
+        private bool galleryHeaders;
+        public bool GalleryHeaders
+        {
+            get { return galleryHeaders; }
+            set
+            {
+                if (galleryHeaders == value) return;
+                galleryHeaders = value;
+                FitTabs();
+                Invalidate();
+            }
+        }
+
 		private bool fittingTabs;
 
 		public bool LegacyHeaders
@@ -15994,6 +16117,12 @@ namespace EmulatorHub
 			fittingTabs = true;
 			try
 			{
+                if (galleryHeaders)
+                {
+                    var hiddenSize = new Size(1, 1);
+                    if (ItemSize != hiddenSize) ItemSize = hiddenSize;
+                    return;
+                }
 				if (Alignment == TabAlignment.Left)
                 {
                     int railWidth = Math.Max(104, TabPages.Cast<TabPage>().Select(page => TextRenderer.MeasureText(page.Text, Font).Width + 50).DefaultIfEmpty(128).Max());
@@ -16081,6 +16210,7 @@ namespace EmulatorHub
 				e.Graphics.FillRectangle(brush, base.ClientRectangle);
 				e.Graphics.Restore(gstate);
 			}
+            if (galleryHeaders) return;
 			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 			for (int i = 0; i < base.TabPages.Count; i++)
 			{
