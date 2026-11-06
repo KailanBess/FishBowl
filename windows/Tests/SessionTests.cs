@@ -120,7 +120,7 @@ class SessionTests
             string childSource = Path.Combine(directory, "Child.cs");
             string launcher = Path.Combine(directory, "Launcher.exe");
             string launcherSource = Path.Combine(directory, "Launcher.cs");
-            File.WriteAllText(childSource, "class Child { static void Main(){string release=System.Reflection.Assembly.GetExecutingAssembly().Location+\\".release\\";var clock=System.Diagnostics.Stopwatch.StartNew();while(!System.IO.File.Exists(release)&&clock.Elapsed.TotalSeconds<30)System.Threading.Thread.Sleep(25);} }");
+            File.WriteAllText(childSource, "class Child { static void Main(){string release=System.Reflection.Assembly.GetExecutingAssembly().Location+\".release\";var clock=System.Diagnostics.Stopwatch.StartNew();while(!System.IO.File.Exists(release)&&clock.Elapsed.TotalSeconds<30)System.Threading.Thread.Sleep(25);} }");
             File.WriteAllText(launcherSource, "using System.Diagnostics;class Launcher {static void Main(string[] args){Process.Start(new ProcessStartInfo{FileName=args[0],UseShellExecute=false,CreateNoWindow=true});System.Threading.Thread.Sleep(100);}}");
             string compiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe");
             foreach (string source in new[] { childSource, launcherSource })
@@ -137,15 +137,18 @@ class SessionTests
             using (var tracker = SessionLedger.Start(directory, session, process, before))
             {
                 var clock = Stopwatch.StartNew();
+                TimeSpan? launcherExitObserved = null;
                 try
                 {
                     while (!tracker.Finished && clock.Elapsed.TotalSeconds < 12)
                     {
                         tracker.Poll();
-                        if (process.HasExited && tracker.Seconds >= 2) break;
+                        if (process.HasExited && !launcherExitObserved.HasValue) launcherExitObserved = clock.Elapsed;
+                        if (launcherExitObserved.HasValue && clock.Elapsed - launcherExitObserved.Value >= TimeSpan.FromSeconds(3)) break;
                         System.Threading.Thread.Sleep(50);
                     }
-                    Check(process.HasExited && !tracker.Finished && tracker.Seconds >= 2,
+                    Check(launcherExitObserved.HasValue && clock.Elapsed - launcherExitObserved.Value >= TimeSpan.FromSeconds(3) &&
+                        !tracker.Finished && tracker.Seconds >= 2,
                         "actual launcher exits while verified child remains tracked");
                 }
                 finally { File.WriteAllText(child + ".release", "exit"); }
