@@ -10489,10 +10489,10 @@ namespace EmulatorHub
 		{
 			AddButton(bar, "Add game", AddGame);
 			AddButton(bar, "Launch", LaunchGame);
+			AddButton(bar, "Details", ShowDetails);
 			AddButton(bar, "Remove game", RemoveGames);
 			AddActionGroup(bar, "Game actions", delegate(ContextMenuStrip menu)
 			{
-				GroupAction(menu, "Details", ShowDetails, true);
 				GroupAction(menu, "Edit game", EditGame, true);
                 GroupAction(menu, "Per-game launch and controller profile", delegate { WindowsGameTools.Setup(this, library, SelectedGame(), ReloadLibrary); }, true);
                 GroupAction(menu, "Choose local cover art", ChooseLocalCover, true);
