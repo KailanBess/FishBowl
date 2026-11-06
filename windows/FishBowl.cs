@@ -9797,7 +9797,6 @@ namespace EmulatorHub
 			};
 			flowLayoutPanel.Name = "FishBowlToolbar";
 			BuildCompactActions(flowLayoutPanel);
-            AddButton(flowLayoutPanel, "List / cards", ToggleGameView);
             AddButton(flowLayoutPanel, "Platforms", delegate {
                 var platforms = library.Games.GroupBy(g => ConsoleName(g)).ToDictionary(g => g.Key, g => g.Count());
                 using (var gallery = new ReferencePlatformGallery(platforms, delegate(string platform) {
