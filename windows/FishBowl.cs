@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.7.0")]
+[assembly: AssemblyFileVersion("1.29.8.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.7.0")]
+[assembly: AssemblyVersion("1.29.8.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.7";
+		private const string FishBowlVersion = "1.29.8";
 
-		private const string FishBowlTitleVersion = "1.29.7";
+		private const string FishBowlTitleVersion = "1.29.8";
 
 		private Icon ownedAppIcon;
 
@@ -320,7 +320,7 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.29.7";
+			Text = "FishBowl 1.29.8";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -406,11 +406,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.7" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.8" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.7";
+						library.Theme.LastSeenBuild = "1.29.8";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -3410,7 +3410,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.7"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.8"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3418,7 +3418,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.7"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.8"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3426,7 +3426,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.7"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.8"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -11706,7 +11706,7 @@ namespace EmulatorHub
             detailText.Visible = showDetails;
             detailCover.Visible = showDetails;
             int missing = games.Items.Cast<ListViewItem>().Count(item => item.SubItems[3].Text == "Missing");
-            librarySummary.Text = string.Format("Games  {0:N0}\nShowing  {1:N0}\nMissing files  {2:N0}\nEmulators  {3:N0}",
+            librarySummary.Text = string.Format("Games  {0:N0}\nShowing  {1:N0}\nMissing  {2:N0}\nEmulators  {3:N0}",
                 library.Games.Count, games.Items.Count, missing, library.Emulators.Count);
 			GameEntry gameEntry = SelectedGame();
 			string text = ((gameEntry == null) ? "" : (gameEntry.Id + "|" + gameEntry.Title + "|" + gameEntry.ConsoleLabel + "|" + gameEntry.Genre + "|" + gameEntry.ArtworkPath + "|" + Immersion.ArtworkStamp(gameEntry.ArtworkPath) + "|" + gameEntry.Description));

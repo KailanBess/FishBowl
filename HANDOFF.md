@@ -123,3 +123,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - 2026-11-06: Added a Windows Settings workspace with categorized cards, moved Home summary actions into a right column at wider sizes, and gave the Emulators workspace a narrower details inspector. Settings editors, emulator actions, and saved preferences continue to use the existing implementations.
 - Play and Web use the dashboard command strip spacing and a right-hand status inspector on wide windows, with a bottom status line on narrow or fullscreen layouts.
 - Shared Windows detail and settings dialogs based on NextDialog now use a compact title strip and matching workspace surfaces.
+
+- 2026-11-06: Prepared 1.29.8 packaging for the Windows workspace redesign. The compact-density fixture opens Filters before testing the action bar and verifies the My Games heading at each supported text size.

@@ -592,6 +592,7 @@ namespace EmulatorHub
             stage = new MixedStage { Dock = DockStyle.Fill, BackColor = FishBowlPalette.ThemeBottom };
             empty = new Label { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(16), Text = "Your game will appear here. Launch a game from Library or an emulator from Emulators.", ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeBottom };
             stage.Controls.Add(empty);
+            stage.SizeChanged += delegate { empty.MaximumSize = new Size(Math.Max(1, stage.ClientSize.Width), 0); };
             status = new Label { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8), ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeSurface, Text = "Launch a game or emulator to show it here." };
             Controls.Add(stage); Controls.Add(status); Controls.Add(toolbar);
             choice.SelectedIndexChanged += delegate { ShowSelected(); };
@@ -602,7 +603,7 @@ namespace EmulatorHub
         public void SetFullscreen(bool active) { fullScreenActive = active; RefreshStatus(); }
         protected override void OnLayout(LayoutEventArgs e) {
             WorkspaceInspector.Fit(status, ClientSize.Width, fullScreenActive);
-            if (empty != null) empty.MaximumSize = new Size(Math.Max(1, ClientSize.Width), 0);
+            if (empty != null) empty.MaximumSize = new Size(Math.Max(1, stage.ClientSize.Width), 0);
             base.OnLayout(e);
         }
         public bool OpenSelectedInWindow() {
