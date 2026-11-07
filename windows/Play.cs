@@ -560,7 +560,7 @@ namespace EmulatorHub
         {
             library = data; fullscreen = fullScreen;
             Dock = DockStyle.Fill; BackColor = FishBowlPalette.ThemeSurface;
-            var toolbar = ExperienceUi.Bar(); toolbar.Dock = DockStyle.Top;
+            var toolbar = ExperienceUi.Bar(); toolbar.Dock = DockStyle.Top; toolbar.Padding = new Padding(12, 6, 12, 6);
             // This toolbar already owns a More menu and wraps; avoid adding a second overflow menu.
             toolbar.Tag = "FishBowl overflow";
             choice = NextDialog.Choice(new string[0], null); choice.Width = 220; choice.AccessibleName = "Running games";
@@ -592,6 +592,7 @@ namespace EmulatorHub
             stage = new MixedStage { Dock = DockStyle.Fill, BackColor = FishBowlPalette.ThemeBottom };
             empty = new Label { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(16), Text = "Your game will appear here. Launch a game from Library or an emulator from Emulators.", ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeBottom };
             stage.Controls.Add(empty);
+            stage.SizeChanged += delegate { empty.MaximumSize = new Size(Math.Max(1, stage.ClientSize.Width), 0); };
             status = new Label { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8), ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeSurface, Text = "Launch a game or emulator to show it here." };
             Controls.Add(stage); Controls.Add(status); Controls.Add(toolbar);
             choice.SelectedIndexChanged += delegate { ShowSelected(); };
@@ -601,8 +602,8 @@ namespace EmulatorHub
         Session Selected() { return choice.SelectedItem as Session; }
         public void SetFullscreen(bool active) { fullScreenActive = active; RefreshStatus(); }
         protected override void OnLayout(LayoutEventArgs e) {
-            if (status != null) status.MaximumSize = new Size(Math.Max(1, ClientSize.Width), 0);
-            if (empty != null) empty.MaximumSize = new Size(Math.Max(1, ClientSize.Width), 0);
+            WorkspaceInspector.Fit(status, ClientSize.Width, fullScreenActive);
+            if (empty != null) empty.MaximumSize = new Size(Math.Max(1, stage.ClientSize.Width), 0);
             base.OnLayout(e);
         }
         public bool OpenSelectedInWindow() {

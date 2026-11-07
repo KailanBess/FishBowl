@@ -32,7 +32,7 @@ class PlayLaunchTests {
   using(var main=new MainForm(true)){
    main.ShowInTaskbar=false;main.StartPosition=FormStartPosition.Manual;main.Location=new Point(-4500,-4500);main.Show();Pump(150);
    var data=(LibraryData)Field(main,"library");NextData.Ensure(data);data.Emulators.Clear();data.Games.Clear();data.Theme.ConfirmBeforeGameLaunch=false;data.Theme.ConfirmBeforeEmulatorLaunch=false;Immersion.Ensure(data).LaunchPresentation=false;Immersion.Ensure(data).Recap=false;
-   var tabs=(TabControl)Field(main,"workspaceNavigation");Check(tabs.TabCount==5&&tabs.TabPages[3].Text=="Play","actual launch targets the fourth Play workspace");
+   var tabs=(TabControl)Field(main,"workspaceNavigation");Check(tabs.TabCount==6&&tabs.TabPages[3].Text=="Play","actual launch targets the fourth Play workspace");
    var emulator=new EmulatorProfile{Id="launch-fixture",Name="Fixture emulator",Executable=childExe,Arguments="--child",Extensions=new List<string>(),LaunchProfiles=new List<LaunchProfile>()};data.Emulators.Add(emulator);
    typeof(MainForm).GetMethod("OpenEmulator",Private).Invoke(main,new object[]{emulator,"--child","Fixture emulator"});var host=Attached(main);var process=Record(host);IntPtr window=host.GameWindow;Check(tabs.SelectedIndex==3,"OpenEmulator selects Play after starting a native executable");
    string originalPath=childExe;var shortPath=new System.Text.StringBuilder(512);uint shortLength=GetShortPathName(originalPath,shortPath,(uint)shortPath.Capacity);

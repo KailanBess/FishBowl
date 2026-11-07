@@ -51,6 +51,20 @@ internal static class AquariumWorkspace
 }
 
 namespace EmulatorHub {
+ internal static class WorkspaceInspector {
+  internal static void Fit(Label status, int width, bool immersive) {
+   if(status==null)return;
+   bool side=width>=960&&!immersive;
+   status.Dock=side?DockStyle.Right:DockStyle.Bottom;
+   status.AutoSize=!side;
+   status.MaximumSize=new Size(side?0:Math.Max(1,width),0);
+   if(side)status.Width=235;
+   status.Padding=new Padding(14);
+   status.BackColor=FishBowlPalette.ThemeTop;
+   status.ForeColor=FishBowlPalette.ThemeInk;
+  }
+ }
+
  public static class WindowsAppearance {
   public static void Open(IWin32Window owner, LibraryData data, Action refresh, Action fonts, Action cosmetics) {
    using(var dialog=new NextDialog("Appearance and accessibility",760,580)) {

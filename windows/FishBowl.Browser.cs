@@ -87,7 +87,7 @@ namespace EmulatorHub {
   public bool HasRunningBrowser {get{return known.Any(PlayNative.IsAlive);}}
   public BrowserSurface(LibraryData data,Action toggleFullscreen) {
    library=data;fullscreen=toggleFullscreen;Dock=DockStyle.Fill;BackColor=FishBowlPalette.ThemeSurface;
-   var bar=ExperienceUi.Bar();bar.Dock=DockStyle.Top;bar.Tag="FishBowl overflow";
+   var bar=ExperienceUi.Bar();bar.Dock=DockStyle.Top;bar.Padding=new Padding(12,6,12,6);bar.Tag="FishBowl overflow";
    address=new TextBox{Width=330,Text=FishBowlWeb.Settings(library).HomePage,AccessibleName="Web address or search"};
    address.KeyDown+=delegate(object sender,KeyEventArgs e){if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;Navigate(address.Text);}};
    bar.Controls.Add(address);bar.Controls.Add(ExperienceUi.Button("Go",delegate{Navigate(address.Text);}));
@@ -101,7 +101,7 @@ namespace EmulatorHub {
    status=ExperienceUi.Label("Web is ready. No browser runs until you press Go.",80);status.Dock=DockStyle.Bottom;status.AutoSize=true;
    Controls.Add(host);Controls.Add(status);Controls.Add(bar);timer=new Timer{Interval=150};timer.Tick+=Tick;UpdateState();
   }
-  protected override void OnLayout(LayoutEventArgs e){if(status!=null)status.MaximumSize=new Size(Math.Max(1,ClientSize.Width),0);if(empty!=null)empty.MaximumSize=new Size(Math.Max(1,ClientSize.Width),0);base.OnLayout(e);}
+  protected override void OnLayout(LayoutEventArgs e){WorkspaceInspector.Fit(status,ClientSize.Width,fullScreen);if(empty!=null)empty.MaximumSize=new Size(Math.Max(1,ClientSize.Width),0);base.OnLayout(e);}
   public void Navigate(string input) {
    try {
     string url=FishBowlWeb.Address(input);bool running=HasRunningBrowser;

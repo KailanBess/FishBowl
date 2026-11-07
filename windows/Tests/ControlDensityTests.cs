@@ -36,10 +36,11 @@ class ControlDensityTests {
     main.ShowInTaskbar=false;main.MinimumSize=new Size(800,600);main.Size=new Size(1024,720);main.Show();Application.DoEvents();
     ((TabControl)typeof(MainForm).GetField("workspaceNavigation",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main)).SelectedIndex=2;Application.DoEvents();
     var embedded=NextUi.Descendants(main).OfType<GameLibraryDialog>().Single();
-    var title=NextUi.Descendants(embedded).OfType<Label>().Single(c=>c.Text=="Game Library");
+    var title=NextUi.Descendants(embedded).OfType<Label>().Single(c=>c.Text=="My Games");
     Check(Math.Abs(title.Font.Size-16f*percent/100f)<0.1f,"embedded library text scales exactly once at "+percent+" actual="+title.Font.Size);
     var bar=NextUi.Descendants(embedded).OfType<FlowLayoutPanel>().Single(c=>c.Name=="FishBowlToolbar");
     var games=NextUi.Descendants(embedded).OfType<ListView>().Single(c=>c.AccessibleName=="FishBowl game list");
+    ((Button)typeof(MainForm).GetField("dashboardLibraryTools",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main)).PerformClick();Application.DoEvents();
     var filters=NextUi.Descendants(embedded).OfType<ComboBox>().Where(c=>c.Parent is FlowLayoutPanel).ToArray();
     Check(filters.All(a=>filters.All(b=>a==b||!a.Bounds.IntersectsWith(b.Bounds))),"Library filters never overlap at "+percent+" "+string.Join(";",filters.Select(c=>c.Text+" "+c.Bounds)));
     Capture(main,"library-before-"+percent);Check(bar.Visible&&bar.Bottom<=bar.Parent.ClientSize.Height&&games.Height>=100,"library actions and list retain space at "+percent+" bar="+bar.Bounds+" visible="+bar.Visible+" list="+games.Bounds+" client="+embedded.ClientSize);

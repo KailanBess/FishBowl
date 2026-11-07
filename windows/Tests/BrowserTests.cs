@@ -37,7 +37,7 @@ class BrowserTests {
   using(var main=new MainForm(true)){
    main.ShowInTaskbar=false;main.StartPosition=FormStartPosition.Manual;main.Location=realFirefox?new Point(40,40):new Point(-4000,-4000);main.Show();Pump(100);
    var library=Field<LibraryData>(main,"library");library.Browser=settings;
-   var tabs=Field<TabControl>(main,"workspaceNavigation");Check(tabs.TabCount==5&&tabs.TabPages[4].Text=="Web","Web joins current workspace navigation");
+   var tabs=Field<TabControl>(main,"workspaceNavigation");Check(tabs.TabCount==6&&tabs.TabPages[4].Text=="Web","Web joins current workspace navigation");
    var browser=Field<BrowserSurface>(main,"browserSurface");Check(!browser.HasRunningBrowser,"browser does not start on app startup");
    // The CI desktop cannot grant keyboard focus. Exercise surface routing over a fixture-only transport.
    // --firefox-smoke retains the production foreground/keyboard transport for interactive verification.

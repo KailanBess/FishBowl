@@ -99,6 +99,7 @@ class RemovalTests
                 var remove=(Button)typeof(MainForm).GetField("removeButton",flags).GetValue(main);
                 Check(remove.Visible && remove.Parent.ClientRectangle.Contains(remove.Bounds),"Emulator removal fits toolbar at "+percent+"% text");
                 navigation.SelectedIndex=2;Application.DoEvents();
+                ((Button)typeof(MainForm).GetField("dashboardLibraryTools",flags).GetValue(main)).PerformClick();Application.DoEvents();
                 var gameRemove=NextUi.Descendants(main).OfType<Button>().First(b=>b.Text=="Remove game");
                 Check(gameRemove.Visible && gameRemove.Parent.ClientRectangle.Contains(gameRemove.Bounds),"Game removal fits toolbar at "+percent+"% text; button="+gameRemove.Bounds+" visible="+gameRemove.Visible+" parent="+gameRemove.Parent.ClientRectangle+" parent visible="+gameRemove.Parent.Visible+" page="+navigation.DisplayRectangle);
                 using(var image=new Bitmap(main.Width,main.Height)){main.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save("Removal-library-"+percent+".png");}

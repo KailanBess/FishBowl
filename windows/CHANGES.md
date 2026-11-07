@@ -1,3 +1,9 @@
+# Windows 1.29.8
+
+- Rebuild the workspace navigation and game library across all themes.
+- Add a dedicated Settings workspace and adapt Home, Emulators, Play, Web and shared dialogs to the dashboard.
+- Keep existing game data, appearance settings and launch options.
+
 # Windows 1.29.7
 
 - Add the Gallery Night workspace shell and landscape artwork cards.
