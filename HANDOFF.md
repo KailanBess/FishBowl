@@ -129,3 +129,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - **2026-11-09 (iOS library preview):** Added a separate native SwiftUI app for iPhone and iPad, with local Files import, search, favorites, and appearance settings. Windows and Linux builds are unaffected. iOS simulator compilation runs on macOS CI. Gameplay, desktop sync, on-device testing and signing remain open.
 
 - **2026-11-09:** Fixed the core release fixture's midnight assumption. The weekly chart test uses an explicit local timestamp and checks totals on both sides of midnight.
+
+- **2026-11-09:** Windows Play session details report the renderer mode, matched emulator profile, XInput detection, and the last explicit focus request. Eden input still requires physical verification.

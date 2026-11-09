@@ -521,6 +521,7 @@ namespace EmulatorHub
             internal readonly List<Frontend> Frontends=new List<Frontend>();
             internal readonly string FrontendMarker="FishBowl.Frontend."+Guid.NewGuid().ToString("N");
             internal string Title, Notice;
+            internal bool? LastFocusRequest;
             internal EmulatorProfile ViewProfile;
             internal PlayViewSettings View = new PlayViewSettings();
             internal readonly List<SessionProcess> Known = new List<SessionProcess>();
@@ -575,7 +576,9 @@ namespace EmulatorHub
             {
                 var selected = Selected();
                 if (selected == null || selected.External) return;
-                selected.Notice = selected.Host.FocusGame() ? null : "Click the game or use Open in window to give the emulator focus.";
+                bool focused = selected.Host.FocusGame();
+                selected.LastFocusRequest = focused;
+                selected.Notice = focused ? null : "Click the game or use Open in window to give the emulator focus.";
                 RefreshStatus();
             });
             menu.Opening += delegate
@@ -583,7 +586,7 @@ namespace EmulatorHub
                 var selected = Selected();
                 focusGame.Enabled = selected != null && !selected.External && selected.Host.IsAttached;
             };
-            menu.Items.Add("Session details", null, delegate { SessionDetails(); });
+            menu.Items.Add("Input and session details", null, delegate { SessionDetails(); });
             menu.Items.Add("Game view settings", null, delegate { GameViewSettings(); });
             moreButton.ContextMenuStrip = menu;
             moreButton.Click += delegate { menu.Show(moreButton, new Point(0, moreButton.Height)); };
@@ -648,6 +651,16 @@ namespace EmulatorHub
                 var fields = NextDialog.Fields(dialog.Body);
                 NextDialog.Field(fields, "Game", new Label { Text = selected.Title, AutoSize = true }, 60);
                 NextDialog.Field(fields, "Status", new Label { Text = status.Text, AutoSize = true }, 100);
+                string hosting = selected.External ? "Separate window" :
+                    selected.Host.IsAnchored ? "Owned renderer" : selected.Host.IsAttached ? "Embedded renderer" : "Waiting for renderer";
+                string profile = selected.ViewProfile == null ? "No emulator profile associated with this renderer" : selected.ViewProfile.Name;
+                string focus = !selected.LastFocusRequest.HasValue ? "Focus game has not been used in this session" :
+                    selected.LastFocusRequest.Value ? "Windows accepted the last Focus game request" : "The last Focus game request did not reach the renderer";
+                string controller = NavigationController.HasConnectedController()
+                    ? "XInput controller detected. Check the emulator mapping if buttons do not respond."
+                    : "No XInput controller detected. Other input modes may still be available in the emulator.";
+                NextDialog.Field(fields, "Renderer", new Label { Text = hosting + " · " + profile, AutoSize = true }, 58);
+                NextDialog.Field(fields, "Input", new Label { Text = controller + "\n" + focus, AutoSize = true }, 100);
                 NextDialog.Field(fields, "Controls", new Label { Text = "Switching menus keeps the game running. Use the fullscreen button to return from fullscreen while game controls have focus. Closing FishBowl asks before closing running games. Emulator save prompts remain available.", AutoSize = true }, 110);
                 NextDialog.Field(fields, "Recovery", new Label { Text = "If the renderer is busy or unsupported, open it in its own window. Show in Play retries the same verified session. Details are recorded in the activity log.", AutoSize = true }, 100);
                 dialog.Action("Close", dialog.Close); dialog.ShowDialog(FindForm());
