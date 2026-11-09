@@ -11910,7 +11910,7 @@ namespace EmulatorHub
 			smartRule.DropDownStyle = ComboBoxStyle.DropDownList;
 			smartRule.BackColor = Color.FromArgb(62, 56, 69);
 			smartRule.ForeColor = Color.White;
-			smartRule.Items.AddRange(new object[6] { "Favorites", "Pinned", "Playing", "Completed", "Recent", "Missing" });
+			smartRule.Items.AddRange(GameCollections.SmartRules);
 			smartRule.SelectedIndex = 0;
 			smartRule.Location = new Point(260, 322);
 			smartRule.Size = new Size(160, 24);

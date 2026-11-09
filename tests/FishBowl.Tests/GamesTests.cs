@@ -89,6 +89,12 @@ public static class GamesTests
         check("games: Windows local dates parse", GameLibraryQuery.Date(new DateTime(2026, 1, 2, 3, 4, 0).ToString("g")).Year == 2026);
         GamePlay.RecordLaunch(lib, lib.Games[0], DateTime.UtcNow);
         check("games: record launch", lib.Games[0].LaunchCount == 1 && GamePlay.LastGame(lib).Id == "a" && GamePlay.Recent(lib, 1)[0].Id == "a");
+        var unplayed = new GameCollection { IsSmart = true, SmartRule = "Unplayed" };
+        var never = new GameEntry { Id = "fresh" };
+        var legacy = new GameEntry { Id = "legacy", LastLaunched = "2026-01-01" };
+        var manual = new GameEntry { Id = "manual", TotalPlaySeconds = 60 };
+        check("games: unplayed collection excludes launches and manually recorded sessions",
+            GameCollections.Entries(unplayed, new[] { never, legacy, manual, lib.Games[0] }).Single().Id == "fresh");
         check("games: duration text", GamePlay.Duration(3725) == "1 h 02 min" && GamePlay.Duration(125) == "2 min");
     }
 }
