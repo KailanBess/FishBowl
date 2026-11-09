@@ -29,7 +29,7 @@ jobs:
       - name: Package matching app, installer and source
         shell: pwsh
         env:
-          REQUESTED_VERSION: ${{ inputs.version || '1.29.8' }}
+          REQUESTED_VERSION: ${{ inputs.version || '1.29.9' }}
         run: |
           $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { $env:REQUESTED_VERSION }
           ./windows/Package.ps1 -OutputDirectory artifacts/windows -ExpectedVersion $version
@@ -50,7 +50,7 @@ jobs:
       - run: dotnet publish FishBowl.Avalonia -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o artifacts/linux-x64
       - name: Archive Linux executable with permissions
         env:
-          REQUESTED_VERSION: ${{ inputs.version || '1.29.8' }}
+          REQUESTED_VERSION: ${{ inputs.version || '1.29.9' }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           if [ "$GITHUB_REF_TYPE" != tag ]; then version="$REQUESTED_VERSION"; fi
@@ -84,7 +84,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          REQUESTED_VERSION: ${{ inputs.version || '1.29.8' }}
+          REQUESTED_VERSION: ${{ inputs.version || '1.29.9' }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           if [ "$GITHUB_REF_TYPE" != tag ]; then version="$REQUESTED_VERSION"; fi
