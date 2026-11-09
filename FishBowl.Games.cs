@@ -38,6 +38,8 @@ namespace EmulatorHub
 					where !string.IsNullOrWhiteSpace(game.LastLaunched)
 					orderby GameLibraryQuery.Date(game.LastLaunched) descending
 					select game).Take(30);
+			case "Unplayed":
+				return source.Where((GameEntry game) => game.LaunchCount == 0 && string.IsNullOrWhiteSpace(game.LastLaunched) && game.TotalPlaySeconds <= 0);
 			case "Missing":
 				return source.Where((GameEntry game) => string.IsNullOrWhiteSpace(game.Path) || !File.Exists(game.Path));
 			default:
@@ -45,7 +47,7 @@ namespace EmulatorHub
 			}
 		}
 
-		public static readonly string[] SmartRules = new string[6] { "Favorites", "Pinned", "Playing", "Completed", "Recent", "Missing" };
+		public static readonly string[] SmartRules = { "Favorites", "Pinned", "Playing", "Completed", "Recent", "Missing", "Unplayed" };
 
 		// Collections in display order: by SortOrder, then name, with children after their parent.
 		public static List<KeyValuePair<GameCollection, int>> Tree(LibraryData data)
