@@ -125,3 +125,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - Shared Windows detail and settings dialogs based on NextDialog now use a compact title strip and matching workspace surfaces.
 
 - 2026-11-06: Prepared 1.29.8 packaging for the Windows workspace redesign. The compact-density fixture opens Filters before testing the action bar and verifies the My Games heading at each supported text size.
+
+- **2026-11-09 (iOS library preview):** Added a separate native SwiftUI app for iPhone and iPad, with local Files import, search, favorites, and appearance settings. Windows and Linux builds are unaffected. iOS simulator compilation runs on macOS CI. Gameplay, desktop sync, on-device testing and signing remain open.
