@@ -131,3 +131,5 @@ Tracked hosting readiness defect: #45. Windows navigation and reference-layout f
 - **2026-11-09:** Fixed the core release fixture's midnight assumption. The weekly chart test uses an explicit local timestamp and checks totals on both sides of midnight.
 
 - **2026-11-09:** Windows Play session details report the renderer mode, matched emulator profile, XInput detection, and the last explicit focus request. Eden input still requires physical verification.
+
+- **2026-11-09:** Prepared the Windows and Linux 1.29.9 release with the Windows Play input diagnostics. Physical Eden input verification remains open.

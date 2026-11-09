@@ -1,3 +1,7 @@
+# Windows 1.29.9
+
+- Show renderer mode, emulator profile, XInput detection and the last Focus game result in Play session details.
+
 # Windows 1.29.8
 
 - Rebuild the workspace navigation and game library across all themes.
