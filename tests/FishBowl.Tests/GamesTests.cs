@@ -80,9 +80,12 @@ public static class GamesTests
         check("games: complete session adds playtime", lib.Games[1].TotalPlaySeconds == 620 && session.EndedAt != null);
         GamePlay.CorrectSession(lib, session, 60, "fixed");
         check("games: correct session adjusts total", lib.Games[1].TotalPlaySeconds == 560 && session.Corrected);
-        GamePlay.AddManualSession(lib, lib.Games[1], DateTime.Now.AddHours(-1), 600, null);
-        var week = GamePlay.WeekTotals(lib, DateTime.Now);
-        check("games: week totals cover 7 days and today", week.Count == 7 && week[DateTime.Now.ToString("yyyy-MM-dd")] >= 660);
+        var chartTime = new DateTime(2026, 2, 10, 0, 30, 0, DateTimeKind.Local);
+        session.StartedAt = chartTime.AddMinutes(-15).ToUniversalTime().ToString("o");
+        GamePlay.AddManualSession(lib, lib.Games[1], chartTime.AddHours(-1), 600, null);
+        var week = GamePlay.WeekTotals(lib, chartTime);
+        check("games: week totals keep sessions on their local start date",
+            week.Count == 7 && week["2026-02-10"] == 60 && week["2026-02-09"] == 600);
         check("games: Windows local dates parse", GameLibraryQuery.Date(new DateTime(2026, 1, 2, 3, 4, 0).ToString("g")).Year == 2026);
         GamePlay.RecordLaunch(lib, lib.Games[0], DateTime.UtcNow);
         check("games: record launch", lib.Games[0].LaunchCount == 1 && GamePlay.LastGame(lib).Id == "a" && GamePlay.Recent(lib, 1)[0].Id == "a");
