@@ -24230,6 +24230,20 @@ namespace EmulatorHub
 			{
 				return;
 			}
+			if (game.BackupBeforeLaunch && game.Saves != null && game.Saves.Count > 0)
+			{
+				try
+				{
+					SaveHistory.RequireClosed(library, new SaveSnapshot { GameId = game.Id });
+					foreach (GameSaveEntry save in game.Saves) GameSaves.Copy(library, game, save);
+					Store.Save(library);
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show(owner, "Game launch cancelled because the linked saves could not be backed up.\n\n" + ex.Message, "Backup before launch");
+					return;
+				}
+			}
 			UserSaveRoutes.Arguments(library, emulatorProfile, true);
 			ProcessStartInfo processStartInfo = Platform.StartInfo(emulatorProfile.Executable, text);
 			processStartInfo.WorkingDirectory = ((Hub.Native(game) && !string.IsNullOrWhiteSpace(game.Extras.WorkingDirectory)) ? game.Extras.WorkingDirectory : Path.GetDirectoryName(emulatorProfile.Executable));
