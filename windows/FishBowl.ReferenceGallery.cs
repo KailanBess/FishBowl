@@ -40,6 +40,16 @@ namespace EmulatorHub
 
         protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; Invalidate(); }
         protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; Invalidate(); }
+        protected override void OnFontChanged(EventArgs e) { base.OnFontChanged(e); FitToolbarCaption(); }
+        protected override void OnParentChanged(EventArgs e) { base.OnParentChanged(e); FitToolbarCaption(); }
+
+        private void FitToolbarCaption()
+        {
+            if (!(Parent is TableLayoutPanel) || LeftAligned) return;
+            int width = Math.Max(84, TextRenderer.MeasureText(Text, Font).Width + 42);
+            MinimumSize = new Size(width, 0);
+            Width = width;
+        }
 
         protected override void OnPaint(PaintEventArgs e)
         {
