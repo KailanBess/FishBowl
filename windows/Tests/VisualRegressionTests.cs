@@ -34,6 +34,17 @@ class VisualRegressionTests
                 Check(!(bool)typeof(MainForm).GetField("workspaceTransition", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main), "Redraw resumes after every transition");
             }
             tabs.SelectedIndex = 0;
+            Application.DoEvents();
+            var feature = Descendants(home).Single(control => control.AccessibleName == "FishBowl featured games and emulators");
+            var libraryBanner = Descendants(feature).OfType<Button>().Single(button => button.AccessibleName == "Open library Game Library");
+            var emulatorBanner = Descendants(feature).OfType<Button>().Single(button => button.AccessibleName == "Browse emulators Emulators");
+            Check(libraryBanner.Visible && emulatorBanner.Visible && !libraryBanner.Parent.Bounds.IntersectsWith(emulatorBanner.Parent.Bounds), "Both featured cards are visible and separated");
+            libraryBanner.PerformClick();
+            Check(tabs.SelectedIndex == 2, "Featured library action opens the existing Library");
+            tabs.SelectedIndex = 0;
+            emulatorBanner.PerformClick();
+            Check(tabs.SelectedIndex == 1, "Featured emulator action opens the existing Emulators workspace");
+            tabs.SelectedIndex = 0;
             foreach (var button in Descendants(home).OfType<Button>()) Check(button.Height >= 28, "Home action retains its full height");
         }
         using (var organizer = new GameStorageOrganizerDialog(library, null))
