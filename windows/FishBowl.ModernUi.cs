@@ -205,6 +205,9 @@ namespace EmulatorHub
                     heading.MaximumSize = new Size(Math.Max(1, frame.ClientSize.Width - frame.Padding.Horizontal), 0);
                     heading.MinimumSize = new Size(0, height);
                     if (heading.Height != height) heading.Height = height;
+                    int rowHeight = height + heading.Margin.Vertical;
+                    if (frame.RowStyles[0].SizeType != SizeType.Absolute || frame.RowStyles[0].Height != rowHeight)
+                        frame.RowStyles[0] = new RowStyle(SizeType.Absolute, rowHeight);
                 }
             };
             return frame;
@@ -462,6 +465,7 @@ namespace EmulatorHub
             refresh.Tick += delegate { RefreshCards(); };
             VisibleChanged += delegate { if (Visible) { RefreshCards(); refresh.Start(); } else refresh.Stop(); };
             SizeChanged += delegate { ArrangeCards(); };
+            cards.SizeChanged += delegate { ArrangeCards(); };
         }
 
         internal void Attach()
@@ -616,7 +620,8 @@ namespace EmulatorHub
 
         private void Navigate(ListViewItem item, KeyEventArgs e)
         {
-            int offset = e.KeyCode == Keys.Left ? -1 : e.KeyCode == Keys.Right ? 1 : e.KeyCode == Keys.Up ? -columns : e.KeyCode == Keys.Down ? columns : 0;
+            int offset = e.KeyCode == Keys.Left ? -1 : e.KeyCode == Keys.Right ? 1 : e.KeyCode == Keys.Up ? -columns : e.KeyCode == Keys.Down ? columns :
+                e.KeyCode == Keys.PageUp ? -PageSize : e.KeyCode == Keys.PageDown ? PageSize : e.KeyCode == Keys.Home ? -item.Index : e.KeyCode == Keys.End ? source.Items.Count - item.Index - 1 : 0;
             if (offset != 0)
             {
                 int index = Math.Max(0, Math.Min(source.Items.Count - 1, item.Index + offset));
@@ -627,7 +632,8 @@ namespace EmulatorHub
             }
             else if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space)
             {
-                Activate(item);
+                if (e.KeyCode == Keys.Space && source.CheckBoxes) { item.Checked = !item.Checked; UpdateSelection(); }
+                else Activate(item);
                 e.Handled = e.SuppressKeyPress = true;
             }
             else if (e.Control && e.KeyCode == Keys.A && source.MultiSelect)
@@ -839,7 +845,7 @@ namespace EmulatorHub
         internal void Arrange(bool grid)
         {
             float scale = Math.Max(.75f, NextUi.TextPercent / 100f);
-            int inset = (int)(18 * scale), artwork = (int)((grid ? 60 : 64) * scale);
+            int inset = Math.Min((int)(18 * scale), Math.Max(10, Width / 12)), artwork = (int)((grid ? 60 : 64) * scale);
             image.SetBounds(inset, inset, artwork, artwork);
             title.SetBounds(inset + artwork + 14, inset, Math.Max(1, Width - inset * 2 - artwork - 14), grid ? Math.Max(34, title.Font.Height * 2) : title.Font.Height + 8);
             int top = grid ? Math.Max(image.Bottom, title.Bottom) + 14 : title.Bottom + 10;
@@ -870,6 +876,7 @@ namespace EmulatorHub
                     Item.ImageIndex >= 0 && Item.ImageIndex < count ? images.Images[Item.ImageIndex] : null;
                 if (artwork != null && (!(Item.Tag is GameEntry) || Item.ImageIndex > 0)) image.Image = new Bitmap(artwork);
             }
+            if (image.Image == null) image.Image = GameLibraryDialog.MakeThumbnail(null, Item.Text.TrimStart('★', ' '), 96);
             if (previous != null) previous.Dispose();
         }
 

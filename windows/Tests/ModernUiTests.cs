@@ -68,6 +68,21 @@ class ModernUiTests
                 All(dialog).OfType<Button>().Single(b => b.Text == "Appearance").PerformClick();
                 Check(tabs.SelectedIndex == 1, "new navigation selects the existing feature page");
             }
+            var saved = Store.Load();
+            saved.Theme.WindowsInterfaceVersion = 0; saved.Theme.Name = "Ocean"; Store.Save(saved);
+            using (var main = new MainForm(true))
+            {
+                var data = (LibraryData)typeof(MainForm).GetField("library", hidden).GetValue(main);
+                Check(data.Theme.WindowsInterfaceVersion == 1 && data.Theme.Name == "Gallery Night" && data.Experience.LibraryView == "Artwork", "first opening applies the new interface preset");
+                using (var settings = new SettingsDialog(data.Theme, data.BackupFolder))
+                    Check(settings.Theme.WindowsInterfaceVersion == 1, "saving preferences retains the migration marker");
+                data.Theme.Name = "Ocean"; Store.Save(data);
+            }
+            using (var main = new MainForm(true))
+            {
+                var data = (LibraryData)typeof(MainForm).GetField("library", hidden).GetValue(main);
+                Check(data.Theme.Name == "Ocean", "later appearance choices survive reopening");
+            }
             Console.WriteLine("PASS: " + checks + " modern catalog, paging, feature routing and dialog navigation checks."); return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }

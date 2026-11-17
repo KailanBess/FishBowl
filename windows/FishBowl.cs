@@ -489,6 +489,7 @@ namespace EmulatorHub
                 library.Theme.FontFamily = "Segoe UI";
                 library.Theme.AppIconColor = "Match accent";
                 library.Theme.ShowStatusBar = false;
+                Immersion.Ensure(library).Bubbles = false;
                 library.Experience.LibraryView = "Artwork";
                 if (library.Cosmetics == null) library.Cosmetics = new CosmeticSettings();
                 library.Cosmetics.CustomPalette = false;
@@ -23194,7 +23195,7 @@ namespace EmulatorHub
             {
                 if (card == referenceGallery) { referenceGallery.Fit(available); continue; }
                 card.Margin = new Padding(10);
-                card.Padding = new Padding(24);
+                card.Padding = new Padding(ControlDensityTools.Choose(18,24,30));
                 card.Width = Math.Max(1, available / columns - card.Margin.Horizontal - 2);
                 card.BackColor = ColorHarmony.Card;
                 var title = card.Controls.OfType<Label>().FirstOrDefault();
@@ -23231,7 +23232,7 @@ namespace EmulatorHub
                             if (button == null) continue;
                             button.MaximumSize = Size.Empty;
                             button.MinimumSize = Size.Empty;
-                            button.Size = new Size(Math.Min(width, Math.Max(95, TextRenderer.MeasureText(button.Text, button.Font).Width + 32)), Math.Max(36, button.Font.Height + 16));
+                            button.Size = new Size(Math.Min(width, Math.Max(95, TextRenderer.MeasureText(button.Text, button.Font).Width + 32)), Math.Max(ControlDensityTools.Choose(30,36,42), button.Font.Height + ControlDensityTools.Choose(10,16,20)));
                             var action = button as FishBowlActionButton;
                             if (action != null && row.AccessibleName == "Home card actions") action.PrimaryAction = firstAction;
                             firstAction = false;
@@ -23302,7 +23303,7 @@ namespace EmulatorHub
                 row.Controls.Add(new Label { Text = emulator.Name, AutoEllipsis = true, Width = 180, Height = 38, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent, ForeColor = FishBowlPalette.ThemeInk });
                 var open = ExperienceUi.Button("Open", delegate { action(command, null, emulator); });
                 open.PrimaryAction = true;
-                open.AccessibleName = "Open " + emulator.Name;
+                open.AccessibleName = "Open " + emulator.Name; open.Tag = emulator;
                 row.Controls.Add(open);
                 flowLayoutPanel.Controls.Add(row);
                 return;

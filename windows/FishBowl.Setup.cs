@@ -63,6 +63,31 @@ namespace FishBowlSetup
             }
         }
 
+        private DialogResult Notice(string message, bool confirm)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = confirm ? "Replace installed files" : "Installation needs attention";
+                dialog.BackColor = Color.FromArgb(37, 36, 41); dialog.ForeColor = Color.White;
+                dialog.Font = Font; dialog.Icon = Icon; dialog.ClientSize = new Size(640, 300);
+                dialog.MinimumSize = new Size(500, 280); dialog.StartPosition = FormStartPosition.CenterParent;
+                var frame = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 3 };
+                frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); frame.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+                frame.Controls.Add(new Label { Text = dialog.Text, Font = new Font("Segoe UI", 18, FontStyle.Bold), Dock = DockStyle.Fill, AutoEllipsis = true }, 0, 0);
+                frame.Controls.Add(new TextBox { Text = message, Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, BorderStyle = BorderStyle.None, ScrollBars = ScrollBars.Vertical, BackColor = Color.FromArgb(48, 46, 54), ForeColor = Color.White }, 0, 1);
+                var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 12, 0, 0), FlowDirection = FlowDirection.RightToLeft };
+                var cancelNotice = new SetupButton { Text = confirm ? "Cancel" : "Close", Size = new Size(110, 38), BackColor = Color.FromArgb(48, 46, 54), ForeColor = Color.White, DialogResult = confirm ? DialogResult.No : DialogResult.OK };
+                actions.Controls.Add(cancelNotice); dialog.CancelButton = cancelNotice; dialog.AcceptButton = cancelNotice;
+                if (confirm)
+                {
+                    var yes = new SetupButton { Text = "Replace files", Size = new Size(140, 38), BackColor = Color.FromArgb(145, 55, 238), ForeColor = Color.White, DialogResult = DialogResult.Yes };
+                    actions.Controls.Add(yes);
+                }
+                frame.Controls.Add(actions, 0, 2); dialog.Controls.Add(frame);
+                return dialog.ShowDialog(this);
+            }
+        }
+
 		private sealed class InstallOptions
 		{
 			public string Destination;
@@ -439,7 +464,7 @@ namespace FishBowlSetup
 				page = 1;
 				ShowPage();
 			}
-			else if (page == 1 && (!Directory.Exists(installPath.Text) || Directory.GetFileSystemEntries(installPath.Text).Length <= 0 || MessageBox.Show(this, "FishBowl is already installed here. Replace the existing files?", "FishBowl Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes))
+			else if (page == 1 && (!Directory.Exists(installPath.Text) || Directory.GetFileSystemEntries(installPath.Text).Length <= 0 || Notice("FishBowl is already installed here. Replace the existing files?", true) == DialogResult.Yes))
 			{
 				page = 2;
 				primary.Enabled = false;
@@ -507,7 +532,7 @@ namespace FishBowlSetup
 		{
 			if (e.Error != null)
 			{
-				MessageBox.Show(this, "FishBowl could not be installed.\n\n" + e.Error.Message, "FishBowl Setup", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+				Notice("FishBowl could not be installed.\n\n" + e.Error.Message, false);
 				page = 1;
 				primary.Enabled = true;
 			}
