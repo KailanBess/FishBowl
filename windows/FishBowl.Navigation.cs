@@ -54,13 +54,11 @@ namespace EmulatorHub {
  internal static class WorkspaceInspector {
   internal static void Fit(Label status, int width, bool immersive) {
    if(status==null)return;
-   bool side=width>=960&&!immersive;
-   status.Dock=side?DockStyle.Right:DockStyle.Bottom;
-   status.AutoSize=!side;
-   status.MaximumSize=new Size(side?0:Math.Max(1,width),0);
-   if(side)status.Width=235;
+   status.Dock=DockStyle.Bottom;
+   status.AutoSize=true;
+   status.MaximumSize=new Size(Math.Max(1,width),0);
    status.Padding=new Padding(14);
-   status.BackColor=FishBowlPalette.ThemeTop;
+   status.BackColor=ColorHarmony.Card;
    status.ForeColor=FishBowlPalette.ThemeInk;
   }
  }

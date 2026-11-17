@@ -71,7 +71,7 @@ namespace EmulatorHub {
     try { string page=FishBowlWeb.Address(homepage.Text);var value=new BrowserPreferences{Engine=engine.Text,Executable=executable.Text.Trim(),HomePage=page};
      if(value.Executable.Length>0)FishBowlWeb.Resolve(value);
      settings.Engine=value.Engine;settings.Executable=value.Executable;settings.HomePage=value.HomePage;Store.Save(library);DialogResult=DialogResult.OK;Close();
-    }catch(Exception error){MessageBox.Show(this,error.Message,"Browser settings");}
+    }catch(Exception error){FishBowlMessageBox.Show(this,error.Message,"Browser settings");}
    });Action("Cancel",Close);
   }
  }

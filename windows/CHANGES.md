@@ -1,3 +1,10 @@
+# Windows 1.29.13
+
+- Match app dialogs, confirmations, toolbars and dropdown frames to the active shell palette.
+- Paint rounded action corners from their parent surface to remove rectangular patches.
+- Keep Web and Play status information in a compact bottom strip.
+- Preserve confirmation results, safe defaults, keyboard navigation and text scaling.
+
 # Windows 1.29.12
 
 - Remove repeated product labels from the main shell. The native title now identifies the active workspace.

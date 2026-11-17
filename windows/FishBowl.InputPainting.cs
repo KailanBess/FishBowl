@@ -39,8 +39,13 @@ namespace EmulatorHub
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object> choices = new System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object>();
         public static void Style(Control c)
         {
+            var check = c as CheckBox;
+            if (check != null) check.FlatStyle = SystemInformation.HighContrast ? FlatStyle.Standard : FlatStyle.Flat;
+            var radio = c as RadioButton;
+            if (radio != null) radio.FlatStyle = SystemInformation.HighContrast ? FlatStyle.Standard : FlatStyle.Flat;
             var choice = c as ComboBox;
             if (choice != null && choice.DropDownStyle == ComboBoxStyle.DropDownList) {
+                choice.FlatStyle = SystemInformation.HighContrast ? FlatStyle.Standard : FlatStyle.Flat;
                 choice.DrawMode = DrawMode.OwnerDrawFixed;
                 choice.ItemHeight = Math.Max(18, choice.Font.Height + 6);
                 choice.BackColor = FishBowlPalette.DeepSeaSurface;
@@ -65,8 +70,8 @@ namespace EmulatorHub
             var text = c as TextBoxBase;
             if (text != null)
             {
-                text.BorderStyle = BorderStyle.FixedSingle;
-                text.BackColor = FishBowlPalette.DeepSeaSurface;
+                text.BorderStyle = text is ReferenceMessageText ? BorderStyle.None : BorderStyle.FixedSingle;
+                text.BackColor = text is ReferenceMessageText ? ColorHarmony.Card : FishBowlPalette.DeepSeaSurface;
                 text.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, text.BackColor);
                 // Preserve native caret, selection, scrollbars and DPI sizing; no clipping regions.
                 if (text.Region != null) { var old = text.Region; text.Region = null; old.Dispose(); }

@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.12.0")]
+[assembly: AssemblyFileVersion("1.29.13.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.12.0")]
+[assembly: AssemblyVersion("1.29.13.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.12";
+		private const string FishBowlVersion = "1.29.13";
 
-		private const string FishBowlTitleVersion = "1.29.12";
+		private const string FishBowlTitleVersion = "1.29.13";
 
 		private Icon ownedAppIcon;
 
@@ -65,7 +65,7 @@ namespace EmulatorHub
 
 		private readonly Button communityButton = new FishBowlActionButton();
 
-		private readonly ComboBox platformFilter = new ComboBox();
+		private readonly ComboBox platformFilter = new ReferenceComboBox();
 
 		private readonly CheckBox favoritesOnly = new CheckBox();
 
@@ -407,11 +407,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.12" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.13" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.12";
+						library.Theme.LastSeenBuild = "1.29.13";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -449,7 +449,7 @@ namespace EmulatorHub
 					catch (Exception ex)
 					{
 						e.Cancel = true;
-						MessageBox.Show(this, "Your notes could not be saved.\n\n" + ex.Message, "FishBowl");
+						FishBowlMessageBox.Show(this, "Your notes could not be saved.\n\n" + ex.Message, "FishBowl");
 					}
 				}
                 if (!e.Cancel && !restartingAfterRestore && playSurface != null && e.CloseReason != CloseReason.WindowsShutDown && e.CloseReason != CloseReason.TaskManagerClosing) {
@@ -464,7 +464,7 @@ namespace EmulatorHub
                 }
                 if (!e.Cancel && playSurface != null && !playSurface.TryDetachAll()) {
                     e.Cancel = true;
-                    MessageBox.Show(this, "A running emulator window could not be returned to its own window. Close it in the emulator, then retry closing FishBowl.", "FishBowl");
+                    FishBowlMessageBox.Show(this, "A running emulator window could not be returned to its own window. Close it in the emulator, then retry closing FishBowl.", "FishBowl");
                 }
 			};
 		}
@@ -1920,11 +1920,11 @@ namespace EmulatorHub
 				}
 				if (multiplayerDialog.Mode == "Native online")
 				{
-					MessageBox.Show(this, selectedProfile.Name + " will open normally. Start its own netplay or multiplayer feature inside the emulator.\n\n" + MultiplayerSupport.For(selectedProfile).NativeOnline, "Native online session");
+					FishBowlMessageBox.Show(this, selectedProfile.Name + " will open normally. Start its own netplay or multiplayer feature inside the emulator.\n\n" + MultiplayerSupport.For(selectedProfile).NativeOnline, "Native online session");
 				}
 				else
 				{
-					MessageBox.Show(this, selectedProfile.Name + " will open normally. Configure all local controllers inside the emulator.\n\n" + MultiplayerSupport.For(selectedProfile).LocalPlay, "Local session");
+					FishBowlMessageBox.Show(this, selectedProfile.Name + " will open normally. Configure all local controllers inside the emulator.\n\n" + MultiplayerSupport.For(selectedProfile).LocalPlay, "Local session");
 				}
 				selectedEmulatorId = selectedProfile.Id;
 				RefreshHub();
@@ -1943,7 +1943,7 @@ namespace EmulatorHub
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(this, "The FishBowl community link could not be opened.\n\n" + ex.Message, "FishBowl");
+				FishBowlMessageBox.Show(this, "The FishBowl community link could not be opened.\n\n" + ex.Message, "FishBowl");
 			}
 		}
 
@@ -1959,7 +1959,7 @@ namespace EmulatorHub
 				list.Add("\nLOCAL PLAY\n" + multiplayerCapability.LocalPlay);
 				list.Add("\nREMOTE COUCH PLAY\n" + multiplayerCapability.RemoteCouchPlay);
 			}
-			MessageBox.Show(this, string.Join("\n\n", list), "Multiplayer readiness", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+			FishBowlMessageBox.Show(this, string.Join("\n\n", list), "Multiplayer readiness", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
 		}
 
 		private void ShowMultiplayerSettings()
@@ -1984,7 +1984,7 @@ namespace EmulatorHub
 					library.Theme.HubPerformanceMode = performanceDialog.Mode;
 					library.Theme.PauseBackgroundRefresh = performanceDialog.PauseBackgroundRefresh;
 					Store.Save(library);
-					MessageBox.Show(this, "Hub performance preferences saved. Restart FishBowl to apply background refresh changes.", "FishBowl performance");
+					FishBowlMessageBox.Show(this, "Hub performance preferences saved. Restart FishBowl to apply background refresh changes.", "FishBowl performance");
 				}
 			}
 		}
@@ -1995,11 +1995,11 @@ namespace EmulatorHub
 			{
 				Cursor = Cursors.WaitCursor;
 				UpdateResult updateResult = FishBowlUpdates.Check(library.Multiplayer);
-				MessageBox.Show(this, updateResult.Status + "\n\nInstalled: " + updateResult.Installed + "\nLatest: " + (updateResult.Latest ?? "No published release") + "\n\nFishBowl only checks the public release page. It does not download or replace the app automatically.\n\n" + (updateResult.Notes ?? ""), "FishBowl updates");
+				FishBowlMessageBox.Show(this, updateResult.Status + "\n\nInstalled: " + updateResult.Installed + "\nLatest: " + (updateResult.Latest ?? "No published release") + "\n\nFishBowl only checks the public release page. It does not download or replace the app automatically.\n\n" + (updateResult.Notes ?? ""), "FishBowl updates");
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(this, "FishBowl could not check its release feed.\n\n" + ex.Message, "FishBowl updates");
+				FishBowlMessageBox.Show(this, "FishBowl could not check its release feed.\n\n" + ex.Message, "FishBowl updates");
 			}
 			finally
 			{
@@ -2048,7 +2048,7 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			using (SetupChecklistDialog setupChecklistDialog = new SetupChecklistDialog(emulatorProfile))
@@ -2067,7 +2067,7 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			using (LaunchProfilesDialog launchProfilesDialog = new LaunchProfilesDialog(emulatorProfile))
@@ -2089,7 +2089,7 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			SaveFileDialog saveFileDialog = new SaveFileDialog();
@@ -2122,12 +2122,12 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, "FishBowl could not read that emulator profile.\n\n" + ex.Message, "FishBowl");
+					FishBowlMessageBox.Show(this, "FishBowl could not read that emulator profile.\n\n" + ex.Message, "FishBowl");
 					return;
 				}
 				if (emulatorProfile == null || string.IsNullOrWhiteSpace(emulatorProfile.Name))
 				{
-					MessageBox.Show(this, "That file does not contain a valid FishBowl emulator profile.", "FishBowl");
+					FishBowlMessageBox.Show(this, "That file does not contain a valid FishBowl emulator profile.", "FishBowl");
 					return;
 				}
 				emulatorProfile.Id = Guid.NewGuid().ToString("N");
@@ -2289,7 +2289,7 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			SaveFileDialog saveFileDialog = new SaveFileDialog();
@@ -2346,7 +2346,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, "FishBowl could not read that portable profile pack.\n\n" + ex.Message, "FishBowl");
+					FishBowlMessageBox.Show(this, "FishBowl could not read that portable profile pack.\n\n" + ex.Message, "FishBowl");
 					return;
 				}
 				AddImportedProfile(imported, "portable profile pack");
@@ -2357,7 +2357,7 @@ namespace EmulatorHub
 		{
 			if (imported == null || string.IsNullOrWhiteSpace(imported.Name))
 			{
-				MessageBox.Show(this, "That file does not contain a valid FishBowl emulator profile.", "FishBowl");
+				FishBowlMessageBox.Show(this, "That file does not contain a valid FishBowl emulator profile.", "FishBowl");
 				return;
 			}
 			imported.Id = Guid.NewGuid().ToString("N");
@@ -2405,7 +2405,7 @@ namespace EmulatorHub
 						streamWriter.Write("FishBowl support bundle\r\n\r\nContains FishBowl settings and activity log only. It does not contain emulator programs, games, saves, BIOS, firmware, keys, screenshots, or other personal files. Review it before sharing.");
 					}
 				}
-				MessageBox.Show(this, "Created a local support bundle. Review it before attaching it to a report or sharing it.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Created a local support bundle. Review it before attaching it to a report or sharing it.", "FishBowl");
 			}
 		}
 
@@ -2414,13 +2414,13 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			EmulatorFolder emulatorFolder = new EmulatorFolderDetector().Detect(emulatorProfile).FirstOrDefault((EmulatorFolder item) => item.Property == property);
 			if (emulatorFolder == null || string.IsNullOrWhiteSpace(emulatorFolder.Path) || !Directory.Exists(emulatorFolder.Path))
 			{
-				MessageBox.Show(this, "FishBowl could not find an existing " + label + " for " + emulatorProfile.Name + ". Use Edit information and links to add a folder override, or configure the folder inside the emulator.", "FishBowl");
+				FishBowlMessageBox.Show(this, "FishBowl could not find an existing " + label + " for " + emulatorProfile.Name + ". Use Edit information and links to add a folder override, or configure the folder inside the emulator.", "FishBowl");
 			}
 			else
 			{
@@ -2435,13 +2435,13 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			EmulatorFolder emulatorFolder = new EmulatorFolderDetector().Detect(emulatorProfile).FirstOrDefault((EmulatorFolder item) => item.Property == "ScreenshotFolder");
 			if (emulatorFolder == null || string.IsNullOrWhiteSpace(emulatorFolder.Path) || !Directory.Exists(emulatorFolder.Path))
 			{
-				MessageBox.Show(this, "FishBowl could not find an existing screenshot folder for " + emulatorProfile.Name + ". Configure it inside the emulator or add a folder override.", "FishBowl");
+				FishBowlMessageBox.Show(this, "FishBowl could not find an existing screenshot folder for " + emulatorProfile.Name + ". Configure it inside the emulator or add a folder override.", "FishBowl");
 				return;
 			}
 			using (FolderFileBrowserDialog folderFileBrowserDialog = new FolderFileBrowserDialog(emulatorProfile.Name + " Screenshots", emulatorFolder.Path, new string[6] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp" }))
@@ -2479,20 +2479,20 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			EmulatorReference emulatorReference = EmulatorReference.For(emulatorProfile);
 			string text = (EmulatorReference.IsWebUrl(emulatorReference.Documentation) ? emulatorReference.Documentation : emulatorReference.Website);
 			string text2 = emulatorReference.Requirements ?? "Review the emulator's official setup instructions for any required system files, graphics setup, and controller configuration.";
 			string text3 = emulatorProfile.Name + " setup guidance\n\n" + text2 + "\n\nFishBowl can open the emulator project's official guide. For firmware, BIOS, keys, or system software, use only files you are allowed to use and official instructions. FishBowl does not link to third-party downloads.\n\nOpen the official guide now?";
-			if (MessageBox.Show(this, text3, "Official setup guidance", MessageBoxButtons.YesNo, MessageBoxIcon.Asterisk) != DialogResult.Yes)
+			if (FishBowlMessageBox.Show(this, text3, "Official setup guidance", MessageBoxButtons.YesNo, MessageBoxIcon.Asterisk) != DialogResult.Yes)
 			{
 				return;
 			}
 			if (!EmulatorReference.IsWebUrl(text))
 			{
-				MessageBox.Show(this, "No official setup guide is saved for this emulator. Use Edit information and links to add one.", "FishBowl");
+				FishBowlMessageBox.Show(this, "No official setup guide is saved for this emulator. Use Edit information and links to add one.", "FishBowl");
 				return;
 			}
 			try
@@ -2504,7 +2504,7 @@ namespace EmulatorHub
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(this, "The official setup guide could not be opened.\n\n" + ex.Message, "FishBowl");
+				FishBowlMessageBox.Show(this, "The official setup guide could not be opened.\n\n" + ex.Message, "FishBowl");
 			}
 		}
 
@@ -2561,7 +2561,7 @@ namespace EmulatorHub
 			EmulatorProfile emulator = CurrentEmulator();
 			if (emulator == null)
 			{
-				MessageBox.Show(this, "Select an emulator first.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first.", "FishBowl");
 				return;
 			}
 			OpenFileDialog openFileDialog = new OpenFileDialog();
@@ -2582,7 +2582,7 @@ namespace EmulatorHub
 				GameConverter gameConverter = library.Converters.FirstOrDefault((GameConverter item) => item.EmulatorId == emulator.Id && (item.InputExtensions ?? "").Split(',').Any((string value) => string.Equals(value.Trim().TrimStart('.'), extension.TrimStart('.'), StringComparison.OrdinalIgnoreCase)));
 				if (gameConverter == null)
 				{
-					MessageBox.Show(this, "FishBowl has no registered extractor or converter for " + extension + " with " + emulator.Name + ".\n\nAdd one from Game converters, then try again.", "FishBowl");
+					FishBowlMessageBox.Show(this, "FishBowl has no registered extractor or converter for " + extension + " with " + emulator.Name + ".\n\nAdd one from Game converters, then try again.", "FishBowl");
 				}
 				else
 				{
@@ -2622,7 +2622,7 @@ namespace EmulatorHub
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(this, "FishBowl could not extract that ZIP archive.\n\n" + ex.Message, "FishBowl");
+				FishBowlMessageBox.Show(this, "FishBowl could not extract that ZIP archive.\n\n" + ex.Message, "FishBowl");
 			}
 		}
 
@@ -2631,7 +2631,7 @@ namespace EmulatorHub
 			EmulatorProfile emulatorProfile = CurrentEmulator();
 			if (emulatorProfile == null)
 			{
-				MessageBox.Show(this, "Select an emulator first, then add its converter.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select an emulator first, then add its converter.", "FishBowl");
 				return;
 			}
 			using (TextPromptDialog textPromptDialog = new TextPromptDialog("Game Converter", "Converter name for " + emulatorProfile.Name))
@@ -2690,7 +2690,7 @@ namespace EmulatorHub
 		{
 			if (!File.Exists(tool.Program))
 			{
-				MessageBox.Show(this, "The converter program cannot be found. Add it again from Game converters.", "FishBowl");
+				FishBowlMessageBox.Show(this, "The converter program cannot be found. Add it again from Game converters.", "FishBowl");
 				return;
 			}
 			string[] array = (from item in (tool.InputExtensions ?? "").Split(',')
@@ -2714,7 +2714,7 @@ namespace EmulatorHub
 		{
 			if (!File.Exists(tool.Program))
 			{
-				MessageBox.Show(this, "The converter program cannot be found. Add it again from Game converters.", "FishBowl");
+				FishBowlMessageBox.Show(this, "The converter program cannot be found. Add it again from Game converters.", "FishBowl");
 				return;
 			}
 			string text = tool.OutputExtension ?? "";
@@ -2737,7 +2737,7 @@ namespace EmulatorHub
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(this, "The converter could not be started.\n\n" + ex.Message, "FishBowl");
+				FishBowlMessageBox.Show(this, "The converter could not be started.\n\n" + ex.Message, "FishBowl");
 			}
 		}
 
@@ -2941,7 +2941,7 @@ namespace EmulatorHub
             if (frame != null) { frame.PauseForPlay = playSurface != null && playSurface.HasSessions; frame.ApplyState(); }
 				SetStatus(profile.Name + " is already running.");
 			}
-			else if (!library.Theme.ConfirmBeforeEmulatorLaunch || MessageBox.Show(this, "Open " + launchName + "? FishBowl will start the emulator normally without changing its settings.", "Open emulator", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+			else if (!library.Theme.ConfirmBeforeEmulatorLaunch || FishBowlMessageBox.Show(this, "Open " + launchName + "? FishBowl will start the emulator normally without changing its settings.", "Open emulator", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 			{
 				var playBeforeLaunch = SessionLedger.ProcessSnapshot();
                 ProcessStartInfo processStartInfo = EmulatorStartInfo(profile);
@@ -2992,7 +2992,7 @@ namespace EmulatorHub
 			}
 			string text2 = (EmulatorReference.IsWebUrl(emulatorReference.Documentation) ? emulatorReference.Documentation : emulatorReference.Website);
 			string text3 = profile.Name + " requires additional setup before it can run some or all games.\n\nWHAT THIS EMULATOR REQUIRES\n" + text + "\n\nWHERE TO CONFIGURE IT\nIn FishBowl, select " + profile.Name + " and open Emulators > Setup checks. Choose the firmware folder you already use, then follow the emulator's own setup screen.\n\nFishBowl does not include, download, or bypass BIOS, firmware, system software, or keys. Use files you are allowed to use and the emulator's official instructions.\n\nOpen the official setup guide now?";
-			if (MessageBox.Show(this, text3, "Setup required", MessageBoxButtons.YesNo, MessageBoxIcon.Asterisk) != DialogResult.Yes)
+			if (FishBowlMessageBox.Show(this, text3, "Setup required", MessageBoxButtons.YesNo, MessageBoxIcon.Asterisk) != DialogResult.Yes)
 			{
 				return;
 			}
@@ -3007,11 +3007,11 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, "The official setup guide could not be opened.\n\n" + ex.Message, "FishBowl");
+					FishBowlMessageBox.Show(this, "The official setup guide could not be opened.\n\n" + ex.Message, "FishBowl");
 					return;
 				}
 			}
-			MessageBox.Show(this, "This emulator does not have a setup link saved yet. Open Edit information and links to add its official guide.", "FishBowl");
+			FishBowlMessageBox.Show(this, "This emulator does not have a setup link saved yet. Open Edit information and links to add its official guide.", "FishBowl");
 		}
 
 		private void EditEmulator()
@@ -3053,7 +3053,7 @@ namespace EmulatorHub
 		private void RemoveEmulator()
 		{
 			EmulatorProfile emulatorProfile = CurrentEmulator();
-			if (emulatorProfile != null && (!library.Theme.ConfirmBeforeEmulatorRemoval || MessageBox.Show(this, "Remove " + emulatorProfile.Name + " from FishBowl?\n\nIts emulator program, games, and saves will stay where they are.", "FishBowl", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes))
+			if (emulatorProfile != null && (!library.Theme.ConfirmBeforeEmulatorRemoval || FishBowlMessageBox.Show(this, "Remove " + emulatorProfile.Name + " from FishBowl?\n\nIts emulator program, games, and saves will stay where they are.", "FishBowl", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes))
 			{
 				GameLibraryRemoval.RemoveEmulator(library, emulatorProfile.Id);
 				selectedEmulatorId = null;
@@ -3360,7 +3360,7 @@ namespace EmulatorHub
 						throw new InvalidDataException("The restore point is not a valid FishBowl library.");
 					}
 					ExperienceData.Ensure(libraryData);
-					if (MessageBox.Show(this, "Restore this FishBowl library?\n\n" + libraryData.Emulators.Count + " emulators, " + libraryData.Games.Count + " games, " + libraryData.SaveSnapshots.Count + " save snapshots.\n\nCurrent settings will receive a restore point first. Emulator and game files are unchanged.", "Review library restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+					if (FishBowlMessageBox.Show(this, "Restore this FishBowl library?\n\n" + libraryData.Emulators.Count + " emulators, " + libraryData.Games.Count + " games, " + libraryData.SaveSnapshots.Count + " save snapshots.\n\nCurrent settings will receive a restore point first. Emulator and game files are unchanged.", "Review library restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
 					{
 						Store.CreateRestorePoint(library, "Before library restore");
 						Store.Save(libraryData);
@@ -3378,7 +3378,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.12"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.13"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3386,7 +3386,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.12"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.13"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3394,7 +3394,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.12"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.13"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -3615,7 +3615,7 @@ namespace EmulatorHub
 			catch (Exception ex)
 			{
 				Store.Log("Action failed: " + ex);
-				MessageBox.Show(this, "FishBowl could not complete this action.\n\n" + ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show(this, "FishBowl could not complete this action.\n\n" + ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -3927,11 +3927,11 @@ namespace EmulatorHub
 			try
 			{
 				string executablePath = Application.ExecutablePath;
-				MessageBox.Show(Platform.CreateAppShortcut(executablePath, FishBowlBranding.WriteShortcutIcon()), "FishBowl");
+				FishBowlMessageBox.Show(Platform.CreateAppShortcut(executablePath, FishBowlBranding.WriteShortcutIcon()), "FishBowl");
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("FishBowl could not create the desktop shortcut.\n\n" + ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show("FishBowl could not create the desktop shortcut.\n\n" + ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -4008,7 +4008,7 @@ namespace EmulatorHub
 			Uri result;
 			if (!Uri.TryCreate(link.Url, UriKind.Absolute, out result) || (result.Scheme != Uri.UriSchemeHttp && result.Scheme != Uri.UriSchemeHttps))
 			{
-				MessageBox.Show("This saved link is not a valid http or https address.", "FishBowl");
+				FishBowlMessageBox.Show("This saved link is not a valid http or https address.", "FishBowl");
 				return;
 			}
 			try
@@ -4018,7 +4018,7 @@ namespace EmulatorHub
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("The website could not be opened:\n" + ex.Message, "FishBowl");
+				FishBowlMessageBox.Show("The website could not be opened:\n" + ex.Message, "FishBowl");
 			}
 		}
 
@@ -4031,11 +4031,11 @@ namespace EmulatorHub
 		{
 			if (Store.PortableMode)
 			{
-				MessageBox.Show("FishBowl is already using portable storage beside the app.", "FishBowl");
+				FishBowlMessageBox.Show("FishBowl is already using portable storage beside the app.", "FishBowl");
 				return;
 			}
 			Store.EnablePortableMode(library);
-			MessageBox.Show("Portable mode is ready. Your library is now stored beside FishBowl in the FishBowlData folder.", "FishBowl");
+			FishBowlMessageBox.Show("Portable mode is ready. Your library is now stored beside FishBowl in the FishBowlData folder.", "FishBowl");
 		}
 
 		private void ShowEmulatorManager(string page)
@@ -4561,7 +4561,7 @@ namespace EmulatorHub
 			}
 			if (library.SaveReviews.Count == 0)
 			{
-				MessageBox.Show(this, "No changed saves await review. Link original saves or choose emulator save folders to begin monitoring.", "FishBowl Game Saves");
+				FishBowlMessageBox.Show(this, "No changed saves await review. Link original saves or choose emulator save folders to begin monitoring.", "FishBowl Game Saves");
 				return;
 			}
 			reviewingSaveNotifications = true;
@@ -5636,7 +5636,7 @@ namespace EmulatorHub
 				GameEntry game = library.Games.FirstOrDefault((GameEntry g) => g.Id == args[index + 1]);
 				if (game == null)
 				{
-					MessageBox.Show(this, "This Jump List game is no longer in your library.", "FishBowl");
+					FishBowlMessageBox.Show(this, "This Jump List game is no longer in your library.", "FishBowl");
 				}
 				else
 				{
@@ -6293,7 +6293,7 @@ namespace EmulatorHub
 
 		private void OfferStartupRecovery()
 		{
-			if (recovery != null && recovery.Interrupted && library.Hub.ResumeAfterCrash && MessageBox.Show(this, "The previous FishBowl run did not close cleanly. Reopen the remembered Library view?", "Recover Library view", MessageBoxButtons.YesNo) == DialogResult.Yes)
+			if (recovery != null && recovery.Interrupted && library.Hub.ResumeAfterCrash && FishBowlMessageBox.Show(this, "The previous FishBowl run did not close cleanly. Reopen the remembered Library view?", "Recover Library view", MessageBoxButtons.YesNo) == DialogResult.Yes)
 			{
 				workspaceNavigation.SelectedIndex = 2;
 				embeddedLibrary.ReloadLibrary();
@@ -6340,7 +6340,7 @@ namespace EmulatorHub
 				if (captureRunning)
 				{
 					b.Cancel = true;
-					MessageBox.Show(this, "A scheduled save capture is finishing. Wait for it to complete, then close FishBowl.", "Save capture in progress");
+					FishBowlMessageBox.Show(this, "A scheduled save capture is finishing. Wait for it to complete, then close FishBowl.", "Save capture in progress");
 				}
 			};
 			base.Disposed += delegate
@@ -6841,7 +6841,7 @@ namespace EmulatorHub
 
 		private EmulatorProfile profile;
 
-		private readonly ComboBox profiles = new ComboBox();
+		private readonly ComboBox profiles = new ReferenceComboBox();
 
 		private readonly TabControl tabs = new FishBowlTabs();
 
@@ -6861,7 +6861,7 @@ namespace EmulatorHub
 
 		private readonly TextBox repository = new TextBox();
 
-		private readonly ComboBox setupPreset = new ComboBox();
+		private readonly ComboBox setupPreset = new ReferenceComboBox();
 
 		private readonly ListView discovered = new SmoothListView();
 
@@ -7039,7 +7039,7 @@ namespace EmulatorHub
 			if (!base.IsDisposed)
 			{
 				progress.Text = "Action could not finish.";
-				MessageBox.Show(this, ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show(this, ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -8029,7 +8029,7 @@ namespace EmulatorHub
 			{
 				if (!string.IsNullOrWhiteSpace(item.Value.Text) && !EmulatorReference.IsWebUrl(item.Value.Text.Trim()))
 				{
-					MessageBox.Show(this, "Use a full http or https web address for each link, or leave it blank.", "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					FishBowlMessageBox.Show(this, "Use a full http or https web address for each link, or leave it blank.", "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					return;
 				}
 			}
@@ -8048,7 +8048,7 @@ namespace EmulatorHub
 
 		private readonly TextBox iconPath = new TextBox();
 
-		private readonly ComboBox preset = new ComboBox();
+		private readonly ComboBox preset = new ReferenceComboBox();
 
 		private readonly Label hint = new Label();
 
@@ -8177,7 +8177,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, "The website could not be opened.\n\n" + ex.Message, "FishBowl");
+					FishBowlMessageBox.Show(this, "The website could not be opened.\n\n" + ex.Message, "FishBowl");
 				}
 			};
 			flowLayoutPanel.Controls.Add(fishBowlActionButton2);
@@ -8285,7 +8285,7 @@ namespace EmulatorHub
 			string path = executable.Text.Trim().Trim('"');
 			if (name.Text.Trim().Length == 0 || !File.Exists(path) || !EmulatorReference.IsLaunchFile(path))
 			{
-				MessageBox.Show(this, "Enter a display name and choose an existing Windows emulator program or shortcut (.exe, .bat, .cmd, or .lnk).", "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show(this, "Enter a display name and choose an existing Windows emulator program or shortcut (.exe, .bat, .cmd, or .lnk).", "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				return;
 			}
 			Profile = existingProfile ?? new EmulatorProfile
@@ -8425,7 +8425,7 @@ namespace EmulatorHub
 
 		private readonly CheckBox copyFiles = new CheckBox();
 
-		private readonly ComboBox forcedConsole = new ComboBox();
+		private readonly ComboBox forcedConsole = new ReferenceComboBox();
 
 		private readonly List<string> queued = new List<string>();
 
@@ -8660,7 +8660,7 @@ namespace EmulatorHub
 					}
 					Store.Save(library);
 					RefreshQueue();
-					MessageBox.Show(this, "Organized " + selected.Count + " game groups. Library > Undo latest organization can reverse this operation.", "FishBowl");
+					FishBowlMessageBox.Show(this, "Organized " + selected.Count + " game groups. Library > Undo latest organization can reverse this operation.", "FishBowl");
 				}
 			}
 			catch (OperationCanceledException)
@@ -8668,14 +8668,14 @@ namespace EmulatorHub
 				queued.RemoveAll((string path) => !File.Exists(path));
 				RefreshQueue();
 				Store.Save(library);
-				MessageBox.Show(this, "Cancelled. Completed work is recorded for reviewed undo; remaining files stay queued.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Cancelled. Completed work is recorded for reviewed undo; remaining files stay queued.", "FishBowl");
 			}
 			catch (Exception ex2)
 			{
 				queued.RemoveAll((string path) => !File.Exists(path));
 				RefreshQueue();
 				Store.Save(library);
-				MessageBox.Show(this, ex2.Message + "\n\nRemaining items stay queued. Review Library > Undo latest organization for completed work.", "Organization stopped", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show(this, ex2.Message + "\n\nRemaining items stay queued. Review Library > Undo latest organization for completed work.", "Organization stopped", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 	}
@@ -8768,9 +8768,9 @@ namespace EmulatorHub
 
 		private readonly CheckBox copyFiles = new CheckBox();
 
-		private readonly ComboBox platform = new ComboBox();
+		private readonly ComboBox platform = new ReferenceComboBox();
 
-		private readonly ComboBox kind = new ComboBox();
+		private readonly ComboBox kind = new ReferenceComboBox();
 
 		private readonly List<string> queued = new List<string>();
 
@@ -9017,7 +9017,7 @@ namespace EmulatorHub
 			{
 				text5 = text5 + "\n\nCould not store:\n" + string.Join("\n", list.Take(5));
 			}
-			MessageBox.Show(this, text5, "FishBowl Requirements Storage");
+			FishBowlMessageBox.Show(this, text5, "FishBowl Requirements Storage");
 		}
 	}
 	public class PersonalWorkspaceDialog : FishBowlDialog
@@ -9114,7 +9114,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, ex.Message, "FishBowl Game Library", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					FishBowlMessageBox.Show(this, ex.Message, "FishBowl Game Library", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 			};
 			panel.Controls.Add(fishBowlActionButton2);
@@ -9206,12 +9206,12 @@ namespace EmulatorHub
 				}
 				else
 				{
-					MessageBox.Show(this, "That local path is unavailable. Use Edit to repair it.", "FishBowl");
+					FishBowlMessageBox.Show(this, "That local path is unavailable. Use Edit to repair it.", "FishBowl");
 				}
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(this, "FishBowl could not open that workspace item.\n\n" + ex.Message, "FishBowl");
+				FishBowlMessageBox.Show(this, "FishBowl could not open that workspace item.\n\n" + ex.Message, "FishBowl");
 			}
 		}
 
@@ -9245,7 +9245,7 @@ namespace EmulatorHub
 
 		private readonly TextBox notes = new TextBox();
 
-		private readonly ComboBox kind = new ComboBox();
+		private readonly ComboBox kind = new ReferenceComboBox();
 
 		public WorkspaceItemDialog(WorkspaceItem item)
 		{
@@ -9434,9 +9434,9 @@ namespace EmulatorHub
 	{
 		private readonly LibraryData library;
 
-		private readonly ComboBox gameChoice = new ComboBox();
+		private readonly ComboBox gameChoice = new ReferenceComboBox();
 
-		private readonly ComboBox category = new ComboBox();
+		private readonly ComboBox category = new ReferenceComboBox();
 
 		private readonly ListView files = new ListView();
 
@@ -9560,7 +9560,7 @@ namespace EmulatorHub
 			{
 				if (Game == null)
 				{
-					MessageBox.Show(this, "Add or select a game in Library first.", "FishBowl");
+					FishBowlMessageBox.Show(this, "Add or select a game in Library first.", "FishBowl");
 				}
 				else
 				{
@@ -9569,7 +9569,7 @@ namespace EmulatorHub
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(this, ex.Message, "FishBowl Game Saves", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show(this, ex.Message, "FishBowl Game Saves", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			}
 		}
 
@@ -9632,7 +9632,7 @@ namespace EmulatorHub
 				select (GameSaveEntry)item.Tag).ToArray();
 			if (array.Length == 0)
 			{
-				MessageBox.Show(this, "Select linked save files to copy into the game's library folders.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Select linked save files to copy into the game's library folders.", "FishBowl");
 				return;
 			}
 			List<string> list = new List<string>();
@@ -9653,7 +9653,7 @@ namespace EmulatorHub
 			RefreshFiles();
 			if (list.Count > 0)
 			{
-				MessageBox.Show(this, string.Join("\n", list), "Some saves could not be copied");
+				FishBowlMessageBox.Show(this, string.Join("\n", list), "Some saves could not be copied");
 			}
 		}
 
@@ -9731,17 +9731,17 @@ namespace EmulatorHub
 
 		private readonly TextBox search = new TextBox();
 
-		private readonly ComboBox scope = new ComboBox();
+		private readonly ComboBox scope = new ReferenceComboBox();
 
 		private readonly List<Button> selectionActions = new List<Button>();
 
-		private readonly ComboBox consoleChoice = new ComboBox();
+		private readonly ComboBox consoleChoice = new ReferenceComboBox();
 
-		private readonly ComboBox emulatorChoice = new ComboBox();
+		private readonly ComboBox emulatorChoice = new ReferenceComboBox();
 
-		private readonly ComboBox saveChoice = new ComboBox();
+		private readonly ComboBox saveChoice = new ReferenceComboBox();
 
-		private readonly ComboBox sortChoice = new ComboBox();
+		private readonly ComboBox sortChoice = new ReferenceComboBox();
 
 		private readonly TextBox tagChoice = new TextBox();
 
@@ -9968,7 +9968,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, ex.Message, "FishBowl Game Library", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					FishBowlMessageBox.Show(this, ex.Message, "FishBowl Game Library", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 			};
 			panel.Controls.Add(fishBowlActionButton2);
@@ -10048,7 +10048,7 @@ namespace EmulatorHub
         {
             if (library.Games.Count == 0)
             {
-                MessageBox.Show(this, "Add a game to check its platform setup.", "FishBowl");
+                FishBowlMessageBox.Show(this, "Add a game to check its platform setup.", "FishBowl");
                 return;
             }
             using (var dialog = new NextDialog("Platform setup", 820, 560))
@@ -10056,7 +10056,7 @@ namespace EmulatorHub
                 var selected = SelectedGame();
                 var platforms = library.Games.Select(ConsoleName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name);
                 var platform = NextDialog.Choice(platforms, selected == null ? consoleChoice.SelectedItem as string : ConsoleName(selected));
-                var title = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Title" };
+                var title = new ReferenceComboBox { DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Title" };
                 var details = new TextBox { ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical };
                 var fields = NextDialog.Fields(dialog.Body);
                 NextDialog.Field(fields, "Platform", platform);
@@ -10096,7 +10096,7 @@ namespace EmulatorHub
                     var game = title.SelectedItem as GameEntry;
                     if (game == null) return;
                     try { GameSessions.Validate(library, game); }
-                    catch (Exception ex) { MessageBox.Show(dialog, ex.Message, "Setup needs attention"); return; }
+                    catch (Exception ex) { FishBowlMessageBox.Show(dialog, ex.Message, "Setup needs attention"); return; }
                     ExperienceTools.Launch(dialog, library, game);
                     RefreshGames();
                 });
@@ -10130,7 +10130,7 @@ namespace EmulatorHub
             var selected = games.SelectedItems.Cast<ListViewItem>().Select(row => row.Tag as GameEntry).Where(game => game != null).ToArray();
             if (selected.Length == 0) return;
             string name = selected.Length == 1 ? selected[0].Title : selected.Length + " selected games";
-            if (MessageBox.Show(this, "Remove " + name + " from FishBowl?\n\nGame files, saves and emulator installations will stay on disk. These games will be skipped by folder scans until you add them again.", "Remove games", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            if (FishBowlMessageBox.Show(this, "Remove " + name + " from FishBowl?\n\nGame files, saves and emulator installations will stay on disk. These games will be skipped by folder scans until you add them again.", "Remove games", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
             GameLibraryRemoval.RemoveGames(library, selected.Select(game => game.Id));
             Store.Save(library);
             RefreshGames();
@@ -10577,7 +10577,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					FishBowlMessageBox.Show(this, ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 			};
 			menu.Items.Add(toolStripMenuItem2);
@@ -11826,7 +11826,7 @@ namespace EmulatorHub
 
 		private readonly ListBox collections = new ListBox();
 
-		private readonly ComboBox smartRule = new ComboBox();
+		private readonly ComboBox smartRule = new ReferenceComboBox();
 
 		public CollectionsDialog(LibraryData library, IEnumerable<GameEntry> selected)
 		{
@@ -11994,7 +11994,7 @@ namespace EmulatorHub
 
 		private readonly TextBox artwork = new TextBox();
 
-		private readonly ComboBox preferredEmulator = new ComboBox();
+		private readonly ComboBox preferredEmulator = new ReferenceComboBox();
 
 		private readonly TextBox arguments = new TextBox();
 
@@ -12199,7 +12199,7 @@ namespace EmulatorHub
 		{
 			if (string.IsNullOrWhiteSpace(title.Text) || string.IsNullOrWhiteSpace(path.Text))
 			{
-				MessageBox.Show("Title and game file are required.", "FishBowl");
+				FishBowlMessageBox.Show("Title and game file are required.", "FishBowl");
 				base.DialogResult = DialogResult.None;
 				return;
 			}
@@ -12219,7 +12219,7 @@ namespace EmulatorHub
                 catch (Exception error) {
                     if (!(error is IOException || error is ArgumentException || error is UnauthorizedAccessException || error is OutOfMemoryException || error is System.Runtime.InteropServices.ExternalException)) throw;
                     Game = null;
-                    MessageBox.Show(this, "The cover image could not be loaded. Choose an existing image file.\n\n" + error.Message, "Game artwork", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    FishBowlMessageBox.Show(this, "The cover image could not be loaded. Choose an existing image file.\n\n" + error.Message, "Game artwork", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     DialogResult = DialogResult.None;
                     return;
                 }
@@ -12522,7 +12522,7 @@ namespace EmulatorHub
 			Uri result;
 			if (!Uri.TryCreate(url.Text.Trim(), UriKind.Absolute, out result) || (result.Scheme != Uri.UriSchemeHttp && result.Scheme != Uri.UriSchemeHttps))
 			{
-				MessageBox.Show("Enter a complete http or https image address.", "FishBowl");
+				FishBowlMessageBox.Show("Enter a complete http or https image address.", "FishBowl");
 				base.DialogResult = DialogResult.None;
 			}
 			else
@@ -12767,7 +12767,7 @@ namespace EmulatorHub
 	}
 	public class GameProgressDialog : FishBowlDialog
 	{
-		private readonly ComboBox status = new ComboBox();
+		private readonly ComboBox status = new ReferenceComboBox();
 
 		private readonly NumericUpDown rating = new NumericUpDown();
 
@@ -12853,7 +12853,7 @@ namespace EmulatorHub
 	}
 	public class SettingsDialog : FishBowlDialog
 	{
-		private readonly ComboBox theme = new ComboBox();
+		private readonly ComboBox theme = new ReferenceComboBox();
 
 		private readonly TextBox backupFolder = new TextBox();
 
@@ -12869,15 +12869,15 @@ namespace EmulatorHub
 
 		private readonly NumericUpDown backupDays = new NumericUpDown();
 
-		private readonly ComboBox accent = new ComboBox();
+		private readonly ComboBox accent = new ReferenceComboBox();
 
-		private readonly ComboBox appIconColor = new ComboBox();
+		private readonly ComboBox appIconColor = new ReferenceComboBox();
 
-		private readonly ComboBox fontFamily = new ComboBox();
+		private readonly ComboBox fontFamily = new ReferenceComboBox();
 
-		private readonly ComboBox uiScale = new ComboBox();
+		private readonly ComboBox uiScale = new ReferenceComboBox();
 
-		private readonly ComboBox density = new ComboBox();
+		private readonly ComboBox density = new ReferenceComboBox();
 
 		private readonly CheckBox showBanner = new CheckBox();
 
@@ -12891,9 +12891,9 @@ namespace EmulatorHub
 
 		private readonly CheckBox alternateRows = new CheckBox();
 
-		private readonly ComboBox selectionContrast = new ComboBox();
+		private readonly ComboBox selectionContrast = new ReferenceComboBox();
 
-		private readonly ComboBox iconTileShape = new ComboBox();
+		private readonly ComboBox iconTileShape = new ReferenceComboBox();
 
 		private readonly ThemeSettings originalTheme;
 
@@ -13447,7 +13447,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, "FishBowl could not open that file.\n\n" + ex.Message, "FishBowl");
+					FishBowlMessageBox.Show(this, "FishBowl could not open that file.\n\n" + ex.Message, "FishBowl");
 				}
 			}
 		}
@@ -14018,7 +14018,7 @@ namespace EmulatorHub
 			EventHandler value = delegate
 			{
 				Clipboard.SetText(BuildReport());
-				MessageBox.Show(this, "Feedback report copied. Review it before sharing.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Feedback report copied. Review it before sharing.", "FishBowl");
 			};
 			fishBowlActionButton.Click += value;
 			base.Controls.Add(fishBowlActionButton);
@@ -14334,7 +14334,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, "Windows controller settings could not be opened.\n\n" + ex.Message, "FishBowl");
+					FishBowlMessageBox.Show(this, "Windows controller settings could not be opened.\n\n" + ex.Message, "FishBowl");
 				}
 			};
 			base.Controls.Add(fishBowlActionButton2);
@@ -14834,7 +14834,7 @@ namespace EmulatorHub
 	}
 	public class PerformanceDialog : FishBowlDialog
 	{
-		private readonly ComboBox mode = new ComboBox();
+		private readonly ComboBox mode = new ReferenceComboBox();
 
 		private readonly CheckBox pause = new CheckBox();
 
@@ -14930,9 +14930,9 @@ namespace EmulatorHub
 	}
 	public class MultiplayerDialog : FishBowlDialog
 	{
-		private readonly ComboBox emulator = new ComboBox();
+		private readonly ComboBox emulator = new ReferenceComboBox();
 
-		private readonly ComboBox mode = new ComboBox();
+		private readonly ComboBox mode = new ReferenceComboBox();
 
 		private readonly CheckBox inviteOnly = new CheckBox();
 
@@ -15076,7 +15076,7 @@ namespace EmulatorHub
 		{
 			if (SelectedProfile == null)
 			{
-				MessageBox.Show(this, "Add an emulator before starting a session.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Add an emulator before starting a session.", "FishBowl");
 				base.DialogResult = DialogResult.None;
 				return;
 			}
@@ -15096,7 +15096,7 @@ namespace EmulatorHub
 	{
 		private readonly TextBox relay = new TextBox();
 
-		private readonly ComboBox channel = new ComboBox();
+		private readonly ComboBox channel = new ReferenceComboBox();
 
 		private readonly CheckBox inviteOnly = new CheckBox();
 
@@ -15226,7 +15226,7 @@ namespace EmulatorHub
 			Uri result;
 			if (text.Length > 0 && (!Uri.TryCreate(text, UriKind.Absolute, out result) || result.Scheme != "https"))
 			{
-				MessageBox.Show(this, "Use a full https LiveKit token endpoint, or leave it blank.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Use a full https LiveKit token endpoint, or leave it blank.", "FishBowl");
 				base.DialogResult = DialogResult.None;
 				return;
 			}
@@ -15335,7 +15335,7 @@ namespace EmulatorHub
 			Uri result;
 			if (!Uri.TryCreate(url.Text.Trim(), UriKind.Absolute, out result) || (result.Scheme != Uri.UriSchemeHttp && result.Scheme != Uri.UriSchemeHttps))
 			{
-				MessageBox.Show("Enter a complete http or https website address.", "FishBowl");
+				FishBowlMessageBox.Show("Enter a complete http or https website address.", "FishBowl");
 				base.DialogResult = DialogResult.None;
 				return;
 			}
@@ -15364,7 +15364,7 @@ namespace EmulatorHub
 			}
 		}
 
-		private readonly ComboBox links = new ComboBox();
+		private readonly ComboBox links = new ReferenceComboBox();
 
 		public WebsiteLink SelectedLink { get; private set; }
 
@@ -16749,6 +16749,7 @@ namespace EmulatorHub
 			{
 				return;
 			}
+			ReferenceWindowStyle.ApplyCaption(form);
 			styledRevisions[form] = paletteRevision;
 			if (!styledForms.Add(form))
 			{
@@ -16757,6 +16758,7 @@ namespace EmulatorHub
 			}
 			else if (form != null)
 			{
+				form.HandleCreated += delegate { ReferenceWindowStyle.ApplyCaption(form); };
 				ApplyAppIcon(form);
 				StyleControl(form);
 				if (!(form is FishBowlDialog))
@@ -16846,7 +16848,7 @@ namespace EmulatorHub
 			ComboBox comboBox = control as ComboBox;
 			if (comboBox != null)
 			{
-				comboBox.FlatStyle = FlatStyle.Standard;
+				comboBox.FlatStyle = SystemInformation.HighContrast ? FlatStyle.Standard : FlatStyle.Flat;
 				if (comboBox.DropDownStyle != ComboBoxStyle.DropDownList) comboBox.DrawMode = DrawMode.Normal;
 			}
 			ListView list = control as ListView;
@@ -17280,8 +17282,26 @@ namespace EmulatorHub
 			base.OnEnabledChanged(e);
 		}
 
+		private void PaintParentBackground(PaintEventArgs e)
+		{
+			if (Parent == null) { base.OnPaintBackground(e); return; }
+			Control surface = Parent;
+			while (surface.Parent != null && surface.BackColor.A != 255) surface = surface.Parent;
+			e.Graphics.Clear(surface.BackColor.A == 255 ? surface.BackColor : FishBowlPalette.ThemeBottom);
+			GraphicsState state = e.Graphics.Save();
+			try
+			{
+				e.Graphics.TranslateTransform(-Left, -Top);
+				Rectangle clip = e.ClipRectangle;
+				clip.Offset(Left, Top);
+				InvokePaintBackground(Parent, new PaintEventArgs(e.Graphics, clip));
+			}
+			finally { e.Graphics.Restore(state); }
+		}
+
 		protected override void OnPaint(PaintEventArgs e)
 		{
+			PaintParentBackground(e);
 			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 			RectangleF box = new RectangleF(0.5f, 0.5f, Math.Max(1, base.Width - 1), Math.Max(1, base.Height - 1));
 			Color color = (base.Enabled ? BackColor : FishBowlPalette.DisabledSurface);
@@ -17601,13 +17621,13 @@ namespace EmulatorHub
 			};
 			Store.ShowWarning = delegate(string message)
 			{
-				MessageBox.Show(message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show(message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			};
 			Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 			Application.ThreadException += delegate(object sender, ThreadExceptionEventArgs e)
 			{
 				Store.Log("Interface action failed: " + e.Exception);
-				MessageBox.Show("FishBowl could not complete this action.\n\n" + e.Exception.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+				FishBowlMessageBox.Show("FishBowl could not complete this action.\n\n" + e.Exception.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 			};
 			try
 			{
@@ -17616,7 +17636,7 @@ namespace EmulatorHub
 			catch (Exception ex)
 			{
 				Store.Log("Startup failed: " + ex);
-				MessageBox.Show("FishBowl could not start.\n\n" + ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+				FishBowlMessageBox.Show("FishBowl could not start.\n\n" + ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Hand);
 			}
 		}
 	}
@@ -22072,7 +22092,7 @@ namespace EmulatorHub
 	}
 	public class SaveCopyPromptDialog : FishBowlDialog
 	{
-		private readonly ComboBox games = new ComboBox();
+		private readonly ComboBox games = new ReferenceComboBox();
 
 		public SaveCopyPromptDialog(LibraryData library, string source, IEnumerable<GameEntry> candidates)
 		{
@@ -22162,7 +22182,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, "The save could not be copied. Wait for the emulator to finish saving, then retry.\n\n" + ex.Message, "FishBowl Game Saves", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					FishBowlMessageBox.Show(this, "The save could not be copied. Wait for the emulator to finish saving, then retry.\n\n" + ex.Message, "FishBowl Game Saves", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 			};
 			base.Controls.Add(copy);
@@ -22805,7 +22825,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(button.FindForm(), ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					FishBowlMessageBox.Show(button.FindForm(), ex.Message, "FishBowl", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 				}
 			};
 			return button;
@@ -22827,7 +22847,7 @@ namespace EmulatorHub
 
 		public static FlowLayoutPanel Bar()
 		{
-			FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel();
+			FlowLayoutPanel flowLayoutPanel = new ReferenceToolbar();
 			flowLayoutPanel.Dock = DockStyle.Bottom;
 			flowLayoutPanel.AutoSize = true;
 			flowLayoutPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -23590,9 +23610,9 @@ namespace EmulatorHub
 	{
 		private readonly LibraryData library;
 
-		private readonly ComboBox games = new ComboBox();
+		private readonly ComboBox games = new ReferenceComboBox();
 
-		private readonly ComboBox kind = new ComboBox();
+		private readonly ComboBox kind = new ReferenceComboBox();
 
 		private readonly ListView list = new ListView();
 
@@ -23827,7 +23847,7 @@ namespace EmulatorHub
 					return;
 				}
 				string text3 = "Restore " + Game.Title + "?\n\nDestination: " + snapshot.Source + "\n\n" + SaveHistory.Compatibility(library, snapshot) + "\n\nClose the emulator first. Current contents will be backed up and retained.";
-				if (MessageBox.Show(this, text3, "Review save restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes)
+				if (FishBowlMessageBox.Show(this, text3, "Review save restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes)
 				{
 					return;
 				}
@@ -23837,7 +23857,7 @@ namespace EmulatorHub
 					SaveHistory.Restore(library, snapshot, token);
 					return true;
 				});
-				MessageBox.Show(this, "Save restored. The previous live save is retained as a pinned snapshot and an adjacent rollback copy.", "FishBowl");
+				FishBowlMessageBox.Show(this, "Save restored. The previous live save is retained as a pinned snapshot and an adjacent rollback copy.", "FishBowl");
 				break;
 			}
 			case "Export":
@@ -23881,7 +23901,7 @@ namespace EmulatorHub
 				{
 					if (picker.ShowDialog(this) == DialogResult.OK)
 					{
-						if (MessageBox.Show(this, "Import this bundle into " + Game.Title + "? Import creates history only; it does not restore an emulator save.", "Review save import", MessageBoxButtons.YesNo) != DialogResult.Yes)
+						if (FishBowlMessageBox.Show(this, "Import this bundle into " + Game.Title + "? Import creates history only; it does not restore an emulator save.", "Review save import", MessageBoxButtons.YesNo) != DialogResult.Yes)
 						{
 							return;
 						}
@@ -23935,7 +23955,7 @@ namespace EmulatorHub
 				Form dialog = ExperienceUi.Dialog("Save copy preference", 680, 440);
 				try
 				{
-					ComboBox choices = new ComboBox
+					ComboBox choices = new ReferenceComboBox
 					{
 						Dock = DockStyle.Top,
 						DropDownStyle = ComboBoxStyle.DropDownList
@@ -23972,7 +23992,7 @@ namespace EmulatorHub
 				{
 					resultsDialog.ShowDialog(this);
 				}
-				if (list.Count <= 0 || MessageBox.Show(this, "Delete these " + list.Count + " unpinned managed snapshots?", "Confirm cleanup", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes)
+				if (list.Count <= 0 || FishBowlMessageBox.Show(this, "Delete these " + list.Count + " unpinned managed snapshots?", "Confirm cleanup", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes)
 				{
 					break;
 				}
@@ -24070,7 +24090,7 @@ namespace EmulatorHub
 				ExperienceTools.Launch(this, library, game);
 				break;
 			case "Preview launch":
-				MessageBox.Show(this, ExperienceData.Emulator(library, game).Executable + "\n" + GameSessions.Validate(library, game), "Launch command preview");
+				FishBowlMessageBox.Show(this, ExperienceData.Emulator(library, game).Executable + "\n" + GameSessions.Validate(library, game), "Launch command preview");
 				break;
 			case "Saves":
 			{
@@ -24173,7 +24193,7 @@ namespace EmulatorHub
         {
             if (!Hub.Native(game) && (game.RequiresEmulatorAssignment || NextData.LaunchEmulator(library, game) == null)) {
                 var choices = library.Emulators.ToList();
-                if (choices.Count == 0) { MessageBox.Show(owner, "Add an emulator before launching this game.", "FishBowl"); return; }
+                if (choices.Count == 0) { FishBowlMessageBox.Show(owner, "Add an emulator before launching this game.", "FishBowl"); return; }
                 var names = choices.Select(e => string.IsNullOrWhiteSpace(e.Name) ? Path.GetFileNameWithoutExtension(e.Executable) : e.Name).ToList();
                 var labels = names.Select((name, index) => names.Count(n => n == name) > 1 ? name + " (" + (index + 1) + ")" : name).ToList();
                 string choice = Choose(owner, "Preferred emulator", labels, labels[0]);
@@ -24197,9 +24217,9 @@ namespace EmulatorHub
 			ControllerProfile controllerProfile = (library.ControllerProfiles ?? new List<ControllerProfile>()).FirstOrDefault((ControllerProfile p) => p.Id == game.ControllerProfileId);
 			if (controllerProfile != null)
 			{
-				MessageBox.Show(owner, controllerProfile.Name + "\n\n" + controllerProfile.Notes, "Controller reminder");
+				FishBowlMessageBox.Show(owner, controllerProfile.Name + "\n\n" + controllerProfile.Notes, "Controller reminder");
 			}
-			if ((library.Theme.ConfirmBeforeGameLaunch && MessageBox.Show(owner, "Launch " + game.Title + "?\n\n" + emulatorProfile.Executable + "\n" + text, "Launch game", MessageBoxButtons.YesNo) != DialogResult.Yes) || !Immersion.PreLaunch(owner, library, game))
+			if ((library.Theme.ConfirmBeforeGameLaunch && FishBowlMessageBox.Show(owner, "Launch " + game.Title + "?\n\n" + emulatorProfile.Executable + "\n" + text, "Launch game", MessageBoxButtons.YesNo) != DialogResult.Yes) || !Immersion.PreLaunch(owner, library, game))
 			{
 				return;
 			}
@@ -24213,7 +24233,7 @@ namespace EmulatorHub
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(owner, "Game launch cancelled because the linked saves could not be backed up.\n\n" + ex.Message, "Backup before launch");
+					FishBowlMessageBox.Show(owner, "Game launch cancelled because the linked saves could not be backed up.\n\n" + ex.Message, "Backup before launch");
 					return;
 				}
 			}
@@ -24278,7 +24298,7 @@ namespace EmulatorHub
         {
             int restored = GameLibraryRemoval.Undo(library);
             Store.Save(library);
-            MessageBox.Show(owner, restored == 0 ? "No entries could be restored. Existing entries were kept." : "Restored entries: " + restored, "FishBowl");
+            FishBowlMessageBox.Show(owner, restored == 0 ? "No entries could be restored. Existing entries were kept." : "Restored entries: " + restored, "FishBowl");
             foreach (var main in Application.OpenForms.OfType<MainForm>()) main.RefreshUserToolsViews(library);
         }
         public static void CleanupArtwork(IWin32Window owner, LibraryData library)
@@ -24296,14 +24316,14 @@ namespace EmulatorHub
                     backups.Add(backup);
                 }
                 var files = LibraryPaths.ArtworkCandidates(library, Store.DataDirectory, backups);
-                if (files.Count == 0) { MessageBox.Show(owner, "Nothing needs attention.", "FishBowl"); return; }
+                if (files.Count == 0) { FishBowlMessageBox.Show(owner, "Nothing needs attention.", "FishBowl"); return; }
                 if (!Polish.Review(owner, "Cleanup artwork", "Unused artwork files: " + files.Count + "\r\n\r\n" + string.Join("\r\n", files.Select(Path.GetFileName)) + "\r\n\r\nRemove these unused FishBowl artwork files? Covers used by games, Undo removal and library backups are kept.")) return;
                 // Check references again after the review, including any library edits made while it was open.
                 var current = new HashSet<string>(LibraryPaths.ArtworkCandidates(library, Store.DataDirectory, backups), Platform.PathComparer);
                 int removed = 0;
                 foreach (var file in files) if (current.Contains(file)) { File.Delete(file); removed++; }
-                MessageBox.Show(owner, "Removed artwork files: " + removed, "FishBowl");
-            } catch (Exception error) { MessageBox.Show(owner, "Artwork cleanup could not be completed.\r\n\r\n" + error.Message, "FishBowl"); }
+                FishBowlMessageBox.Show(owner, "Removed artwork files: " + removed, "FishBowl");
+            } catch (Exception error) { FishBowlMessageBox.Show(owner, "Artwork cleanup could not be completed.\r\n\r\n" + error.Message, "FishBowl"); }
         }
 
         private static string Choose(IWin32Window owner, string title, IEnumerable<string> items, string current)
@@ -24311,7 +24331,7 @@ namespace EmulatorHub
 			Form dialog = ExperienceUi.Dialog(title, 680, 440);
 			try
 			{
-				ComboBox choices = new ComboBox
+				ComboBox choices = new ReferenceComboBox
 				{
 					Dock = DockStyle.Top,
 					DropDownStyle = ComboBoxStyle.DropDownList
@@ -24410,7 +24430,7 @@ namespace EmulatorHub
 
 		private static ComboBox Choices(IEnumerable<string> items, string selected)
 		{
-			ComboBox comboBox = new ComboBox();
+			ComboBox comboBox = new ReferenceComboBox();
 			comboBox.DropDownStyle = ComboBoxStyle.DropDownList;
 			ComboBox comboBox2 = comboBox;
 			comboBox2.Items.AddRange(items.Cast<object>().ToArray());
@@ -24552,7 +24572,7 @@ namespace EmulatorHub
 				{
 					settings.SnoozeUntil = DateTime.UtcNow.AddHours(1.0).ToString("o");
 					Store.Save(library);
-					MessageBox.Show(dialog, "Save notifications snoozed for one hour. Review remains available.", "FishBowl");
+					FishBowlMessageBox.Show(dialog, "Save notifications snoozed for one hour. Review remains available.", "FishBowl");
 				}));
 				flowLayoutPanel3.Controls.Add(ExperienceUi.Button("Resume prompts", delegate
 				{
@@ -24660,7 +24680,7 @@ namespace EmulatorHub
 			Form dialog = ExperienceUi.Dialog("Emulator Readiness, Releases and Save Folders");
 			try
 			{
-				ComboBox choices = new ComboBox
+				ComboBox choices = new ReferenceComboBox
 				{
 					Dock = DockStyle.Top,
 					DropDownStyle = ComboBoxStyle.DropDownList,
@@ -24808,7 +24828,7 @@ namespace EmulatorHub
 							}
 						}
 					}
-					MessageBox.Show(dialog, string.Join("\n", list), "Save-folder write checks");
+					FishBowlMessageBox.Show(dialog, string.Join("\n", list), "Save-folder write checks");
 				}));
 				dialog.Controls.Add(text);
 				dialog.Controls.Add(choices);
@@ -24893,7 +24913,7 @@ namespace EmulatorHub
                         if (picker.ShowDialog(dialog) != DialogResult.OK) return;
                         string oldRoot = Path.GetDirectoryName(selected.Path), newRoot = picker.SelectedPath;
                         int count = LibraryPaths.Rebase(library, oldRoot, newRoot, false);
-                        if (count == 0) { MessageBox.Show(dialog, "No matching files found in this folder.", "FishBowl"); return; }
+                        if (count == 0) { FishBowlMessageBox.Show(dialog, "No matching files found in this folder.", "FishBowl"); return; }
                         if (!Polish.Review(dialog, "Review game path repair", "Old folder: " + oldRoot + "\r\nNew folder: " + newRoot + "\r\n\r\nMatching paths: " + count + "\r\nGame identity, notes and save associations stay together. No files are moved.")) return;
                         LibraryPaths.Rebase(library, oldRoot, newRoot, true); Store.Save(library); reload();
                     }
@@ -24931,7 +24951,7 @@ namespace EmulatorHub
 						{
 							resultsDialog.ShowDialog(owner);
 						}
-						if (list.Count > 0 && MessageBox.Show(owner, "Apply the reviewed path mapping? Every replacement game file must already exist.", "Review portable paths", MessageBoxButtons.YesNo) == DialogResult.Yes)
+						if (list.Count > 0 && FishBowlMessageBox.Show(owner, "Apply the reviewed path mapping? Every replacement game file must already exist.", "Review portable paths", MessageBoxButtons.YesNo) == DialogResult.Yes)
 						{
 							Store.CreateRestorePoint(library, "Before portable path remap");
 							PortablePaths.Apply(library, textPromptDialog.Value, folderBrowserDialog2.SelectedPath, list);
@@ -24957,7 +24977,7 @@ namespace EmulatorHub
 			{
 				resultsDialog.ShowDialog(owner);
 			}
-			if (MessageBox.Show(owner, "Undo the latest organization operation? Changed or missing files stop the operation.", "Confirm undo", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+			if (FishBowlMessageBox.Show(owner, "Undo the latest organization operation? Changed or missing files stop the operation.", "Confirm undo", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
 			{
 				BackgroundWork<bool>.Run(owner, "Undo organization", delegate(CancellationToken token, Action<string> progress)
 				{
@@ -25127,7 +25147,7 @@ namespace EmulatorHub
 					flowLayoutPanel.Controls.Add(ExperienceUi.Button("Preview / apply", delegate
 					{
 						GameEntry gameEntry = list.SelectedItem as GameEntry;
-						if (gameEntry != null && MessageBox.Show(dialog, "Title: " + gameEntry.Title + "\nGenre: " + gameEntry.Genre + "\nDeveloper: " + gameEntry.Developer + "\nYear: " + gameEntry.ReleaseYear + "\n\n" + gameEntry.Description + "\n\nApply these metadata fields? Game and save paths stay attached to the same record.", "Review metadata", MessageBoxButtons.YesNo) == DialogResult.Yes)
+						if (gameEntry != null && FishBowlMessageBox.Show(dialog, "Title: " + gameEntry.Title + "\nGenre: " + gameEntry.Genre + "\nDeveloper: " + gameEntry.Developer + "\nYear: " + gameEntry.ReleaseYear + "\n\n" + gameEntry.Description + "\n\nApply these metadata fields? Game and save paths stay attached to the same record.", "Review metadata", MessageBoxButtons.YesNo) == DialogResult.Yes)
 						{
 							game.Title = gameEntry.Title;
 							game.Genre = gameEntry.Genre;
@@ -25220,7 +25240,7 @@ namespace EmulatorHub
 					{
 						resultsDialog.ShowDialog(dialog);
 					}
-					if (MessageBox.Show(dialog, "Export verified snapshot bundles into " + folder.Text + "? Existing conflicting archives receive unique filenames. The provider controls upload.", "Review cloud export", MessageBoxButtons.YesNo) == DialogResult.Yes)
+					if (FishBowlMessageBox.Show(dialog, "Export verified snapshot bundles into " + folder.Text + "? Existing conflicting archives receive unique filenames. The provider controls upload.", "Review cloud export", MessageBoxButtons.YesNo) == DialogResult.Yes)
 					{
 						BackgroundWork<int>.Run(dialog, "Export snapshot bundles", delegate(CancellationToken token, Action<string> progress)
 						{
@@ -25303,12 +25323,12 @@ namespace EmulatorHub
 							{
 								throw new InvalidDataException("Invalid library restore point.");
 							}
-							MessageBox.Show(dialog, "Restore point contains " + libraryData.Emulators.Count + " emulators and " + libraryData.Games.Count + " games.", "Verified metadata");
+							FishBowlMessageBox.Show(dialog, "Restore point contains " + libraryData.Emulators.Count + " emulators and " + libraryData.Games.Count + " games.", "Verified metadata");
 						}
 						else
 						{
 							BackupManifest backupManifest = BackgroundWork<BackupManifest>.Run(dialog, "Verify backup contents", (CancellationToken token, Action<string> progress) => BackupIntegrity.Verify(path2, token));
-							MessageBox.Show(dialog, backupManifest.EmulatorName + "\n" + backupManifest.Files.Count + " verified files\nCreated: " + backupManifest.CreatedAt, "Backup verified");
+							FishBowlMessageBox.Show(dialog, backupManifest.EmulatorName + "\n" + backupManifest.Files.Count + " verified files\nCreated: " + backupManifest.CreatedAt, "Backup verified");
 						}
 					}
 				}));
@@ -25336,7 +25356,7 @@ namespace EmulatorHub
 						{
 							resultsDialog2.ShowDialog(dialog);
 						}
-						if (MessageBox.Show(dialog, "Restore this reviewed emulator backup?", "Confirm backup restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+						if (FishBowlMessageBox.Show(dialog, "Restore this reviewed emulator backup?", "Confirm backup restore", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
 						{
 							BackgroundWork<string>.Run(dialog, "Restore verified emulator backup", (CancellationToken token, Action<string> progress) => EmulatorBackups.Restore(emulator, path, root, token));
 						}
@@ -25356,7 +25376,7 @@ namespace EmulatorHub
 							library.Experience.PinnedBackupPaths.Add(text);
 						}
 						Store.Save(library);
-						MessageBox.Show(dialog, library.Experience.PinnedBackupPaths.Contains(text) ? "Pinned; retention will preserve it." : "Unpinned.", "Backup retention");
+						FishBowlMessageBox.Show(dialog, library.Experience.PinnedBackupPaths.Contains(text) ? "Pinned; retention will preserve it." : "Unpinned.", "Backup retention");
 					}
 				}));
 				flowLayoutPanel.Controls.Add(ExperienceUi.Button("Retention settings", delegate
@@ -25375,7 +25395,7 @@ namespace EmulatorHub
 					{
 						resultsDialog.ShowDialog(dialog);
 					}
-					if (list2.Count > 0 && MessageBox.Show(dialog, "Delete the " + list2.Count + " reviewed, unpinned backup files?", "Confirm cleanup", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+					if (list2.Count > 0 && FishBowlMessageBox.Show(dialog, "Delete the " + list2.Count + " reviewed, unpinned backup files?", "Confirm cleanup", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
 					{
 						foreach (string item in list2)
 						{
@@ -25424,7 +25444,7 @@ namespace EmulatorHub
 				ForeColor = Color.White,
 				Text = string.Join("\r\n", paths)
 			};
-			ComboBox gameChoice = new ComboBox
+			ComboBox gameChoice = new ReferenceComboBox
 			{
 				Dock = DockStyle.Top,
 				DropDownStyle = ComboBoxStyle.DropDownList,
@@ -26031,7 +26051,7 @@ namespace EmulatorHub
 						}
 						catch (Exception ex)
 						{
-							MessageBox.Show(dialog, ex.Message, "Artwork");
+							FishBowlMessageBox.Show(dialog, ex.Message, "Artwork");
 						}
 					}
 				};
@@ -26309,7 +26329,7 @@ namespace EmulatorHub
 
 		public static ComboBox Games(LibraryData data, GameEntry selected)
 		{
-			ComboBox comboBox = new ComboBox();
+			ComboBox comboBox = new ReferenceComboBox();
 			comboBox.DropDownStyle = ComboBoxStyle.DropDownList;
 			comboBox.DisplayMember = "Title";
 			comboBox.Dock = DockStyle.Top;
@@ -26334,15 +26354,15 @@ namespace EmulatorHub
 			{
 				TableLayoutPanel table = NextDialog.Fields(dialog.Body);
 				ComboBox game = Games(data, selected);
-				ComboBox builds = new ComboBox
+				ComboBox builds = new ReferenceComboBox
 				{
 					DropDownStyle = ComboBoxStyle.DropDownList
 				};
-				ComboBox discs = new ComboBox
+				ComboBox discs = new ReferenceComboBox
 				{
 					DropDownStyle = ComboBoxStyle.DropDownList
 				};
-				ComboBox profiles = new ComboBox
+				ComboBox profiles = new ReferenceComboBox
 				{
 					DropDownStyle = ComboBoxStyle.DropDownList
 				};
@@ -26661,7 +26681,7 @@ namespace EmulatorHub
 					}
 					SaveSnapshot snap = (SaveSnapshot)list.SelectedItems[0].Tag;
 					int num = BackgroundWork<int>.Run(dialog, "Count snapshot files", (CancellationToken token, Action<string> progress) => NextData.SnapshotFiles(snap, token).Count);
-					MessageBox.Show(dialog, num + " files in this snapshot.", "Snapshot file count");
+					FishBowlMessageBox.Show(dialog, num + " files in this snapshot.", "Snapshot file count");
 				});
 				dialog.Action("Note", delegate
 				{
@@ -26832,7 +26852,7 @@ namespace EmulatorHub
 	}
 	public class NextDialog : FishBowlDialog
 	{
-		public readonly Panel Body = new Panel
+		public readonly Panel Body = new ReferenceHomeCard
 		{
 			Dock = DockStyle.Fill,
 			AutoScroll = true,
@@ -26852,11 +26872,11 @@ namespace EmulatorHub
             var heading = new Label
             {
                 Text = title, AccessibleName = title, Dock = DockStyle.Top, AutoSize = true,
-                Padding = new Padding(16, 9, 12, 9), Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
-                BackColor = FishBowlPalette.ThemeTop, ForeColor = FishBowlPalette.ThemeInk
+                Padding = new Padding(16, 12, 12, 12), Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+                BackColor = FishBowlPalette.ThemeBottom, ForeColor = FishBowlPalette.ThemeInk
             };
             TextChanged += delegate { heading.Text = Text; heading.AccessibleName = Text; };
-            Body.BackColor = FishBowlPalette.ThemeBottom;
+            Body.BackColor = ColorHarmony.Card;
             Actions.Padding = new Padding(10, 4, 10, 4);
             base.Controls.Add(Body);
             base.Controls.Add(Actions);
@@ -26884,6 +26904,7 @@ namespace EmulatorHub
 		public static TableLayoutPanel Fields(Control parent)
 		{
 			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
+			tableLayoutPanel.BackColor = Color.Transparent;
 			tableLayoutPanel.Dock = DockStyle.Top;
 			tableLayoutPanel.AutoSize = true;
 			tableLayoutPanel.ColumnCount = 2;
@@ -26915,7 +26936,7 @@ namespace EmulatorHub
 
 		public static ComboBox Choice(IEnumerable<string> items, string selected)
 		{
-			ComboBox comboBox = new ComboBox();
+			ComboBox comboBox = new ReferenceComboBox();
 			comboBox.DropDownStyle = ComboBoxStyle.DropDownList;
 			ComboBox comboBox2 = comboBox;
 			comboBox2.Items.AddRange(items.Cast<object>().ToArray());
@@ -27467,7 +27488,7 @@ namespace EmulatorHub
 					{
 						throw new IOException("Download and verify a release first.");
 					}
-					if (MessageBox.Show(dialog, "Install the reviewed release and close FishBowl? Your library and emulator files are not part of the replacement.", "Apply FishBowl update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+					if (FishBowlMessageBox.Show(dialog, "Install the reviewed release and close FishBowl? Your library and emulator files are not part of the replacement.", "Apply FishBowl update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
 					{
 						PrepareApply(staged, reviewedHashes);
 						dialog.Close();
@@ -27506,7 +27527,7 @@ namespace EmulatorHub
 									throw new IOException("Rollback folder is incomplete.");
 								}
 							}
-							if (MessageBox.Show(dialog, "Restore this saved runtime build and restart FishBowl?", "Rollback", MessageBoxButtons.YesNo) == DialogResult.Yes)
+							if (FishBowlMessageBox.Show(dialog, "Restore this saved runtime build and restart FishBowl?", "Rollback", MessageBoxButtons.YesNo) == DialogResult.Yes)
 							{
 								PrepareApply(folderBrowserDialog.SelectedPath);
 								dialog.Close();
@@ -27763,7 +27784,7 @@ namespace EmulatorHub
 			catch (Exception ex)
 			{
 				Show();
-				MessageBox.Show(this, ex.Message, "Launch game");
+				FishBowlMessageBox.Show(this, ex.Message, "Launch game");
 			}
 		}
 
@@ -28224,7 +28245,7 @@ namespace EmulatorHub
 			NextDialog dialog = new NextDialog("Smart Library lists", 1000, 620);
 			try
 			{
-				ComboBox choices = new ComboBox
+				ComboBox choices = new ReferenceComboBox
 				{
 					Dock = DockStyle.Top,
 					DropDownStyle = ComboBoxStyle.DropDownList,
@@ -28292,7 +28313,7 @@ namespace EmulatorHub
 				dialog.Action("Delete list", delegate
 				{
 					SmartLibraryList smartLibraryList2 = choices.SelectedItem as SmartLibraryList;
-					if (smartLibraryList2 != null && MessageBox.Show(dialog, "Delete this smart list? Games stay in your Library.", "FishBowl", MessageBoxButtons.YesNo) == DialogResult.Yes)
+					if (smartLibraryList2 != null && FishBowlMessageBox.Show(dialog, "Delete this smart list? Games stay in your Library.", "FishBowl", MessageBoxButtons.YesNo) == DialogResult.Yes)
 					{
 						data.SmartLists.Remove(smartLibraryList2);
 						Store.Save(data);
@@ -28590,7 +28611,7 @@ namespace EmulatorHub
 				if (saveFileDialog2.ShowDialog(owner) == DialogResult.OK)
 				{
 					File.WriteAllText(saveFileDialog2.FileName, Csv(list), new UTF8Encoding(true));
-					MessageBox.Show(owner, "Exported " + list.Count + " games.", "FishBowl");
+					FishBowlMessageBox.Show(owner, "Exported " + list.Count + " games.", "FishBowl");
 				}
 			}
 		}
@@ -29393,7 +29414,7 @@ namespace EmulatorHub
 				tabPage4.Controls.Add(flowLayoutPanel4);
 				flowLayoutPanel4.Controls.Add(ExperienceUi.Label("Choose a game for diagnostics. Integrity checks compare raw files with a local XML DAT; archives and disc sets are not unpacked.", 80));
 				List<GameEntry> source = d.Games.OrderBy((GameEntry g) => g.Title).ToList();
-				ComboBox choice = new ComboBox
+				ComboBox choice = new ReferenceComboBox
 				{
 					Width = 600,
 					DropDownStyle = ComboBoxStyle.DropDownList,
@@ -29688,7 +29709,7 @@ namespace EmulatorHub
 						if (ActiveLaunches > 0)
 						{
 							b.Cancel = true;
-							MessageBox.Show(f, "Close the launched emulator before leaving guest mode.", "Guest browser");
+							FishBowlMessageBox.Show(f, "Close the launched emulator before leaving guest mode.", "Guest browser");
 						}
 					};
 					f.ShowDialog(owner);
@@ -30379,7 +30400,7 @@ namespace EmulatorHub
 			try
 			{
 				TableLayoutPanel table = NextDialog.Fields(f.Body);
-				ComboBox choice = new ComboBox
+				ComboBox choice = new ReferenceComboBox
 				{
 					DropDownStyle = ComboBoxStyle.DropDownList,
 					DisplayMember = "Name"

@@ -37,7 +37,7 @@ namespace EmulatorHub
     }
     public sealed class RemotePlayDialog : NextDialog
     {
-        readonly ComboBox targets = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        readonly ComboBox targets = new ReferenceComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
         readonly CheckBox allow = new CheckBox { Text = "Allow approved guest controls", AutoSize = true };
         readonly Label status = new Label { AutoSize = true, MaximumSize = new Size(680, 0) };
         readonly TextBox service = new TextBox();
