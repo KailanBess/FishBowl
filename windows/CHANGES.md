@@ -1,3 +1,8 @@
+# Windows 1.29.10
+
+- Add optional snapshots of linked saves before starting a game.
+- Add the Unplayed smart collection rule.
+
 # Windows 1.29.9
 
 - Show renderer mode, emulator profile, XInput detection and the last Focus game result in Play session details.
