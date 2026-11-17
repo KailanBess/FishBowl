@@ -74,12 +74,12 @@ class SmoothUiTests
                 Check(Buffered(f),"Startup dialog painting is buffered");
                 var root=f.Controls.Find("StartupPromptRoot",true).Single(); var body=f.Controls.Find("StartupPromptBody",true).Single();
                 Check(root.Dock==DockStyle.Fill,"Startup popup uses the common shell");
-                Check(NextUi.Descendants(f).OfType<PictureBox>().Any(),"Every startup popup includes the common logo");
+                Check(root.Controls.OfType<Label>().Any(label=>label.Visible&&!string.IsNullOrWhiteSpace(label.Text)),"Every startup popup includes a visible heading");
                 var buttons=NextUi.Descendants(f).OfType<Button>().ToArray();
                 Check(buttons.Length>0&&f.AcceptButton!=null&&f.CancelButton!=null,"Startup actions support Enter and Escape");
                 foreach(var button in buttons)
                 {
-                    Check(button.Width>=TextRenderer.MeasureText(button.Text,button.Font).Width+58,"Startup captions have room for text and action icons");
+                    Check(button.Width>=(button is FishBowlActionButton ? ((FishBowlActionButton)button).TextWidthNeeded() : TextRenderer.MeasureText(button.Text,button.Font).Width+16),"Startup captions have room for text and action icons");
                     var rect=f.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
                     Check(f.ClientRectangle.Contains(rect),"Startup actions remain inside the popup at every text size");
                     var bodyRect=f.RectangleToClient(body.RectangleToScreen(body.ClientRectangle));

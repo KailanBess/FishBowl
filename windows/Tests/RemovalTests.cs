@@ -4,7 +4,6 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using EmulatorHub;
@@ -13,16 +12,20 @@ class RemovalTests
     static int checks;
     static BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
     static void Check(bool value, string name) { checks++; if (!value) throw new Exception(name); }
-    [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
-    [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr window, int message, IntPtr w, IntPtr l);
-    static void Confirm(Action action, int response)
+    static void Confirm(Action action, DialogResult response)
     {
         bool answered = false; int ticks = 0;
         using (var timer = new System.Windows.Forms.Timer { Interval = 40 })
         {
             timer.Tick += delegate {
-                IntPtr dialog = FindWindow("#32770", "Remove games");
-                if (dialog != IntPtr.Zero) { timer.Stop(); answered = true; SendMessage(dialog, 0x111, new IntPtr(response), IntPtr.Zero); }
+                var dialog = Application.OpenForms.Cast<Form>().OfType<ReferenceMessageDialog>().FirstOrDefault(form => form.Text == "Remove games");
+                if (dialog != null)
+                {
+                    timer.Stop();
+                    Check(((Button)dialog.AcceptButton).DialogResult == DialogResult.No, "Removal keeps No as the default action");
+                    answered = true;
+                    dialog.Actions.Controls.OfType<Button>().Single(button => button.DialogResult == response).PerformClick();
+                }
                 else if (++ticks > 100) { timer.Stop(); throw new Exception("Removal confirmation missing"); }
             };
             timer.Start(); action(); Check(answered, "Removal asks for confirmation");
@@ -30,6 +33,7 @@ class RemovalTests
     }
     [STAThread] static int Main()
     {
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         try { Run(); Console.WriteLine("PASS: " + checks + " removal, disk preservation, scans, persistence and UI checks."); return 0; }
         catch (Exception e) { Console.WriteLine(e); return 1; }
     }
@@ -50,13 +54,14 @@ class RemovalTests
         {
             form.ShowInTaskbar=false; form.StartPosition=FormStartPosition.Manual; form.Location=new Point(-4000,-4000); form.Show(); Application.DoEvents();
             var list=(ListView)typeof(GameLibraryDialog).GetField("games",flags).GetValue(form);
+            NextUi.Descendants(form).OfType<Button>().Single(b=>b.Text=="Filters").PerformClick(); Application.DoEvents();
             var remove=NextUi.Descendants(form).OfType<Button>().First(b=>b.Text=="Remove game");
             Check(remove.Visible && !remove.Enabled,"Visible removal action disabled without selection");
             list.Items.Cast<ListViewItem>().First(row=>((GameEntry)row.Tag).Id=="one").Selected=true; Application.DoEvents();
             Check(remove.Enabled,"Removal enabled with selection");
             Check(list.ContextMenuStrip.Items.Cast<ToolStripItem>().Any(item=>item.Text.Contains("Remove selected games")),"Right-click removal available");
-            Confirm(remove.PerformClick,7); Check(data.Games.Count==2 && Store.Load().Games.Count==2,"Cancel leaves library unchanged");
-            Confirm(remove.PerformClick,6); Check(data.Games.Count==1 && list.Items.Count==1,"Confirm removes selected game and refreshes rows");
+            Confirm(remove.PerformClick,DialogResult.No); Check(data.Games.Count==2 && Store.Load().Games.Count==2,"Cancel leaves library unchanged");
+            Confirm(remove.PerformClick,DialogResult.Yes); Check(data.Games.Count==1 && list.Items.Count==1,"Confirm removes selected game and refreshes rows");
             Check(Store.Load().Games.Count==1,"Game removal persists");
             Check(data.Collections[0].GameIds.SequenceEqual(new[]{"two"}) && data.PlayQueue.SequenceEqual(new[]{"two"}),"Removed references cleaned from collection and queue");
             Check(GameLibraryRemoval.IsExcluded(Store.Load(),one.ToUpperInvariant()),"Scan exclusion persists and ignores case");

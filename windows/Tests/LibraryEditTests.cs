@@ -52,12 +52,15 @@ class LibraryEditTests
         Check(entry.ArtworkPath!=green && File.Exists(entry.ArtworkPath),"Cover retained in FishBowl artwork storage");
         Check(File.Exists(green),"Original selected image remains on disk");
         File.Delete(green);Check(File.Exists(entry.ArtworkPath),"Retained cover survives removal of original image");
-        entry.Title="Saved title";data.Games.Add(entry);data.Cosmetics.DetailPreview=true;data.Experience.LibraryView="Details";Store.Save(data);
+        entry.Title="Saved title";data.Games.Add(entry);data.Cosmetics.DetailPreview=true;data.Experience.LibraryView="Details";
+        UserTools.Ensure(data).Navigation=new LibraryNavigation { Artwork=false };Store.Save(data);
         Check(Store.Load().Games.Single().Title=="Saved title" && Store.Load().Games.Single().TitleIsCustom,"Title preference survives library reload");
         using(var library=new GameLibraryDialog(data))
         {
             Show(library);var list=Field<ListView>(library,"games");list.Items[0].Selected=true;Application.DoEvents();
             Wait(()=>list.Items[0].ImageIndex>0,"Default list view loads assigned game image");
+            typeof(GameLibraryDialog).GetMethod("ApplyHubSpacing",flags).Invoke(library,null);
+            Check(list.Items[0].ImageIndex<list.SmallImageList.Images.Count,"resizing retains the loaded list image collection");
             using(var icon=new Bitmap(list.SmallImageList.Images[list.Items[0].ImageIndex]))Check(icon.GetPixel(icon.Width/2,icon.Height/2).G>180,"List row shows selected green cover");
             Check(Field<TextBox>(library,"detailText").Text.StartsWith("Saved title"),"Selected-game preview shows saved display title");
             var old=data.Games[0];

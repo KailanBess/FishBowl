@@ -18,10 +18,24 @@ namespace EmulatorHub
         internal static Color Canvas { get { return FishBowlPalette.ThemeBottom; } }
         internal static Color Rail { get { return FishBowlPalette.ThemeTop; } }
         internal static Color Search { get { return ColorHarmony.Input; } }
-        internal static readonly Color Violet = Color.FromArgb(145, 55, 238);
+        private static Color previousAccent, accessibleAccent;
+        internal static Color Violet
+        {
+            get
+            {
+                if (SystemInformation.HighContrast) return SystemColors.Highlight;
+                var accent = FishBowlPalette.IconAccent;
+                if (accent != previousAccent || accessibleAccent.IsEmpty)
+                {
+                    previousAccent = accent;
+                    accessibleAccent = ColorHarmony.EnsureContrast(accent, Color.White, 4.5);
+                }
+                return accessibleAccent;
+            }
+        }
     }
 
-    internal sealed class ReferenceHomeCard : Panel
+    internal class ReferenceHomeCard : Panel
     {
         internal ReferenceHomeCard() { DoubleBuffered = true; }
         protected override void OnPaintBackground(PaintEventArgs e)
@@ -55,6 +69,7 @@ namespace EmulatorHub
     {
         internal int Radius = 18;
         internal bool LeftAligned;
+        internal bool Primary;
         private bool hovered;
 
         internal ReferenceButton(string title)
@@ -99,6 +114,7 @@ namespace EmulatorHub
                 face = LeftAligned ? ReferencePalette.Search : background;
                 ink = Color.FromArgb(228, 221, 236);
             }
+            if (Primary) { face = SystemInformation.HighContrast ? SystemColors.Highlight : ReferencePalette.Violet; ink = FishBowlPalette.EnsureReadable(Color.White, face); }
             e.Graphics.Clear(background);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var rect = new Rectangle(0, 0, Width - 1, Height - 1);

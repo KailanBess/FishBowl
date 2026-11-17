@@ -11,6 +11,26 @@ using EmulatorHub;
 
 class PlayHostTests
 {
+    static System.Collections.Generic.IEnumerable<ToolStripMenuItem> Actions(ToolStripItemCollection items)
+    {
+        foreach (ToolStripMenuItem item in items.OfType<ToolStripMenuItem>())
+        {
+            yield return item;
+            foreach (var child in Actions(item.DropDownItems)) yield return child;
+        }
+    }
+    static void ClickAction(Control root, string caption)
+    {
+        var button = NextUi.Descendants(root).OfType<Button>().FirstOrDefault(item => item.Visible && item.Text == caption);
+        if (button != null) { button.PerformClick(); return; }
+        var more = NextUi.Descendants(root).OfType<Button>().Single(item => item.AccessibleName == "Play actions");
+        Check(more.Enabled, "Play actions are available");
+        var menu = more.ContextMenuStrip;
+        menu.Show(more, new Point(0, more.Height)); Application.DoEvents();
+        var action = Actions(menu.Items).Single(item => item.Text == caption);
+        Check(action.Enabled, "Play action is available: " + caption);
+        action.PerformClick(); menu.Close();
+    }
     static int checks;
     static void Check(bool value, string message) { checks++; if (!value) throw new Exception(message); }
     static void Pump(int milliseconds)
@@ -161,7 +181,8 @@ class PlayHostTests
                 var footer=(Control)Field(main,"workspaceFooter");
                 foreach(int index in new[]{0,1,2,3}) {
                     tabs.SelectedIndex=index; Pump(40);
-                    Check(footer.Controls.OfType<Label>().Single(l=>l.Text=="Filter:").Visible==(index==1),"filter caption belongs only to Emulators section "+index);
+                    var filter=(Control)Field(main,"filterBox");
+                    Check(filter.Visible==(index==1)&&filter.Parent==(Control)Field(main,"primaryToolbar"),"emulator search belongs to its workspace header "+index);
                     if(index==1) {
                         var toolbar=(Control)Field(main,"primaryToolbar");
                         int content=toolbar.Controls.Cast<Control>().Where(c=>c.Visible).Select(c=>c.Bottom+c.Margin.Bottom).DefaultIfEmpty(0).Max()+toolbar.Padding.Bottom+toolbar.Margin.Vertical;
@@ -175,7 +196,7 @@ class PlayHostTests
                 } finally { typeof(PlayWindowHost).GetField("transitioning",Private).SetValue(host,false); }
                 Check(play.OpenSelectedInWindow(),"retry succeeds after native transition completes");
                 var returnToPlay=NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Return to Play");
-                Check(returnToPlay.Enabled,"external window button offers an enabled return action");returnToPlay.PerformClick();
+                Check(returnToPlay.Enabled,"external window button offers an enabled return action");ClickAction(play,"Return to Play");
                 Check(Until(delegate{return host.IsAttached;}),"retry returns exact native session after detach failure");
                 using(var closeSharing=new System.Windows.Forms.Timer{Interval=50}) {
                     bool selectedExact=false,keptAttached=false;
@@ -206,7 +227,7 @@ class PlayHostTests
                                 }
                             } catch(Exception error) { detailError=error; } finally { dialog.Close(); }
                         };
-                        closeDetails.Start();NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="More").ContextMenuStrip.Items[0].PerformClick();
+                        closeDetails.Start();ClickAction(play,"Input and session details");
                     }
                     NextUi.TextPercent=oldText;if(detailError!=null)throw detailError;
                 }
@@ -263,7 +284,7 @@ class PlayHostTests
                     Pump(80);
                     var choices=NextUi.Descendants(play).OfType<ComboBox>().Single();
                     Check(choices.SelectedItem.ToString()=="DPI-aware fixture","adopting hosted executable selects existing exact session");
-                    var open=NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Open in window");open.PerformClick();Pump(100);
+                    ClickAction(play,"Open in window");Pump(100);
                     Check(NextUi.Descendants(play).OfType<PlayWindowHost>().Count(h=>h.IsAttached)==1,"Open in window detaches selected session only");
                     play.Launch(awareProcess,"DPI-aware fixture");
                     Check(Until(delegate{return NextUi.Descendants(play).OfType<PlayWindowHost>().Count(h=>h.IsAttached)==2;}),"duplicate exact launch restores existing external session into Play");

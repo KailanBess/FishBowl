@@ -71,7 +71,7 @@ namespace EmulatorHub {
     try { string page=FishBowlWeb.Address(homepage.Text);var value=new BrowserPreferences{Engine=engine.Text,Executable=executable.Text.Trim(),HomePage=page};
      if(value.Executable.Length>0)FishBowlWeb.Resolve(value);
      settings.Engine=value.Engine;settings.Executable=value.Executable;settings.HomePage=value.HomePage;Store.Save(library);DialogResult=DialogResult.OK;Close();
-    }catch(Exception error){MessageBox.Show(this,error.Message,"Browser settings");}
+    }catch(Exception error){FishBowlMessageBox.Show(this,error.Message,"Browser settings");}
    });Action("Cancel",Close);
   }
  }
@@ -97,9 +97,12 @@ namespace EmulatorHub {
    show=ExperienceUi.Button("Show in app",ShowInApp);
    full=ExperienceUi.Button("Full screen",delegate{if(fullscreen!=null)fullscreen();});
    bar.Controls.AddRange(new Control[]{back,forward,reload,external,show,full,stop,ExperienceUi.Button("Browser settings",delegate{using(var dialog=new BrowserSettingsDialog(library))if(dialog.ShowDialog(FindForm())==DialogResult.OK){if(!HasRunningBrowser)address.Text=FishBowlWeb.Settings(library).HomePage;else status.Text="Browser settings saved. Close this Web session and press Go to use the new browser.";}})});
-   host=new PlayWindowHost{PreserveRendererWindow=true,MaintainViewportBounds=true};empty=ExperienceUi.Label("Browse inside FishBowl. Firefox is the default; Browser settings lets you choose another installed browser. Enter a web address or search, then press Go.",130);empty.Dock=DockStyle.Top;empty.Padding=new Padding(16);host.Controls.Add(empty);
+   host=new PlayWindowHost{PreserveRendererWindow=true,MaintainViewportBounds=true};empty=new ModernBlankState("Browse the web"){Text="Enter a web address or search above, then press Go. Choose your installed browser in Browser settings."};
    status=ExperienceUi.Label("Web is ready. No browser runs until you press Go.",80);status.Dock=DockStyle.Bottom;status.AutoSize=true;
-   Controls.Add(host);Controls.Add(status);Controls.Add(bar);timer=new Timer{Interval=150};timer.Tick+=Tick;UpdateState();
+   var go=bar.Controls.OfType<Button>().Single(button=>button.Text=="Go");
+   var settingsButton=bar.Controls.OfType<Button>().Single(button=>button.Text=="Browser settings");
+   var header=new ModernWorkspaceHeader("Web",address,go,new[]{back,forward,reload,full},new[]{external,show,stop,settingsButton});
+   bar.Dispose();Controls.Add(host);Controls.Add(empty);Controls.Add(status);Controls.Add(header);timer=new Timer{Interval=150};timer.Tick+=Tick;UpdateState();
   }
   protected override void OnLayout(LayoutEventArgs e){WorkspaceInspector.Fit(status,ClientSize.Width,fullScreen);if(empty!=null)empty.MaximumSize=new Size(Math.Max(1,ClientSize.Width),0);base.OnLayout(e);}
   public void Navigate(string input) {

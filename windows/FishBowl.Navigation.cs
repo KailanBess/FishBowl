@@ -54,13 +54,11 @@ namespace EmulatorHub {
  internal static class WorkspaceInspector {
   internal static void Fit(Label status, int width, bool immersive) {
    if(status==null)return;
-   bool side=width>=960&&!immersive;
-   status.Dock=side?DockStyle.Right:DockStyle.Bottom;
-   status.AutoSize=!side;
-   status.MaximumSize=new Size(side?0:Math.Max(1,width),0);
-   if(side)status.Width=235;
+   status.Dock=DockStyle.Bottom;
+   status.AutoSize=true;
+   status.MaximumSize=new Size(Math.Max(1,width),0);
    status.Padding=new Padding(14);
-   status.BackColor=FishBowlPalette.ThemeTop;
+   status.BackColor=ColorHarmony.Card;
    status.ForeColor=FishBowlPalette.ThemeInk;
   }
  }
@@ -135,7 +133,20 @@ namespace EmulatorHub {
   static readonly ControllerInput input=new ControllerInput();static ToolStripDropDown openMenu;
   static readonly HashSet<ToolStrip> attached=new HashSet<ToolStrip>();
   static readonly HashSet<ToolStripMenuItem> wired=new HashSet<ToolStripMenuItem>();
-  public static void Register(ToolStripDropDown menu){if(menu==null||attached.Contains(menu))return;attached.Add(menu);menu.Opened+=delegate{openMenu=menu;};menu.Closed+=delegate{if(openMenu==menu)openMenu=menu.OwnerItem==null?null:menu.OwnerItem.Owner as ToolStripDropDown;};menu.Disposed+=delegate{attached.Remove(menu);if(openMenu==menu)openMenu=null;};WireItems(menu);}
+  public static void Register(ToolStripDropDown menu){
+   if(menu==null||attached.Contains(menu))return;
+   attached.Add(menu);menu.Renderer=new FishBowlMenuRenderer();Font ownedFont=null;
+   menu.Opening+=delegate{
+    float size=10f*Math.Max(.75f,NextUi.TextPercent/100f);
+    if(ownedFont==null||Math.Abs(ownedFont.Size-size)>.01f||ownedFont.FontFamily.Name!=NextUi.FontFamily){
+     Font previous=ownedFont;ownedFont=new Font(NextUi.FontFamily,size);menu.Font=ownedFont;if(previous!=null)previous.Dispose();
+    }
+    WireItems(menu);
+   };
+   menu.Opened+=delegate{openMenu=menu;};
+   menu.Closed+=delegate{if(openMenu==menu)openMenu=menu.OwnerItem==null?null:menu.OwnerItem.Owner as ToolStripDropDown;};
+   menu.Disposed+=delegate{attached.Remove(menu);if(openMenu==menu)openMenu=null;if(ownedFont!=null)ownedFont.Dispose();};WireItems(menu);
+  }
   static void WireItems(ToolStrip strip){foreach(ToolStripMenuItem item in strip.Items.OfType<ToolStripMenuItem>()){if(!wired.Add(item))continue;item.DropDownOpening+=delegate{Register(item.DropDown);WireItems(item.DropDown);};item.Disposed+=delegate{wired.Remove(item);};}}
   public static void Attach(Form form){foreach(var strip in NextUi.Descendants(form).OfType<MenuStrip>()){if(attached.Add(strip)){WireItems(strip);strip.Disposed+=delegate{attached.Remove(strip);};}}foreach(var control in NextUi.Descendants(form))if(control.ContextMenuStrip!=null)Register(control.ContextMenuStrip);}
   static bool Read(out State state,out int device){state=default(State);device=-1;for(uint i=0;i<4;i++){uint result=1;try{result=Get(i,out state);}catch(DllNotFoundException){try{result=GetOld(i,out state);}catch(DllNotFoundException){try{result=GetLegacy(i,out state);}catch(DllNotFoundException){return false;}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}}catch(EntryPointNotFoundException){return false;}if(result==0){device=(int)i;return true;}}return false;}

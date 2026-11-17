@@ -12,10 +12,10 @@ using Microsoft.Win32;
 
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
-[assembly: AssemblyFileVersion("1.29.12.0")]
+[assembly: AssemblyFileVersion("1.30.0.0")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyTitle("FishBowl")]
-[assembly: AssemblyVersion("1.29.12.0")]
+[assembly: AssemblyVersion("1.30.0.0")]
 namespace FishBowlSetup
 {
 	internal static class Program
@@ -30,16 +30,63 @@ namespace FishBowlSetup
 	}
 	internal sealed class SetupForm : Form
 	{
-		private sealed class OceanPanel : Panel
+		private sealed class GalleryPanel : Panel
 		{
 			protected override void OnPaintBackground(PaintEventArgs e)
 			{
-				using (LinearGradientBrush brush = new LinearGradientBrush(base.ClientRectangle, Color.FromArgb(3, 13, 38), Color.FromArgb(10, 52, 112), LinearGradientMode.Horizontal))
+				using (SolidBrush brush = new SolidBrush(Color.FromArgb(59, 49, 57)))
 				{
 					e.Graphics.FillRectangle(brush, base.ClientRectangle);
 				}
 			}
 		}
+
+        private sealed class SetupButton : Button
+        {
+            public SetupButton() { SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true); }
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                e.Graphics.Clear(Parent == null ? Color.FromArgb(37, 36, 41) : Parent.BackColor);
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Rectangle r = new Rectangle(1, 1, Math.Max(1, Width - 3), Math.Max(1, Height - 3));
+                using (var path = new GraphicsPath())
+                {
+                    int diameter = Math.Min(28, r.Height);
+                    path.AddArc(r.Left, r.Top, diameter, diameter, 180, 90);
+                    path.AddArc(r.Right - diameter, r.Top, diameter, diameter, 270, 90);
+                    path.AddArc(r.Right - diameter, r.Bottom - diameter, diameter, diameter, 0, 90);
+                    path.AddArc(r.Left, r.Bottom - diameter, diameter, diameter, 90, 90); path.CloseFigure();
+                    using (var brush = new SolidBrush(BackColor)) e.Graphics.FillPath(brush, path);
+                    if (Focused) using (var pen = new Pen(Color.White, 2)) e.Graphics.DrawPath(pen, path);
+                }
+                TextRenderer.DrawText(e.Graphics, Text, Font, r, Enabled ? ForeColor : Color.Gray, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            }
+        }
+
+        private DialogResult Notice(string message, bool confirm)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = confirm ? "Replace installed files" : "Installation needs attention";
+                dialog.BackColor = Color.FromArgb(37, 36, 41); dialog.ForeColor = Color.White;
+                dialog.Font = Font; dialog.Icon = Icon; dialog.ClientSize = new Size(640, 300);
+                dialog.MinimumSize = new Size(500, 280); dialog.StartPosition = FormStartPosition.CenterParent;
+                var frame = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 3 };
+                frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); frame.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); frame.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+                frame.Controls.Add(new Label { Text = dialog.Text, Font = new Font("Segoe UI", 18, FontStyle.Bold), Dock = DockStyle.Fill, AutoEllipsis = true }, 0, 0);
+                frame.Controls.Add(new TextBox { Text = message, Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, BorderStyle = BorderStyle.None, ScrollBars = ScrollBars.Vertical, BackColor = Color.FromArgb(48, 46, 54), ForeColor = Color.White }, 0, 1);
+                var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 12, 0, 0), FlowDirection = FlowDirection.RightToLeft };
+                var cancelNotice = new SetupButton { Text = confirm ? "Cancel" : "Close", Size = new Size(110, 38), BackColor = Color.FromArgb(48, 46, 54), ForeColor = Color.White, DialogResult = confirm ? DialogResult.No : DialogResult.OK };
+                actions.Controls.Add(cancelNotice); dialog.CancelButton = cancelNotice; dialog.AcceptButton = cancelNotice;
+                if (confirm)
+                {
+                    var yes = new SetupButton { Text = "Replace files", Size = new Size(140, 38), BackColor = Color.FromArgb(145, 55, 238), ForeColor = Color.White, DialogResult = DialogResult.Yes };
+                    actions.Controls.Add(yes);
+                }
+                frame.Controls.Add(actions, 0, 2); dialog.Controls.Add(frame);
+                return dialog.ShowDialog(this);
+            }
+        }
 
 		private sealed class InstallOptions
 		{
@@ -179,13 +226,13 @@ namespace FishBowlSetup
 
 		private readonly TextBox installPath = new TextBox();
 
-		private readonly Button primary = new Button();
+		private readonly Button primary = new SetupButton();
 
-		private readonly Button back = new Button();
+		private readonly Button back = new SetupButton();
 
-		private readonly Button cancel = new Button();
+		private readonly Button cancel = new SetupButton();
 
-		private readonly Button browse = new Button();
+		private readonly Button browse = new SetupButton();
 
 		private readonly CheckBox desktopShortcut = new CheckBox();
 
@@ -211,17 +258,17 @@ namespace FishBowlSetup
 			base.ClientSize = new Size(780, 520);
 			MinimumSize = new Size(700, 500);
 			base.StartPosition = FormStartPosition.CenterScreen;
-			BackColor = Color.FromArgb(3, 13, 38);
+			BackColor = Color.FromArgb(37, 36, 41);
 			ForeColor = Color.White;
 			Font = new Font("Segoe UI", 10f);
 			base.Icon = LoadIcon();
-			Color color = Color.FromArgb(83, 170, 245);
-			Color borderColor = Color.FromArgb(26, 105, 196);
-			OceanPanel oceanPanel = new OceanPanel
+			Color color = Color.FromArgb(145, 55, 238);
+			Color borderColor = Color.FromArgb(79, 73, 87);
+			GalleryPanel oceanPanel = new GalleryPanel
 			{
 				Dock = DockStyle.Top,
 				Height = 108,
-				BackColor = Color.FromArgb(5, 31, 78)
+				BackColor = Color.FromArgb(59, 49, 57)
 			};
 			logo.Image = LoadLogo();
 			logo.SizeMode = PictureBoxSizeMode.Zoom;
@@ -230,7 +277,7 @@ namespace FishBowlSetup
 			oceanPanel.Controls.Add(logo);
 			Label value = new Label
 			{
-				Text = "FishBowl",
+				Text = "Install your game workspace",
 				Font = new Font("Segoe UI Semibold", 21f),
 				ForeColor = Color.White,
 				AutoSize = true,
@@ -238,9 +285,9 @@ namespace FishBowlSetup
 			};
 			Label value2 = new Label
 			{
-				Text = "FishBowl Setup 1.29.12",
+				Text = "FishBowl Setup 1.30.0",
 				Font = new Font("Segoe UI", 10f),
-				ForeColor = Color.FromArgb(157, 184, 225),
+				ForeColor = Color.FromArgb(193, 187, 200),
 				AutoSize = true,
 				Location = new Point(120, 61)
 			};
@@ -252,14 +299,14 @@ namespace FishBowlSetup
 			title.AutoSize = true;
 			title.Location = new Point(34, 142);
 			base.Controls.Add(title);
-			detail.ForeColor = Color.FromArgb(208, 224, 247);
+			detail.ForeColor = Color.FromArgb(225, 220, 233);
 			detail.Location = new Point(36, 182);
 			detail.Size = new Size(620, 94);
 			base.Controls.Add(detail);
 			installPath.Location = new Point(36, 258);
 			installPath.Size = new Size(505, 29);
 			installPath.ReadOnly = true;
-			installPath.BackColor = Color.FromArgb(10, 52, 112);
+			installPath.BackColor = Color.FromArgb(48, 46, 54);
 			installPath.ForeColor = Color.White;
 			installPath.BorderStyle = BorderStyle.FixedSingle;
 			installPath.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "FishBowl");
@@ -270,13 +317,13 @@ namespace FishBowlSetup
 			browse.FlatStyle = FlatStyle.Flat;
 			browse.FlatAppearance.BorderColor = borderColor;
 			browse.ForeColor = Color.White;
-			browse.BackColor = Color.FromArgb(10, 52, 112);
+			browse.BackColor = Color.FromArgb(48, 46, 54);
 			browse.Click += Browse;
 			base.Controls.Add(browse);
 			desktopShortcut.Text = "Create a desktop shortcut";
 			desktopShortcut.AutoSize = true;
 			desktopShortcut.Checked = true;
-			desktopShortcut.ForeColor = Color.FromArgb(208, 224, 247);
+			desktopShortcut.ForeColor = Color.FromArgb(225, 220, 233);
 			desktopShortcut.Location = new Point(36, 304);
 			base.Controls.Add(desktopShortcut);
 			progress.Location = new Point(36, 305);
@@ -284,7 +331,7 @@ namespace FishBowlSetup
 			progress.Style = ProgressBarStyle.Continuous;
 			progress.Visible = false;
 			base.Controls.Add(progress);
-			footerRule.BackColor = Color.FromArgb(83, 170, 245);
+			footerRule.BackColor = Color.FromArgb(145, 55, 238);
 			base.Controls.Add(footerRule);
 			back.Text = "Back";
 			back.Location = new Point(382, 375);
@@ -292,7 +339,7 @@ namespace FishBowlSetup
 			back.FlatStyle = FlatStyle.Flat;
 			back.FlatAppearance.BorderColor = borderColor;
 			back.ForeColor = Color.White;
-			back.BackColor = Color.FromArgb(10, 52, 112);
+			back.BackColor = Color.FromArgb(48, 46, 54);
 			Button button = back;
 			EventHandler value3 = delegate
 			{
@@ -307,7 +354,7 @@ namespace FishBowlSetup
 			cancel.FlatStyle = FlatStyle.Flat;
 			cancel.FlatAppearance.BorderColor = borderColor;
 			cancel.ForeColor = Color.White;
-			cancel.BackColor = Color.FromArgb(10, 52, 112);
+			cancel.BackColor = Color.FromArgb(48, 46, 54);
 			cancel.Click += delegate
 			{
 				Close();
@@ -318,7 +365,7 @@ namespace FishBowlSetup
 			primary.Size = new Size(86, 32);
 			primary.FlatStyle = FlatStyle.Flat;
 			primary.FlatAppearance.BorderColor = color;
-			primary.ForeColor = Color.FromArgb(3, 13, 38);
+			primary.ForeColor = Color.White;
 			primary.BackColor = color;
 			primary.Font = new Font("Segoe UI Semibold", 9f);
 			primary.Click += PrimaryClick;
@@ -417,7 +464,7 @@ namespace FishBowlSetup
 				page = 1;
 				ShowPage();
 			}
-			else if (page == 1 && (!Directory.Exists(installPath.Text) || Directory.GetFileSystemEntries(installPath.Text).Length <= 0 || MessageBox.Show(this, "FishBowl is already installed here. Replace the existing files?", "FishBowl Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes))
+			else if (page == 1 && (!Directory.Exists(installPath.Text) || Directory.GetFileSystemEntries(installPath.Text).Length <= 0 || Notice("FishBowl is already installed here. Replace the existing files?", true) == DialogResult.Yes))
 			{
 				page = 2;
 				primary.Enabled = false;
@@ -473,7 +520,7 @@ namespace FishBowlSetup
 			using (RegistryKey registryKey = Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FishBowl"))
 			{
 				registryKey.SetValue("DisplayName", "FishBowl");
-				registryKey.SetValue("DisplayVersion", "1.29.12");
+				registryKey.SetValue("DisplayVersion", "1.30.0");
 				registryKey.SetValue("Publisher", "FishBowl");
 				registryKey.SetValue("DisplayIcon", value);
 				registryKey.SetValue("UninstallString", "\"" + Path.Combine(installOptions.Destination, "Uninstall FishBowl.bat") + "\"");
@@ -485,7 +532,7 @@ namespace FishBowlSetup
 		{
 			if (e.Error != null)
 			{
-				MessageBox.Show(this, "FishBowl could not be installed.\n\n" + e.Error.Message, "FishBowl Setup", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+				Notice("FishBowl could not be installed.\n\n" + e.Error.Message, false);
 				page = 1;
 				primary.Enabled = true;
 			}

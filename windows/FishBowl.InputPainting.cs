@@ -35,12 +35,43 @@ namespace EmulatorHub
             if (watched.TryGetValue(c, out marker)) return;
             watched.Add(c, new object());
             c.ControlAdded += delegate(object sender, ControlEventArgs e) { style(e.Control); };
+            var text = c as TextBox;
+            if (text != null)
+            {
+                bool normalizing = false;
+                Action normalize = delegate
+                {
+                    if (normalizing || !text.Multiline || !text.ReadOnly || text.Text.IndexOf('\n') < 0) return;
+                    string value = text.Text.Replace("\r\n", "\n").Replace("\n", "\r\n");
+                    if (value == text.Text) return;
+                    normalizing = true;
+                    try
+                    {
+                        int start = Math.Min(text.SelectionStart, text.Text.Length), length = text.SelectionLength;
+                        text.Text = value; text.Select(Math.Min(start, value.Length), Math.Min(length, Math.Max(0, value.Length - start)));
+                    }
+                    finally { normalizing = false; }
+                };
+                text.TextChanged += delegate { normalize(); };
+                text.MultilineChanged += delegate { normalize(); };
+                normalize();
+                var owner = text.FindForm();
+                if (owner != null) owner.Shown += delegate { if (!text.IsDisposed && text.ReadOnly) text.Select(0, 0); };
+            }
         }
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object> choices = new System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, object>();
         public static void Style(Control c)
         {
+            var check = c as CheckBox;
+            if (check != null) check.FlatStyle = SystemInformation.HighContrast ? FlatStyle.Standard : FlatStyle.Flat;
+            var radio = c as RadioButton;
+            if (radio != null) radio.FlatStyle = SystemInformation.HighContrast ? FlatStyle.Standard : FlatStyle.Flat;
+            if (c is Label || c is CheckBox || c is RadioButton)
+                for (Control parent = c.Parent; parent != null; parent = parent.Parent)
+                    if (parent is ReferenceHomeCard) { c.BackColor = Color.Transparent; break; }
             var choice = c as ComboBox;
             if (choice != null && choice.DropDownStyle == ComboBoxStyle.DropDownList) {
+                choice.FlatStyle = SystemInformation.HighContrast ? FlatStyle.Standard : FlatStyle.Flat;
                 choice.DrawMode = DrawMode.OwnerDrawFixed;
                 choice.ItemHeight = Math.Max(18, choice.Font.Height + 6);
                 choice.BackColor = FishBowlPalette.DeepSeaSurface;
@@ -65,8 +96,8 @@ namespace EmulatorHub
             var text = c as TextBoxBase;
             if (text != null)
             {
-                text.BorderStyle = BorderStyle.FixedSingle;
-                text.BackColor = FishBowlPalette.DeepSeaSurface;
+                text.BorderStyle = text is ReferenceMessageText || text.Parent is ModernInputSurface ? BorderStyle.None : BorderStyle.FixedSingle;
+                text.BackColor = text is ReferenceMessageText ? ColorHarmony.Card : FishBowlPalette.DeepSeaSurface;
                 text.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, text.BackColor);
                 // Preserve native caret, selection, scrollbars and DPI sizing; no clipping regions.
                 if (text.Region != null) { var old = text.Region; text.Region = null; old.Dispose(); }

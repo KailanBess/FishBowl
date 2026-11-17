@@ -2,24 +2,22 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-11-05, coordinated release preparation._
+_Last updated: 2026-11-17, Windows 1.30.0 interface rebuild._
 
 ## Current state
 
 | Area | State |
 | --- | --- |
-| Windows | Source **1.29.4**, browser fitting on branch `fishbowl-browser-auto-fit`. PR #25 is merged; source includes main through `5b96312`. |
+| Windows | **1.30.0** interface rebuild in PR #62, based on released 1.29.12. Full workspace and dialog presentation replaced while existing feature handlers remain. |
 | Linux | Round 1 (#28–#30) and round 2 integrations/QA (#37) merged; round 2 profiles in PR #38 (see Linux work). |
 | Shared | C# 5 game, library, session, save and living-room helpers. Optional Browser/PlayView fields survive Linux saves; Linux browsing remains external. |
 | Issues | [Issue #34](https://github.com/KailanBess/FishBowl/issues/34) tracks automatic browser fitting. Issues #23/#27/#31/#32 are implemented through merged PR #25. |
 
 ## Open pull requests
 
-- [#46: FishBowl 1.29.5 Aquarium family release](https://github.com/KailanBess/FishBowl/pull/46), branch `release/aquarium-family-1.29.5`, targets `main`. Prepared Windows/Linux release packages; normal source checks and approvals must pass before merge/publication.
+- [#62: Windows 1.30.0 interface rebuild](https://github.com/KailanBess/FishBowl/pull/62), branch `fix/consistent-window-style`, targets `main`. Merge after all checks pass. Publish through the release workflow.
+- #50 is the separate iOS proposal and is out of scope for this release.
 
-- [#38: Linux profiles, launch options and settings](https://github.com/KailanBess/FishBowl/pull/38), branch `parity/profiles-2`, targets `main` (see Linux work). #36 and #37 are merged.
-
-Required checks must pass before merging. Distribute executables through Releases or passing workflow artifacts.
 ## Linux work
 
 **Round 2:** PR #37 merged integrations (Flatpak permissions and updates, AppImage updates, Add to Steam, EmuDeck/RetroDECK, AUR `linux/PKGBUILD`, Living Room desktop action) and QA (every Linux screen and dialog checked; interface scale applies to dialogs; single-instance guard: a second launch forwards its arguments to the running copy over a socket in `XDG_RUNTIME_DIR`). PR #38 (`parity/profiles-2`) adds shared `FishBowl.Profiles.cs` (user profiles, guest mode, profile transfer/reviewed sync, multiplayer readiness, ROM integrity, accessibility presets; Windows keeps its dialogs and calls it), Linux launch options per emulator or launch profile (Proton/Wine, GameMode, MangoHud, Gamescope; stored as the extra `LinuxLaunch` field, which Windows ignores), `fishbowl --launch/--launch-last/--list/--help`, and Linux User tools, controller profiles, multiplayer, preferences, appearance/accessibility and keyboard shortcut dialogs. **Windows-side agents: please avoid changing `FishBowl.Avalonia/` until #38 merges.**
@@ -49,6 +47,8 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+
+- **2026-11-17 (Windows):** prepare Windows 1.30.0 with rebuilt Home modules, game/emulator catalogs, Play/Web controls, command navigation, dialog frames, section navigation and field layouts. Native list controls remain offscreen backing state so existing feature handlers retain selection, checks and actions. Runtime confirmations and installer use the gallery surfaces. Optional Theme.WindowsInterfaceVersion applies Gallery Night, Gallery Violet, Segoe UI and artwork view once; later appearance choices persist. Saved fields remain compatible and the retired decorative footer field is retained. Linux receives matching package metadata only. Normal and compact overflow audits report zero findings across six workspaces and 70 dialog types at 100/150/200%. Modern-interface fixtures cover paging, action and check routing, drag-and-drop, sorting, stable card refresh and the one-time appearance migration. Windows C# 5 builds and local native ownership, shutdown, text-field and appearance checks pass. Full GitHub regression and shared/Linux checks must pass before merge. Physical-controller, actual emulator-renderer and mixed-monitor compatibility remain native hardware checks.
 
 - **2026-11-17 (Windows):** remove repeated shell wordmarks, use the active workspace as the native caption, and retire the redundant banner preference from the visible settings. Existing saved fields are retained. Align Home utility cards and shared buttons with the reference geometry while keeping palette choices. Summarize Home activity without showing stack frames, leaving the full log in Activity.
 

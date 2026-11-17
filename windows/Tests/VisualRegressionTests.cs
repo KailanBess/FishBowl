@@ -19,6 +19,28 @@ class VisualRegressionTests
     {
         Application.EnableVisualStyles();
         var library = Store.Load(); ExperienceData.Ensure(library);
+        using (var painted = new Form { ClientSize = new Size(240, 100), BackColor = Color.FromArgb(25, 40, 60) })
+        using (var button = new FishBowlActionButton { Text = "Open", Bounds = new Rectangle(25, 20, 150, 42), BackColor = Color.FromArgb(120, 70, 150) })
+        {
+            painted.Controls.Add(button); Show(painted);
+            using (var bitmap = new Bitmap(button.Width, button.Height))
+            {
+                button.DrawToBitmap(bitmap, button.ClientRectangle);
+                Check(bitmap.GetPixel(0, 0).ToArgb() == painted.BackColor.ToArgb(), "Rounded action corners show the parent surface without rectangular patches: " + bitmap.GetPixel(0, 0) + " vs " + painted.BackColor + " radius " + CosmeticRuntime.Current.CornerRadius);
+                Check(bitmap.GetPixel(button.Width / 2, button.Height / 2).ToArgb() != painted.BackColor.ToArgb(), "Rounded actions still paint their face");
+            }
+        }
+        using (var message = new ReferenceMessageDialog("Review this change.", "Confirm action", MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question, MessageBoxDefaultButton.Button2))
+        {
+            Show(message);
+            Check(((Button)message.AcceptButton).DialogResult == DialogResult.No, "A confirmation retains its safe default action");
+            Check(((Button)message.CancelButton).DialogResult == DialogResult.No, "Escape declines a Yes/No confirmation");
+            Check(message.Actions.Controls.OfType<Button>().Select(button => button.DialogResult).SequenceEqual(new[] { DialogResult.Yes, DialogResult.No }), "Styled confirmations preserve their requested results");
+            Check(message.BackColor == FishBowlPalette.ThemeBottom, "Styled messages inherit the live shell palette");
+            message.Close();
+            Check(message.DialogResult == DialogResult.No, "Closing a styled Yes/No confirmation declines its action");
+        }
         using (var main = new MainForm(true))
         {
             Show(main);
@@ -52,14 +74,14 @@ class VisualRegressionTests
         }
         using (var organizer = new GameStorageOrganizerDialog(library, null))
         {
-            Show(organizer); var buttons = organizer.Controls.OfType<Button>().ToArray();
+            Show(organizer); var buttons = Descendants(organizer).OfType<Button>().Where(button => button.Visible).ToArray();
             for (int i = 0; i < buttons.Length; i++) for (int j = i + 1; j < buttons.Length; j++) Check(!buttons[i].Bounds.IntersectsWith(buttons[j].Bounds), "Organizer actions do not overlap");
         }
         using (var settings = new SettingsDialog(library.Theme, library.BackupFolder))
         {
-            Show(settings); var browse = settings.Controls.OfType<Button>().Single(b => b.Text == "Browse");
+            Show(settings); var browse = Descendants(settings).OfType<Button>().Single(b => b.Text == "Browse");
             Check(browse.Width >= TextRenderer.MeasureText(browse.Text, browse.Font).Width + 36, "Browse label has room for its icon");
-            var info = settings.Controls.OfType<CheckBox>().Single(b => b.Text == "Show emulator information pane");
+            var info = Descendants(settings).OfType<CheckBox>().Single(b => b.Text == "Show emulator information pane");
             Check(info.Right <= settings.ClientSize.Width, "Information-panel checkbox fits");
         }
         using (var history = new SaveHistoryDialog(library, library.Games.FirstOrDefault()))

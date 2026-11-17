@@ -1,3 +1,12 @@
+# Windows 1.30.0
+
+- Rebuild every Windows workspace and app dialog around the gallery shell, with card catalogs, section navigation, stacked fields and consistent confirmations.
+- Replace the old menu strip, emulator sidebar duplication, utility panels, native list presentation and decorative footer.
+- Preserve game, emulator, save, browser, Play and settings actions through the new controls, including paging, selection, checkboxes, drag-and-drop and sorting.
+- Apply Gallery Night, Gallery Violet, Segoe UI and artwork view once when this Windows interface first opens; retain later appearance choices.
+- Match installer surfaces and buttons to the gallery palette. Windows-managed file pickers and system permission prompts keep their operating-system appearance.
+- Retain saved library fields and add an optional Windows interface migration marker. Linux layout is unchanged.
+
 # Windows 1.29.12
 
 - Remove repeated product labels from the main shell. The native title now identifies the active workspace.

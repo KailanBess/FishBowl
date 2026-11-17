@@ -1,5 +1,14 @@
 using System;using System.Collections.Generic;using System.Diagnostics;using System.Drawing;using System.IO;using System.Linq;using System.Reflection;using System.Runtime.InteropServices;using System.Threading;using System.Windows.Forms;using EmulatorHub;
 class BrowserTests {
+ static void ClickAction(Control root,string caption) {
+  var button=NextUi.Descendants(root).OfType<Button>().FirstOrDefault(item=>item.Visible&&item.Text==caption);
+  if(button!=null){button.PerformClick();return;}
+  var more=NextUi.Descendants(root).OfType<Button>().Single(item=>item.AccessibleName=="Web actions");
+  var menu=more.ContextMenuStrip;
+  menu.Show(more,new Point(0,more.Height));Application.DoEvents();
+  var action=menu.Items.OfType<ToolStripMenuItem>().Single(item=>item.Text==caption);
+  Check(action.Enabled,"workspace action is available: "+caption);action.PerformClick();menu.Close();
+ }
  static int checks;static void Check(bool ok,string message){checks++;if(!ok)throw new Exception(message);}
  static void Pump(int ms){var watch=Stopwatch.StartNew();while(watch.ElapsedMilliseconds<ms){Application.DoEvents();Thread.Sleep(10);}}
  static bool Until(Func<bool> done){var watch=Stopwatch.StartNew();while(!done()&&watch.ElapsedMilliseconds<10000)Pump(25);return done();}
@@ -68,10 +77,10 @@ class BrowserTests {
    browser.Navigate("pokemon x");Pump(400);
    if(!realFirefox)Check(File.ReadAllText(Path.Combine(profile,"navigation.txt"))==FishBowlWeb.Address("pokemon x")&&host.GameWindow==navigationWindow,"search updates the same embedded browser");
    if(!realFirefox){var known=Field<List<SessionProcess>>(browser,"known");Check(known.Count(p=>p.EndedUtcTicks==0)==1,"repeated Go creates no second launch process");}
-   NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Open in window").PerformClick();Pump(100);Check(!host.IsAttached&&browser.HasRunningBrowser,"external mode retains browser process");
+   ClickAction(browser,"Open in window");Pump(100);Check(!host.IsAttached&&browser.HasRunningBrowser,"external mode retains browser process");
    Check(Until(delegate{return Fits(navigationWindow,host);}),"external browser starts sized and positioned over the Web viewport");
    if(!realFirefox){SetWindowPos(navigationWindow,IntPtr.Zero,-3100,-3000,730,510,0x4014);Pump(2200);Rect moved;GetWindowRect(navigationWindow,out moved);Check(moved.Left==-3100&&moved.Top==-3000&&moved.Right-moved.Left==730,"external positioning stays under user control after the default fit");}
-   var returnButton=NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Return to Web");Check(returnButton.Enabled,"external window button offers an enabled return action");returnButton.PerformClick();Check(Until(delegate{return host.IsAttached&&host.GameWindow==navigationWindow;}),"same verified browser returns inside FishBowl");
+   ClickAction(browser,"Return to Web");Check(Until(delegate{return host.IsAttached&&host.GameWindow==navigationWindow;}),"same verified browser returns inside FishBowl");
    IntPtr originalWindow=host.GameWindow;NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Full screen").PerformClick();Pump(150);Check(host.IsAnchored&&host.GameWindow==originalWindow,"fullscreen keeps the same browser renderer in the owned viewport");NextUi.Descendants(browser).OfType<Button>().Single(b=>b.Text=="Exit full screen").PerformClick();Pump(150);Check(host.IsAnchored&&host.GameWindow==originalWindow,"fullscreen exit restores the same hosted browser");
    Check(browser.RequestClose(),"dedicated browser closes normally");Check(!browser.HasRunningBrowser,"closed browser is released without affecting personal browser instances");main.Close();
   }

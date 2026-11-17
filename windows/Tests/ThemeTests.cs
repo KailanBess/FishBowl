@@ -18,7 +18,7 @@ class ThemeTests
     static Bitmap Render(Control c) { var b = new Bitmap(c.Width, c.Height); c.DrawToBitmap(b, new Rectangle(Point.Empty, b.Size)); return b; }
     [STAThread] static int Main()
     {
-        try { Application.EnableVisualStyles(); Run(); Console.WriteLine("PASS: " + checks + " theme checks covering all theme/accent combinations, contrast, selectors, persistence, branding and the water footer."); return 0; }
+        try { Application.EnableVisualStyles(); Run(); Console.WriteLine("PASS: " + checks + " theme checks covering all theme/accent combinations, contrast, selectors, persistence, branding and the palette-aware status surface."); return 0; }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
     static void Run()
@@ -80,7 +80,7 @@ class ThemeTests
                 using (var ocean = Render(footer))
                 {
                     Color lower = ocean.GetPixel(250, 86);
-                    Check(lower.R < 10 && lower.G < 20 && lower.B < 45, "footer lower edge remains water without sand or pebbles");
+                    Check(lower.ToArgb() == FishBowlPalette.ThemeTop.ToArgb() && ocean.GetPixel(250, 10).ToArgb() == lower.ToArgb(), "status strip uses a flat palette surface");
                     live.Theme.Name = "Peach"; apply.Invoke(main, null);
                     using (var peach = Render(footer)) Check(peach.GetPixel(250, 86).ToArgb() != lower.ToArgb(), "footer follows live palette changes");
                 }

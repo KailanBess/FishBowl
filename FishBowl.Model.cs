@@ -1042,6 +1042,7 @@ namespace EmulatorHub
 	}
 	public class ThemeSettings
 	{
+        public int WindowsInterfaceVersion { get; set; }
         public List<string> HomeCardOrder { get; set; }
         public List<string> ExpandedHomeCards { get; set; }
         public List<string> HiddenHomeCards { get; set; }
