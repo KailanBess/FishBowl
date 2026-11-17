@@ -75,7 +75,10 @@ class ModernUiTests
                 var data = (LibraryData)typeof(MainForm).GetField("library", hidden).GetValue(main);
                 Check(data.Theme.WindowsInterfaceVersion == 1 && data.Theme.Name == "Gallery Night" && data.Experience.LibraryView == "Artwork", "first opening applies the new interface preset");
                 using (var settings = new SettingsDialog(data.Theme, data.BackupFolder))
+                {
+                    typeof(SettingsDialog).GetMethod("SaveSettings", hidden).Invoke(settings, new object[] { null, EventArgs.Empty });
                     Check(settings.Theme.WindowsInterfaceVersion == 1, "saving preferences retains the migration marker");
+                }
                 data.Theme.Name = "Ocean"; Store.Save(data);
             }
             using (var main = new MainForm(true))

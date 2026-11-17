@@ -54,6 +54,7 @@ class RemovalTests
         {
             form.ShowInTaskbar=false; form.StartPosition=FormStartPosition.Manual; form.Location=new Point(-4000,-4000); form.Show(); Application.DoEvents();
             var list=(ListView)typeof(GameLibraryDialog).GetField("games",flags).GetValue(form);
+            NextUi.Descendants(form).OfType<Button>().Single(b=>b.Text=="Filters").PerformClick(); Application.DoEvents();
             var remove=NextUi.Descendants(form).OfType<Button>().First(b=>b.Text=="Remove game");
             Check(remove.Visible && !remove.Enabled,"Visible removal action disabled without selection");
             list.Items.Cast<ListViewItem>().First(row=>((GameEntry)row.Tag).Id=="one").Selected=true; Application.DoEvents();

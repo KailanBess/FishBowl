@@ -74,14 +74,14 @@ class VisualRegressionTests
         }
         using (var organizer = new GameStorageOrganizerDialog(library, null))
         {
-            Show(organizer); var buttons = organizer.Controls.OfType<Button>().ToArray();
+            Show(organizer); var buttons = Descendants(organizer).OfType<Button>().Where(button => button.Visible).ToArray();
             for (int i = 0; i < buttons.Length; i++) for (int j = i + 1; j < buttons.Length; j++) Check(!buttons[i].Bounds.IntersectsWith(buttons[j].Bounds), "Organizer actions do not overlap");
         }
         using (var settings = new SettingsDialog(library.Theme, library.BackupFolder))
         {
-            Show(settings); var browse = settings.Controls.OfType<Button>().Single(b => b.Text == "Browse");
+            Show(settings); var browse = Descendants(settings).OfType<Button>().Single(b => b.Text == "Browse");
             Check(browse.Width >= TextRenderer.MeasureText(browse.Text, browse.Font).Width + 36, "Browse label has room for its icon");
-            var info = settings.Controls.OfType<CheckBox>().Single(b => b.Text == "Show emulator information pane");
+            var info = Descendants(settings).OfType<CheckBox>().Single(b => b.Text == "Show emulator information pane");
             Check(info.Right <= settings.ClientSize.Width, "Information-panel checkbox fits");
         }
         using (var history = new SaveHistoryDialog(library, library.Games.FirstOrDefault()))
