@@ -439,6 +439,7 @@ namespace EmulatorHub
         public GameToolsSettings Tools { get; set; }
 
         public bool RequiresEmulatorAssignment { get; set; }
+        public bool BackupBeforeLaunch { get; set; }
         public bool TitleIsCustom { get; set; }
 
 #if NETCOREAPP

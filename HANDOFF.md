@@ -50,6 +50,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-16 (Windows):** add an opt-in per-game snapshot of linked saves before launch. The shared library field defaults to off and Linux preserves it. Verify launch with linked saves, a missing save, and a previously running emulator.
+
 - **2026-11-05 (release integrity):** generate cross-platform release notes before hashing the Windows metadata. Publication no longer edits RELEASE-NOTES.md after SHA256SUMS.txt was generated/verified. Windows archive/source and metadata digests now remain unchanged through upload. No runtime behavior changed.
 
 - **2026-11-05 (release audit):** the Windows audit contained hardcoded 1.29.4 app and installer expectations. Updated both to the paired 1.29.5 release contract and run that audit first for quicker feedback, followed by the unchanged full regression suite. No product behavior or shared schema changed; CI and publication remain gated.
