@@ -84,7 +84,8 @@ class ModernUiTests
                 Check(text.Lines.Length == 2 && text.Lines[1] == "Details", "live read-only details retain line breaks");
             }
             var saved = Store.Load();
-            saved.Theme.WindowsInterfaceVersion = 0; saved.Theme.Name = "Ocean"; Store.Save(saved);
+            saved.Theme.WindowsInterfaceVersion = 0; saved.Theme.Name = "Ocean";
+            UserTools.Ensure(saved).Navigation = new LibraryNavigation { Artwork = false }; Store.Save(saved);
             using (var main = new MainForm(true))
             {
                 var data = (LibraryData)typeof(MainForm).GetField("library", hidden).GetValue(main);

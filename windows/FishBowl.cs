@@ -491,6 +491,8 @@ namespace EmulatorHub
                 library.Theme.ShowStatusBar = false;
                 Immersion.Ensure(library).Bubbles = false;
                 library.Experience.LibraryView = "Artwork";
+                var navigation = UserTools.Ensure(library).Navigation;
+                if (navigation != null) navigation.Artwork = true;
                 if (library.Cosmetics == null) library.Cosmetics = new CosmeticSettings();
                 library.Cosmetics.CustomPalette = false;
                 library.Cosmetics.CornerRadius = 16;
@@ -11573,7 +11575,7 @@ namespace EmulatorHub
 				{
 					ColorDepth = ColorDepth.Depth32Bit
 				};
-				games.SmallImageList = densityImages;
+				games.SmallImageList = artworkView ? densityImages : coverImages;
 			}
 			if (num2 != densityHeight)
 			{
