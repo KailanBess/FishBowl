@@ -136,8 +136,10 @@ namespace EmulatorHub
             games = entries.Select((item, i) =>
             {
                 var emulator = library.Emulators.FirstOrDefault(candidate => candidate.Id == item.EmulatorId);
-                var description = emulator == null ? "Game library" : emulator.Name;
-                var card = new GalleryCard(item.Title, description, "Play", "▷", i, false, () => open("Game", item, null));
+                bool available = File.Exists(item.Path);
+                var description = available ? (emulator == null ? "Game library" : emulator.Name) : "Game file missing";
+                var card = new GalleryCard(item.Title, description, available ? "Play" : "Find file", available ? "▷" : "⌕",
+                    i, false, () => open(available ? "Game" : "Missing games", item, null));
                 card.SetArtwork(UiPolishTools.Cover(item.ArtworkPath, item.Title, new Size(72, 72)));
                 var menu = new ContextMenuStrip();
                 NavigationController.Register(menu);
