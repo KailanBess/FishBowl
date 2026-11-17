@@ -11720,7 +11720,7 @@ namespace EmulatorHub
 				return;
 			}
             bool showDetails = library.Cosmetics != null && library.Cosmetics.DetailPreview && SelectedGame() != null;
-            detailPane.Visible = games.Parent.ClientSize.Width >= 790 && showDetails;
+            detailPane.Visible = detailPane.Parent.ClientSize.Width >= 790 && showDetails;
             detailText.Visible = showDetails;
             detailCover.Visible = showDetails;
             int missing = games.Items.Cast<ListViewItem>().Count(item => item.SubItems[3].Text == "Missing");

@@ -233,6 +233,7 @@ namespace EmulatorHub
         {
             var controls = form.Controls.Cast<Control>().ToArray();
             if (controls.Length == 0) return;
+            int originalHeight = form.ClientSize.Height;
             Rectangle area = TextFit.WorkingAreaOverride ?? Screen.FromControl(form.Owner ?? form).WorkingArea;
             form.ClientSize = new Size(Math.Min(Math.Max(640, form.ClientSize.Width), Math.Max(300, area.Width - 48)),
                 Math.Min(Math.Max(360, form.ClientSize.Height), Math.Max(240, area.Height - 80)));
@@ -259,7 +260,8 @@ namespace EmulatorHub
             };
             var actionNames = new HashSet<string>(new[] { "OK", "Save", "Cancel", "Close", "Apply", "Revert", "Finish", "Continue", "Get started" }, StringComparer.OrdinalIgnoreCase);
             var footer = controls.OfType<Button>().Where(button => button.DialogResult != DialogResult.None ||
-                actionNames.Contains(button.Text.Trim()) && button.Bottom >= form.ClientSize.Height - 125).OrderBy(button => button.Left).ToArray();
+                actionNames.Contains(button.Text.Trim()) && button.Bottom >= originalHeight - 125 ||
+                button.Bottom >= originalHeight - 80).OrderBy(button => button.Left).ToArray();
             form.SuspendLayout();
             foreach (var control in controls)
             {
@@ -604,7 +606,10 @@ namespace EmulatorHub
         private void Activate(ListViewItem item)
         {
             if (!source.Enabled) return;
-            Select(item, true);
+            foreach (var selected in source.SelectedItems.Cast<ListViewItem>().Where(row => row != item).ToArray()) selected.Selected = false;
+            item.Selected = true;
+            item.Focused = true;
+            UpdateSelection();
             if (open != null) open(item);
             else if (HasHandler(source, "DoubleClick")) typeof(Control).GetMethod("OnDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(source, new object[] { EventArgs.Empty });
             else FishBowlMessageBox.Show(FindForm(), string.Join("\n\n", item.SubItems.Cast<ListViewItem.ListViewSubItem>().Select((cell, index) =>
@@ -835,7 +840,7 @@ namespace EmulatorHub
             ContextMenuStrip = source.ContextMenuStrip;
             foreach (var control in new Control[] { this, title, detail, image })
             {
-                control.MouseDown += delegate { select(); Focus(); };
+                control.MouseDown += delegate(object sender, MouseEventArgs e) { if (e.Button != MouseButtons.Right || !item.Selected) select(); Focus(); };
                 control.DoubleClick += delegate { activate(); };
             }
             Controls.AddRange(new Control[] { image, title, detail, open });

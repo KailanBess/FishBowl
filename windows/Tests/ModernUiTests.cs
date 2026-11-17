@@ -74,6 +74,15 @@ class ModernUiTests
                 All(dialog).OfType<Button>().Single(b => b.Text == "Appearance").PerformClick();
                 Check(tabs.SelectedIndex == 1, "new navigation selects the existing feature page");
             }
+            using (var dialog = new NextDialog("Fixture details", 800, 600))
+            {
+                var text = new TextBox { Multiline = true, ReadOnly = true, Text = "First\nSecond", Dock = DockStyle.Fill };
+                dialog.Body.Controls.Add(text); dialog.ShowInTaskbar = false; dialog.StartPosition = FormStartPosition.Manual;
+                dialog.Location = new Point(-30000, -30000); dialog.Show(); Pump();
+                Check(text.Lines.Length == 2 && text.Text.Contains("\r\n"), "read-only details retain native multiline formatting");
+                text.Text = "Updated\nDetails";
+                Check(text.Lines.Length == 2 && text.Lines[1] == "Details", "live read-only details retain line breaks");
+            }
             var saved = Store.Load();
             saved.Theme.WindowsInterfaceVersion = 0; saved.Theme.Name = "Ocean"; Store.Save(saved);
             using (var main = new MainForm(true))
