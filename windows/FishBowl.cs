@@ -17548,14 +17548,9 @@ namespace EmulatorHub
 
 		protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
 		{
-			if (!e.Item.Enabled)
-			{
-				FishBowlText.DrawText(e.Graphics, e.Text, e.TextFont, e.TextRectangle, FishBowlPalette.DisabledText, e.TextFormat);
-			}
-			else
-			{
-				base.OnRenderItemText(e);
-			}
+            Color background = e.Item.Enabled && (e.Item.Selected || e.Item.Pressed) ? ColorHarmony.Selection : ColorHarmony.Card;
+            Color text = FishBowlPalette.EnsureReadable(e.Item.Enabled ? FishBowlPalette.ThemeInk : FishBowlPalette.ThemeSubtle, background);
+            FishBowlText.DrawText(e.Graphics, e.Text, e.TextFont, e.TextRectangle, text, e.TextFormat);
 		}
 	}
 	public class FishBowlMenuColors : ProfessionalColorTable

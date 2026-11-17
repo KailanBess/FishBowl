@@ -449,6 +449,7 @@ namespace EmulatorHub
             {
                 var sort = new ReferenceButton("Sort by") { Size = new Size(110, 36) };
                 var choices = new ContextMenuStrip();
+                NavigationController.Register(choices);
                 choices.Opening += delegate
                 {
                     choices.Items.Clear();
