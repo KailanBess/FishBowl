@@ -50,6 +50,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-17 (Windows):** rebuild the desktop navigation, search header and Home around the supplied two-banner reference. Retain the six workspace instances, existing Home actions, app data, game launch routing and native Play/Web surfaces. Check normal and compact overflow, keyboard navigation and the dashboard screenshots before any release.
+
 - **2026-11-17 (both platforms):** prepare 1.29.10. The Windows release includes the per-game linked-save backup option. Linux receives the shared data compatibility and matching build version.
 
 - **2026-11-16 (Windows):** add an opt-in per-game snapshot of linked saves before launch. The shared library field defaults to off and Linux preserves it. Verify launch with linked saves, a missing save, and a previously running emulator.
