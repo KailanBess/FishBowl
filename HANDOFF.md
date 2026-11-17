@@ -50,7 +50,7 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
-- **2026-11-17 (Windows):** prepare 1.29.13 with consistent runtime dialog surfaces, native caption colors, rounded toolbar/action painting, palette-aware dropdown frames, and themed messages and confirmations. Web/Play status becomes a bottom strip. Saved library fields retain compatibility. Linux receives matching release metadata. Verify modal results, default actions, keyboard closure, live native hosting and normal/compact text overflow.
+- **2026-11-17 (Windows):** prepare Windows 1.30.0 with rebuilt Home modules, game/emulator catalogs, Play/Web controls, command navigation, dialog frames, section navigation and field layouts. Native list controls remain offscreen backing state so existing feature handlers retain selection, checks and actions. Runtime confirmations and installer use the gallery surfaces. Optional Theme.WindowsInterfaceVersion applies Gallery Night, Gallery Violet, Segoe UI and artwork view once; later appearance choices persist. Saved fields remain compatible and the retired decorative footer field is retained. Linux receives matching package metadata only. Verify full regression, normal/compact text overflow, schema preservation and native hardware compatibility before publication.
 
 - **2026-11-17 (Windows):** remove repeated shell wordmarks, use the active workspace as the native caption, and retire the redundant banner preference from the visible settings. Existing saved fields are retained. Align Home utility cards and shared buttons with the reference geometry while keeping palette choices. Summarize Home activity without showing stack frames, leaving the full log in Activity.
 

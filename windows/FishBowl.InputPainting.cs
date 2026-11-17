@@ -70,7 +70,7 @@ namespace EmulatorHub
             var text = c as TextBoxBase;
             if (text != null)
             {
-                text.BorderStyle = text is ReferenceMessageText ? BorderStyle.None : BorderStyle.FixedSingle;
+                text.BorderStyle = text is ReferenceMessageText || text.Parent is ModernInputSurface ? BorderStyle.None : BorderStyle.FixedSingle;
                 text.BackColor = text is ReferenceMessageText ? ColorHarmony.Card : FishBowlPalette.DeepSeaSurface;
                 text.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, text.BackColor);
                 // Preserve native caret, selection, scrollbars and DPI sizing; no clipping regions.

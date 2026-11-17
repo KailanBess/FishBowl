@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.13.0")]
+[assembly: AssemblyFileVersion("1.30.0.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.13.0")]
+[assembly: AssemblyVersion("1.30.0.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.13";
+		private const string FishBowlVersion = "1.30.0";
 
-		private const string FishBowlTitleVersion = "1.29.13";
+		private const string FishBowlTitleVersion = "1.30.0";
 
 		private Icon ownedAppIcon;
 
@@ -114,7 +114,7 @@ namespace EmulatorHub
 			ReshowDelay = 100
 		};
 
-		private readonly Label emptyState = new Label();
+		private readonly Label emptyState = new ModernBlankState("Your emulator collection");
 
 		private readonly List<FileSystemWatcher> gameFolderWatchers = new List<FileSystemWatcher>();
 
@@ -243,8 +243,6 @@ namespace EmulatorHub
 
 		private HomeSurface homeSurface;
 
-		private HomeSurface emulatorHome;
-
 		private GameLibraryDialog embeddedLibrary;
 
 		private TableLayoutPanel workspaceShell;
@@ -358,6 +356,14 @@ namespace EmulatorHub
 			Size = new Size(Math.Min(Width, desktop.Width), Math.Min(Height, desktop.Height));
 			InitializeEnhancements(isolatedPreview);
 			InitializeHub(isolatedPreview);
+			emulatorList.Name = "ModernEmulatorSource";
+			ModernUi.Catalog(emulatorList, "emulators", true, delegate(ListViewItem row)
+			{
+				selectedEmulatorId = row.Tag as string;
+				RunUiAction(OpenSelectedEmulator);
+			});
+			ModernUi.RebuildTabs(this);
+            InstallModernWorkspaceLayout();
 			FishBowlPalette.StyleWindow(this);
 			Polish.Accessibility(this);
 			CosmeticRuntime.Apply(this);
@@ -407,11 +413,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.13" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.30.0" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.13";
+						library.Theme.LastSeenBuild = "1.30.0";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -431,7 +437,6 @@ namespace EmulatorHub
 						}
                         // Startup preferences change the Home cache key; settle it before later selection updates.
                         if (homeSurface != null) homeSurface.Reload(false);
-                        if (emulatorHome != null) emulatorHome.Reload(false);
                         if (!isolatedPreview) WindowsSessions.Recover(this, library);
 					}
 				});
@@ -475,6 +480,23 @@ namespace EmulatorHub
 			{
 				library.Theme = new ThemeSettings();
 			}
+            if (library.Theme.WindowsInterfaceVersion < 1)
+            {
+                ExperienceData.Ensure(library);
+                library.Theme.Name = "Gallery Night";
+                library.Theme.AccentColor = "Gallery Violet";
+                library.Theme.ColorHarmony = "Harmonized";
+                library.Theme.FontFamily = "Segoe UI";
+                library.Theme.AppIconColor = "Match accent";
+                library.Theme.ShowStatusBar = false;
+                library.Experience.LibraryView = "Artwork";
+                if (library.Cosmetics == null) library.Cosmetics = new CosmeticSettings();
+                library.Cosmetics.CustomPalette = false;
+                library.Cosmetics.CornerRadius = 16;
+                library.Cosmetics.BackgroundStyle = "Plain";
+                library.Cosmetics.DetailPreview = false;
+                library.Theme.WindowsInterfaceVersion = 1;
+            }
 			if (string.IsNullOrWhiteSpace(library.Theme.Name))
 			{
 				library.Theme.Name = "FishBowl Water";
@@ -963,7 +985,7 @@ namespace EmulatorHub
 		private void UpdateInformationPanel()
 		{
 			EmulatorProfile emulatorProfile = CurrentEmulator();
-			bool flag = !library.Theme.ShowInformationPanel;
+            bool flag = !library.Theme.ShowInformationPanel || emulatorProfile == null;
 			Control control = ((emulatorInformation == null) ? null : emulatorInformation.Parent);
 			bool flag2 = emulatorInformation != null && emulatorInformation.Visible != (emulatorProfile != null);
 			if (control != null)
@@ -978,18 +1000,9 @@ namespace EmulatorHub
 					{
 						emulatorInformation.Visible = false;
 					}
-					if (emulatorHome != null)
-					{
-						emulatorHome.Reload(false);
-						emulatorHome.Visible = true;
-					}
 				}
 				else
 				{
-					if (emulatorHome != null)
-					{
-						emulatorHome.Visible = false;
-					}
 					if (emulatorInformation != null)
 					{
 						emulatorInformation.Visible = true;
@@ -1825,7 +1838,6 @@ namespace EmulatorHub
 			{
 				ExperienceTools.Settings(this, library);
 				homeSurface.Reload();
-				emulatorHome.Reload();
 				embeddedLibrary.ReloadLibrary();
 				ConfigureSaveNotifications();
 			}));
@@ -3378,7 +3390,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.13"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.30.0"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3386,7 +3398,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.13"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.30.0"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3394,7 +3406,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.13"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.30.0"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -4693,9 +4705,6 @@ namespace EmulatorHub
             primaryToolbar.Layout += delegate { FitPrimaryToolbar(); };
 			tableLayoutPanel2.Controls.Add(emulatorPanel, 0, 1);
 			tabPage4.Controls.Add(tableLayoutPanel2);
-			emulatorHome = new HomeSurface(library, HomeAction);
-			emulatorSplit.Panel2.Controls.Add(emulatorHome);
-			emulatorHome.Visible = CurrentEmulator() == null;
 			embeddedLibrary = new GameLibraryDialog(library)
 			{
 				TopLevel = false,
@@ -4713,7 +4722,6 @@ namespace EmulatorHub
 			{
 				BeginWorkspaceTransition();
 				int contentRevision = homeSurface.ContentRevision;
-				int contentRevision2 = emulatorHome.ContentRevision;
 				try
 				{
 					UpdateWorkspaceChrome();
@@ -4726,17 +4734,16 @@ namespace EmulatorHub
 					}
 					else if (workspaceNavigation.SelectedIndex == 1)
 					{
-						emulatorHome.Reload(false);
 					}
 					else if (workspaceNavigation.SelectedIndex == 2)
 					{
 						embeddedLibrary.ReloadOnVisit();
 					}
-					if (contentRevision != homeSurface.ContentRevision || contentRevision2 != emulatorHome.ContentRevision)
+					if (contentRevision != homeSurface.ContentRevision)
 					{
 						ApplyTextOptions();
 					}
-					if (contentRevision != homeSurface.ContentRevision || contentRevision2 != emulatorHome.ContentRevision)
+					if (contentRevision != homeSurface.ContentRevision)
 					{
 						RestoreWorkspace(workspaceNavigation.SelectedIndex);
 					}
@@ -4752,8 +4759,61 @@ namespace EmulatorHub
 		}
 
         private FlowLayoutPanel dashboardRail;
+        private ContextMenuStrip dashboardCommandMenu;
+
+        private void InstallModernWorkspaceLayout()
+        {
+            var previousMenu = NextUi.Descendants(this).OfType<MenuStrip>().FirstOrDefault();
+            if (previousMenu != null)
+            {
+                dashboardCommandMenu = new ContextMenuStrip { Renderer = new FishBowlMenuRenderer() };
+                foreach (ToolStripItem item in previousMenu.Items.Cast<ToolStripItem>().ToArray()) dashboardCommandMenu.Items.Add(item);
+                NavigationController.Register(dashboardCommandMenu);
+                previousMenu.Parent.Controls.Remove(previousMenu);
+                previousMenu.Dispose();
+                ContextMenuStrip = dashboardCommandMenu;
+                dashboardMenu.ContextMenuStrip = dashboardCommandMenu;
+                Disposed += delegate { dashboardCommandMenu.Dispose(); };
+            }
+            filterBox.Parent.Controls.Remove(filterBox);
+            filterBox.Dock = DockStyle.None;
+            filterBox.Width = 250;
+            filterBox.Margin = new Padding(8, 6, 0, 0);
+            filterBox.AccessibleName = "Search emulators";
+            primaryToolbar.Controls.Add(filterBox);
+            var filterLabel = workspaceFooter.GetControlFromPosition(0, 0);
+            if (filterLabel != null) { workspaceFooter.Controls.Remove(filterLabel); filterLabel.Dispose(); }
+            workspaceFooter.Controls.Remove(status);
+            workspaceFooter.Controls.Add(status, 0, 0);
+            workspaceFooter.SetColumnSpan(status, 3);
+            workspaceFooter.ColumnStyles[0].Width = workspaceFooter.ColumnStyles[1].Width = 0;
+            var layout = primaryToolbar.Parent as TableLayoutPanel;
+            if (layout != null)
+            {
+                var content = layout.GetControlFromPosition(0, 1);
+                layout.SuspendLayout();
+                layout.Controls.Remove(primaryToolbar);
+                layout.Controls.Remove(content);
+                layout.RowCount = 3;
+                layout.RowStyles.Clear();
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                var heading = ModernUi.Heading("Emulators");
+                heading.Margin = new Padding(20, 18, 20, 16);
+                layout.Controls.Add(heading, 0, 0);
+                layout.Controls.Add(primaryToolbar, 0, 1);
+                layout.Controls.Add(content, 0, 2);
+                layout.ResumeLayout(true);
+            }
+        }
+
+        private IEnumerable<ToolStrip> ApplicationMenus()
+        {
+            if (dashboardCommandMenu != null) yield return dashboardCommandMenu;
+            foreach (MenuStrip menu in NextUi.Descendants(this).OfType<MenuStrip>()) yield return menu;
+        }
         private TableLayoutPanel dashboardCommands;
-        private bool dashboardMenuOpen;
         private Button dashboardLibraryTools;
         private Panel dashboardRailSpacer;
         private ReferenceButton dashboardSearch;
@@ -4841,7 +4901,7 @@ namespace EmulatorHub
                 AccessibleName = "Toggle application menu", Width = 84, Dock = DockStyle.Fill,
                 Margin = Padding.Empty
             };
-            dashboardMenu.Click += delegate { dashboardMenuOpen = !dashboardMenuOpen; ApplyDashboardShell(); };
+            dashboardMenu.Click += delegate { if (dashboardCommandMenu != null) dashboardCommandMenu.Show(dashboardMenu, new Point(0, dashboardMenu.Height)); };
             dashboardCommands.Controls.Add(dashboardSearch, 0, 0);
             dashboardCommands.Controls.Add(dashboardMenu, 1, 0);
             dashboardLibraryTools = embeddedLibrary.BuildDashboardHeader();
@@ -4856,7 +4916,7 @@ namespace EmulatorHub
             bool referenceDark = ReferencePalette.Dark(library.Theme.Name);
             ((FishBowlTabs)workspaceNavigation).HideWorkspaceHeaders = true;
             dashboardRail.Visible = dashboardCommands.Visible = visible;
-            workspaceShell.RowStyles[0].Height = visible && dashboardMenuOpen ? 28 : 0;
+            workspaceShell.RowStyles[0].Height = 0;
             dashboardRail.BackColor = referenceDark ? ReferencePalette.Rail : FishBowlPalette.ThemeBottom;
 
             dashboardCommands.BackColor = referenceDark ? ReferencePalette.Canvas : FishBowlPalette.ThemeTop;
@@ -4990,7 +5050,6 @@ namespace EmulatorHub
 			}
 			Store.Save(library);
 			homeSurface.Reload();
-			emulatorHome.Reload();
 			embeddedLibrary.ReloadLibrary();
 			ConfigureSaveNotifications();
 		}
@@ -5023,11 +5082,9 @@ namespace EmulatorHub
 				}
 				if (workspaceFooter != null)
 				{
-					workspaceFooter.ColumnStyles[0].Width = (flag ? 46 : 0);
-					workspaceFooter.ColumnStyles[1].Width = (flag ? 240 : 0);
+					workspaceFooter.ColumnStyles[0].Width = 0;
+					workspaceFooter.ColumnStyles[1].Width = 0;
 					filterBox.Visible = flag;
-                    var filterLabel = workspaceFooter.GetControlFromPosition(0, 0);
-                    if (filterLabel != null) filterLabel.Visible = flag;
 
 				}
 			}
@@ -5367,7 +5424,6 @@ namespace EmulatorHub
 				}
 			}
 			homeSurface.Reload();
-			emulatorHome.Reload();
 			embeddedLibrary.ReloadLibrary();
 			FishBowlPalette.StyleOpenWindows();
 			ApplyTextOptions();
@@ -5569,7 +5625,7 @@ namespace EmulatorHub
 						Open = item.Value
 					});
 				}
-				foreach (MenuStrip item2 in NextUi.Descendants(this).OfType<MenuStrip>())
+				foreach (ToolStrip item2 in ApplicationMenus())
 				{
 					foreach (ToolStripMenuItem item3 in from i in MenuItems(item2.Items)
 						where i.DropDownItems.Count == 0 && i.Enabled && !i.Text.StartsWith("Search everything")
@@ -5821,7 +5877,7 @@ namespace EmulatorHub
 		private void UpdateShortcutHints()
 		{
 			NextData.Ensure(library);
-			foreach (MenuStrip item in NextUi.Descendants(this).OfType<MenuStrip>())
+			foreach (ToolStrip item in ApplicationMenus())
 			{
 				foreach (ToolStripMenuItem item2 in MenuItems(item.Items))
 				{
@@ -5903,10 +5959,6 @@ namespace EmulatorHub
 			if (homeSurface != null)
 			{
 				homeSurface.RefreshLayout();
-			}
-			if (emulatorHome != null)
-			{
-				emulatorHome.RefreshLayout();
 			}
 			FishBowlActionButton.StrongFocus = library.Enhancements.StrongFocus;
 		}
@@ -6066,7 +6118,7 @@ namespace EmulatorHub
 				NextDialog.Field(fields["Background"], "", control);
 				action2("Background", "Wallpaper layout", "WallpaperLayout", new string[3] { "Fill", "Fit", "Tile" });
 				action4("Background", "Wallpaper opacity (%)", "WallpaperOpacity", 0, 40);
-				action3("Background", "Show aquarium footer decoration", "ShowFooter");
+				// The retired footer flag remains in saved data for older app versions.
 				action2("Artwork and badges", "Artwork frame", "ArtworkFrame", new string[4] { "None", "Thin", "Accent", "Rounded" });
 				action3("Artwork and badges", "Soft artwork shadows", "ArtworkShadow");
 				action2("Artwork and badges", "Status badge style", "BadgeStyle", new string[3] { "Text", "Pill", "Square" });
@@ -6645,6 +6697,7 @@ namespace EmulatorHub
 
 		private void PrepareDialogAppearance()
 		{
+			ModernUi.RebuildDialog(this);
 			FishBowlPalette.StyleWindow(this);
 			NextUi.ApplyAccessibility(this);
             NavigationController.Attach(this);
@@ -7127,7 +7180,7 @@ namespace EmulatorHub
 
 		private Control Input(string label, TextBox field, Button button = null)
 		{
-			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
+			TableLayoutPanel tableLayoutPanel = new ModernFieldsPanel();
 			tableLayoutPanel.ColumnCount = ((button == null) ? 1 : 2);
 			tableLayoutPanel.RowCount = 2;
 			tableLayoutPanel.Dock = DockStyle.Fill;
@@ -9944,6 +9997,8 @@ namespace EmulatorHub
 			RefreshGames();
 			InitializePolish();
 			InitializeHubLibrary();
+            ModernUi.Catalog(games, "games", false, delegate { LaunchGame(); });
+            BuildDashboardHeader();
             SizeChanged += delegate { FitEmbeddedViewport(); };
             panel.SizeChanged += delegate { FitEmbeddedViewport(); };
 		}
@@ -10726,12 +10781,17 @@ namespace EmulatorHub
         private bool compactDashboardHeader;
         private Button dashboardViewButton;
         private Button dashboardFiltersButton;
+        private Button dashboardAddGameButton;
+        private Button dashboardScanButton;
         private bool dashboardEmbedded;
 
         public Button BuildDashboardHeader()
         {
+            if (dashboardEmbedded) return dashboardFiltersButton;
             dashboardEmbedded = true;
             dashboardViewButton = ExperienceUi.Button("List / Grid", ToggleGameView);
+            dashboardAddGameButton = ExperienceUi.Button("Add game", AddGame);
+            dashboardScanButton = ExperienceUi.Button("Scan folders", SyncFolders);
             dashboardViewButton.AccessibleName = "Switch between list and game cards";
             dashboardFiltersButton = ExperienceUi.Button("Filters", delegate
             {
@@ -10741,6 +10801,8 @@ namespace EmulatorHub
             });
             search.Parent.Controls.Add(dashboardViewButton);
             search.Parent.Controls.Add(dashboardFiltersButton);
+            search.Parent.Controls.Add(dashboardAddGameButton);
+            search.Parent.Controls.Add(dashboardScanButton);
             compactDashboardHeader = true;
             FitLibraryHeader();
             return dashboardFiltersButton;
@@ -10774,33 +10836,50 @@ namespace EmulatorHub
                     list[1].Visible = false;
                     flowLayoutPanel.Visible = !compactDashboardHeader;
                     dashboardLibraryToolbar.Visible = !compactDashboardHeader;
-                    heading.Location = new Point(16, 12);
-                    heading.Text = "My Games";
-                    int right = panel.ClientSize.Width - 16;
-                    dashboardViewButton.Width = TextRenderer.MeasureText(dashboardViewButton.Text, dashboardViewButton.Font).Width + 26;
-                    dashboardFiltersButton.Width = TextRenderer.MeasureText(dashboardFiltersButton.Text, dashboardFiltersButton.Font).Width + 26;
-                    int rowHeight = Math.Max(34, dashboardViewButton.Font.Height + 12);
-                    dashboardViewButton.Height = dashboardFiltersButton.Height = rowHeight;
-                    search.Width = Math.Max(110, Math.Min(285, panel.ClientSize.Width / 4));
-                    scope.Width = Math.Max(105, Math.Min(165, panel.ClientSize.Width / 6));
-                    int controlWidth = search.Width + scope.Width + dashboardViewButton.Width + dashboardFiltersButton.Width + 24;
-                    int top = right - controlWidth >= heading.Right + 16 ? 10 : heading.Bottom + 8;
-                    search.Location = new Point(right - search.Width, top + (rowHeight - search.Height) / 2);
-                    dashboardViewButton.Location = new Point(search.Left - 8 - dashboardViewButton.Width, top);
-                    scope.Location = new Point(dashboardViewButton.Left - 8 - scope.Width, top + (rowHeight - scope.Height) / 2);
-                    dashboardFiltersButton.Location = new Point(scope.Left - 8 - dashboardFiltersButton.Width, top);
-                    int headerBottom = Math.Max(heading.Bottom, top + rowHeight) + 10;
+                    panel.BackColor = FishBowlPalette.ThemeBottom;
+                    heading.Text = "Game library";
+                    heading.AutoEllipsis = true;
+                    ModernUi.SetFont(heading, 23f * Math.Max(1f, NextUi.TextPercent / 100f), FontStyle.Bold);
+                    int available = Math.Max(1, panel.ClientSize.Width - 40);
+                    var topActions = new[] { dashboardAddGameButton, dashboardScanButton };
+                    int actionHeight = Math.Max(38, topActions.Max(button => button.Font.Height + 16));
+                    foreach (var button in topActions) { button.MinimumSize = Size.Empty; button.MaximumSize = Size.Empty; button.Size = new Size(Math.Max(110, TextRenderer.MeasureText(button.Text, button.Font).Width + 32), actionHeight); }
+                    int actionWidth = topActions.Sum(button => button.Width) + 10;
+                    bool sameRow = available - actionWidth >= Math.Max(220, heading.Font.Height * 6);
+                    heading.SetBounds(20, 18, sameRow ? Math.Max(1, available - actionWidth - 20) : available, Math.Max(52, heading.Font.Height + 10));
+                    int top = sameRow ? heading.Top + (heading.Height - actionHeight) / 2 : heading.Bottom + 12;
+                    int x = sameRow ? panel.ClientSize.Width - actionWidth - 20 : 20;
+                    foreach (var button in topActions) { button.Location = new Point(x, top); x = button.Right + 10; }
+                    int y = Math.Max(heading.Bottom, top + actionHeight) + 18;
+                    int scopeWidth = Math.Min(240, Math.Max(150, TextRenderer.MeasureText(scope.Text, scope.Font).Width + 42));
+                    int viewWidth = Math.Max(110, TextRenderer.MeasureText(dashboardViewButton.Text, dashboardViewButton.Font).Width + 32);
+                    int filterWidth = Math.Max(100, TextRenderer.MeasureText(dashboardFiltersButton.Text, dashboardFiltersButton.Font).Width + 32);
+                    bool searchSeparate = 180 + scopeWidth + viewWidth + filterWidth + 30 > available;
+                    int searchWidth = searchSeparate ? available : Math.Max(180, available - scopeWidth - viewWidth - filterWidth - 30);
+                    int rowHeight = Math.Max(38, new Control[] { search, scope, dashboardViewButton, dashboardFiltersButton }.Max(control => control.Font.Height + 16));
+                    x = 20;
+                    var controls = new Control[] { search, scope, dashboardViewButton, dashboardFiltersButton };
+                    int[] widths = { searchWidth, scopeWidth, viewWidth, filterWidth };
+                    for (int index = 0; index < controls.Length; index++)
+                    {
+                        var control = controls[index]; control.MinimumSize = Size.Empty; control.MaximumSize = Size.Empty;
+                        int width = Math.Min(available, widths[index]);
+                        if (x > 20 && x + width > available + 20) { x = 20; y += rowHeight + 10; }
+                        int height = control is Button ? rowHeight : control.PreferredSize.Height;
+                        control.SetBounds(x, y + (rowHeight - height) / 2, width, height);
+                        x = control.Right + 10;
+                    }
+                    int headerBottom = y + rowHeight + 18;
                     if (!compactDashboardHeader)
                     {
                         flowLayoutPanel.Top = headerBottom;
-                        flowLayoutPanel.Height = Math.Max(48, flowLayoutPanel.GetPreferredSize(
-                            new Size(flowLayoutPanel.ClientSize.Width, 0)).Height);
-                        headerBottom = flowLayoutPanel.Bottom + 8;
+                        flowLayoutPanel.Height = Math.Max(48, flowLayoutPanel.GetPreferredSize(new Size(flowLayoutPanel.ClientSize.Width, 0)).Height);
+                        headerBottom = flowLayoutPanel.Bottom + 14;
                     }
                     panel.Height = headerBottom;
                     return;
                 }
-				int num = Math.Max(200, panel.ClientSize.Width - panel.Padding.Horizontal - flowLayoutPanel.Padding.Horizontal - 8);
+                int num = Math.Max(200, panel.ClientSize.Width - panel.Padding.Horizontal - flowLayoutPanel.Padding.Horizontal - 8);
 				foreach (ComboBox item in flowLayoutPanel.Controls.OfType<ComboBox>())
 				{
 					int val = TextRenderer.MeasureText(item.Text, item.Font).Width + 42;
@@ -10878,7 +10957,7 @@ namespace EmulatorHub
 			saveChoice.AccessibleName = "Save status filter";
 			sortChoice.AccessibleName = "Game sorting";
 			tagChoice.AccessibleName = "Tag filter";
-			emptyState = new Panel
+			emptyState = new ModernEmptyPanel
 			{
 				Dock = DockStyle.Fill,
 				Visible = false,
@@ -11352,28 +11431,11 @@ namespace EmulatorHub
 
 		private void LoadVisibleArtwork()
 		{
-			if (!polishReady || thumbnailBusy || !games.Visible || !games.IsHandleCreated || games.Items.Count == 0)
+			if (!polishReady || thumbnailBusy || !ModernUi.PresentationVisible(games) || !games.IsHandleCreated || games.Items.Count == 0)
 			{
 				return;
 			}
-			HashSet<ListViewItem> hashSet = new HashSet<ListViewItem>();
-            if (!artworkView) {
-                ListViewItem top = games.TopItem;
-                int first = top == null ? 0 : top.Index;
-                int count = games.ClientSize.Height / Math.Max(1, densityHeight) + 2;
-                for (int row = first; row < Math.Min(games.Items.Count, first + count); row++) hashSet.Add(games.Items[row]);
-            }
-			for (int i = 8; i < games.ClientSize.Height; i += 32)
-			{
-				for (int j = 8; j < games.ClientSize.Width; j += 32)
-				{
-					ListViewItem itemAt = games.GetItemAt(j, i);
-					if (itemAt != null)
-					{
-						hashSet.Add(itemAt);
-					}
-				}
-			}
+			HashSet<ListViewItem> hashSet = new HashSet<ListViewItem>(ModernUi.VisibleRows(games));
 			int use;
 			foreach (ListViewItem item in hashSet)
 			{
@@ -11656,8 +11718,8 @@ namespace EmulatorHub
 			{
 				return;
 			}
-            detailPane.Visible = games.Parent.ClientSize.Width >= 790;
             bool showDetails = library.Cosmetics != null && library.Cosmetics.DetailPreview && SelectedGame() != null;
+            detailPane.Visible = games.Parent.ClientSize.Width >= 790 && showDetails;
             detailText.Visible = showDetails;
             detailCover.Visible = showDetails;
             int missing = games.Items.Cast<ListViewItem>().Count(item => item.SubItems[3].Text == "Missing");
@@ -13084,7 +13146,7 @@ namespace EmulatorHub
 			StyleCombo(density, 218, 474, 184);
 			base.Controls.Add(density);
 			showBanner.Checked = originalTheme.ShowBanner;
-			AddVisualCheck(showStatusBar, "Show filter and status bar", 418, 482, originalTheme.ShowStatusBar);
+			AddVisualCheck(showStatusBar, "Show status bar", 418, 482, originalTheme.ShowStatusBar);
 			AddVisualCheck(showInformation, "Show emulator information pane", 418, 508, originalTheme.ShowInformationPanel);
 			AddVisualCheck(showIcons, "Show emulator icons", 18, 522, originalTheme.ShowEmulatorIcons);
 			AddVisualCheck(enableMotion, "Enable hover and selection motion", 218, 522, originalTheme.EnableMotion);
@@ -13180,6 +13242,7 @@ namespace EmulatorHub
 			}
 			Theme = new ThemeSettings
 			{
+                WindowsInterfaceVersion = originalTheme.WindowsInterfaceVersion,
 				Name = theme.Text,
 				AutoBackupDays = (int)backupDays.Value,
 				LastBackupAt = originalTheme.LastBackupAt,
@@ -16831,6 +16894,7 @@ namespace EmulatorHub
 
 		private static void StyleControl(Control control)
 		{
+            ModernUi.Watch(control);
 			ConsistentInputs.Watch(control, StyleControl);
 			SmoothPainting.Enable(control);
 			control.BackColor = ColorHarmony.NormalizeControlBackground(control, ReplaceBackground(control.BackColor));
@@ -17023,70 +17087,14 @@ namespace EmulatorHub
 	}
 	public class AquariumFooter : TableLayoutPanel
 	{
-        protected override void OnLayout(LayoutEventArgs e)
-        {
-            var filter = Controls.OfType<Label>().FirstOrDefault(label => label.Text == "Filter:");
-            if (filter != null && !filter.Visible && ColumnStyles.Count > 0) ColumnStyles[0].Width = 0;
-            if (filter != null && filter.Visible && ColumnStyles.Count > 0) {
-                int need = TextRenderer.MeasureText(filter.Text, filter.Font).Width + filter.Margin.Horizontal + 12;
-                if (ColumnStyles[0].Width < need) ColumnStyles[0].Width = need;
-            }
-            base.OnLayout(e);
-        }
-		public AquariumFooter()
-		{
-			SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
-		}
-
-		protected override void OnPaint(PaintEventArgs e)
-		{
-			base.OnPaint(e);
-			if (!CosmeticRuntime.Current.ShowFooter || base.Width < 80 || base.Height < 20)
-			{
-				return;
-			}
-			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-			using (LinearGradientBrush brush = new LinearGradientBrush(base.ClientRectangle, FishBowlPalette.ThemeTop, FishBowlPalette.ThemeBottom, LinearGradientMode.Vertical))
-			{
-				e.Graphics.FillRectangle(brush, base.ClientRectangle);
-			}
-			PointF[] points = new PointF[7]
-			{
-				new PointF(-8f, 9f),
-				new PointF((float)base.Width * 0.14f, 5f),
-				new PointF((float)base.Width * 0.3f, 10f),
-				new PointF((float)base.Width * 0.47f, 4f),
-				new PointF((float)base.Width * 0.66f, 9f),
-				new PointF((float)base.Width * 0.84f, 3f),
-				new PointF(base.Width + 8, 8f)
-			};
-			using (GraphicsPath graphicsPath = new GraphicsPath())
-			{
-				using (SolidBrush brush2 = new SolidBrush(Color.FromArgb(72, Color.White)))
-				{
-					graphicsPath.AddCurve(points, 0.45f);
-					graphicsPath.AddLine(base.Width + 8, 8, base.Width + 8, 0);
-					graphicsPath.AddLine(base.Width + 8, 0, -8, 0);
-					graphicsPath.CloseFigure();
-					e.Graphics.FillPath(brush2, graphicsPath);
-				}
-			}
-			DrawBubbles(e.Graphics, base.Width - 72, 16);
-		}
-
-		private void DrawBubbles(Graphics graphics, int x, int y)
-		{
-			using (Pen pen = new Pen(Color.FromArgb(155, Color.White), 1.2f))
-			{
-				graphics.DrawEllipse(pen, x, y, 6, 6);
-				graphics.DrawEllipse(pen, x + 13, y + 7, 4, 4);
-				graphics.DrawEllipse(pen, x + 23, y - 4, 8, 8);
-			}
-		}
+		public AquariumFooter() { DoubleBuffered = true; Padding = new Padding(16, 8, 16, 8); }
+        protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(FishBowlPalette.ThemeTop); }
 	}
 	public class FishBowlActionButton : Button
 	{
 		public static bool StrongFocus = true;
+        public bool PrimaryAction { get; set; }
+        private static readonly HashSet<string> primaryActions = new HashSet<string>(new[] { "Save", "Apply", "Go", "Play", "Launch", "Add game", "Add emulator", "Continue", "Finish", "Share session", "Yes" }, StringComparer.OrdinalIgnoreCase);
 
 		private bool hovering;
 
@@ -17304,7 +17312,8 @@ namespace EmulatorHub
 			PaintParentBackground(e);
 			e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 			RectangleF box = new RectangleF(0.5f, 0.5f, Math.Max(1, base.Width - 1), Math.Max(1, base.Height - 1));
-			Color color = (base.Enabled ? BackColor : FishBowlPalette.DisabledSurface);
+            bool primary = PrimaryAction || primaryActions.Contains(Text.Trim()) || DialogResult == DialogResult.OK;
+			Color color = (base.Enabled ? primary ? ReferencePalette.Violet : BackColor : FishBowlPalette.DisabledSurface);
 			Color color2 = ((base.Enabled && (pressed || (hovering && !FishBowlHighlights.ReducedMotion))) ? FishBowlHighlights.Blend(color, pressed ? 36 : 24) : color);
 			bool flag = color.GetBrightness() < 0.65f;
 			Color color3 = ((!base.Enabled) ? FishBowlPalette.DisabledBorder : ((base.Enabled && Focused) ? CosmeticRuntime.Focus(color2) : FishBowlHighlights.Blend(color, 22)));
@@ -17332,7 +17341,7 @@ namespace EmulatorHub
 				}
 				return;
 			}
-			Color foreColor = FishBowlPalette.EnsureReadable(base.Enabled ? ForeColor : FishBowlPalette.DisabledText, color2);
+			Color foreColor = FishBowlPalette.EnsureReadable(base.Enabled ? primary ? Color.White : ForeColor : FishBowlPalette.DisabledText, color2);
 			Size size = TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
 			// The icon gives way to the label when both don't fit, so text isn't cut to "Sa..." for decoration.
 			bool flag2 = base.Image != null && base.Width >= 56 && base.Width >= 20 + 7 + size.Width + 14;
@@ -17482,6 +17491,20 @@ namespace EmulatorHub
 	}
 	public class FishBowlMenuRenderer : ToolStripProfessionalRenderer
 	{
+        protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+        {
+            using (var fill = new SolidBrush(ColorHarmony.Card)) e.Graphics.FillRectangle(fill, e.AffectedBounds);
+        }
+
+        protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
+        {
+            using (var fill = new SolidBrush(ColorHarmony.Card)) e.Graphics.FillRectangle(fill, e.AffectedBounds);
+        }
+
+        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+        {
+            using (var border = new Pen(ColorHarmony.Border)) e.Graphics.DrawRectangle(border, 0, 0, Math.Max(0, e.ToolStrip.Width - 1), Math.Max(0, e.ToolStrip.Height - 1));
+        }
 		public FishBowlMenuRenderer()
 			: base(new FishBowlMenuColors())
 		{
@@ -17491,18 +17514,20 @@ namespace EmulatorHub
 		protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
 		{
 			ToolStrip toolStrip = e.ToolStrip ?? e.Item.Owner;
-			Color color = ((toolStrip == null) ? FishBowlPalette.ThemeSurface : toolStrip.BackColor);
+			Color color = ColorHarmony.Card;
 			using (SolidBrush brush = new SolidBrush(color))
 			{
 				e.Graphics.FillRectangle(brush, new Rectangle(Point.Empty, e.Item.Size));
 			}
 			if (e.Item.Enabled && (e.Item.Selected || e.Item.Pressed))
 			{
-				FishBowlHighlights.Draw(e.Graphics, new Rectangle(1, 1, Math.Max(1, e.Item.Width - 2), Math.Max(1, e.Item.Height - 2)), color, e.Item.Pressed);
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (var outline = ReferenceButton.Round(new Rectangle(3, 2, Math.Max(1, e.Item.Width - 6), Math.Max(1, e.Item.Height - 4)), 8))
+                using (var fill = new SolidBrush(ColorHarmony.Selection)) e.Graphics.FillPath(fill, outline);
 			}
 			else
 			{
-				base.OnRenderMenuItemBackground(e);
+                e.Item.ForeColor = FishBowlPalette.ThemeInk;
 			}
 		}
 
@@ -23148,98 +23173,102 @@ namespace EmulatorHub
 		}
 
 		private void LayoutCardsCore()
-		{
-			float num = Math.Max(0.5f, visualScale * Math.Min(1.5f, Math.Max(1f, (float)NextUi.TextPercent / 100f)));
-            bool showSideSummary = !useReferenceGallery && ClientSize.Width >= 960;
-            summary.Dock = showSideSummary ? DockStyle.Right : useReferenceGallery ? DockStyle.Bottom : DockStyle.Top;
-            summary.AutoSize = !showSideSummary;
-            summary.FlowDirection = showSideSummary ? FlowDirection.TopDown : FlowDirection.LeftToRight;
-            summary.WrapContents = !showSideSummary;
-            summary.Width = showSideSummary ? 245 : ClientSize.Width;
+        {
+            float scale = Math.Max(.75f, NextUi.TextPercent / 100f);
+            summary.Dock = DockStyle.Bottom;
+            summary.AutoSize = true;
+            summary.FlowDirection = FlowDirection.LeftToRight;
+            summary.WrapContents = true;
+            summary.Width = ClientSize.Width;
             summary.Padding = new Padding(12);
-            summary.BackColor = FishBowlPalette.ThemeTop;
-			foreach (Button item in summary.Controls.OfType<Button>())
-			{
-				item.AutoSize = false;
-				int available = Math.Max(1, summary.ClientSize.Width - summary.Padding.Horizontal - item.Margin.Horizontal);
-				item.MinimumSize = new Size(Math.Min(ControlDensityTools.Choose(108, 140, 152), available), ControlDensityTools.Choose(30, 42, 48));
-				item.MaximumSize = new Size(available, 0);
-				item.AutoEllipsis = true;
-				item.Width = Math.Min(available, Math.Max(ControlDensityTools.Choose(108, 140, 152), TextRenderer.MeasureText(item.Text, item.Font).Width + ControlDensityTools.Choose(36, 60, 68)));
-				item.Height = Math.Max(ControlDensityTools.Choose(30, 42, 48), item.Font.Height + ControlDensityTools.Choose(10, 16, 20));
-			}
-			int num2 = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
-			int num3 = Math.Max(1, Math.Min(3, num2 / (int)(ControlDensityTools.Choose(240, 265, 310) * num)));
-			foreach (Control control3 in cards.Controls)
-			{
-                if (control3 == referenceGallery)
+            summary.BackColor = FishBowlPalette.ThemeBottom;
+            foreach (Button button in summary.Controls.OfType<Button>())
+            {
+                button.MaximumSize = Size.Empty;
+                button.Size = new Size(Math.Max(110, TextRenderer.MeasureText(button.Text, button.Font).Width + 32), Math.Max(34, button.Font.Height + 14));
+            }
+            int available = Math.Max(1, cards.ClientSize.Width - cards.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
+            int columns = Math.Max(1, Math.Min(2, available / Math.Max(420, (int)(420 * scale))));
+            cards.BackColor = FishBowlPalette.ThemeBottom;
+            foreach (Control card in cards.Controls)
+            {
+                if (card == referenceGallery) { referenceGallery.Fit(available); continue; }
+                card.Margin = new Padding(10);
+                card.Padding = new Padding(24);
+                card.Width = Math.Max(1, available / columns - card.Margin.Horizontal - 2);
+                card.BackColor = ColorHarmony.Card;
+                var title = card.Controls.OfType<Label>().FirstOrDefault();
+                var body = card.Tag as FlowLayoutPanel;
+                if (title == null || body == null) continue;
+                ModernUi.SetFont(title, 16f * scale, FontStyle.Bold);
+                title.Dock = DockStyle.None;
+                title.SetBounds(card.Padding.Left + 60, card.Padding.Top, Math.Max(1, card.Width - card.Padding.Horizontal - 60), Math.Max(46, title.Font.Height + 8));
+                body.Dock = DockStyle.None;
+                body.AutoSize = false;
+                body.MaximumSize = Size.Empty;
+                body.BackColor = Color.Transparent;
+                body.FlowDirection = FlowDirection.TopDown;
+                body.WrapContents = false;
+                int width = Math.Max(1, card.Width - card.Padding.Horizontal);
+                int y = 0;
+                foreach (Control item in body.Controls)
                 {
-                    referenceGallery.Fit(num2);
-                    if (ReferencePalette.Dark(library.Theme.Name)) cards.BackColor = ReferencePalette.Canvas;
-                    continue;
-                }
-				control3.Padding = new Padding(ControlDensityTools.Choose(12, 22, 28));
-                control3.BackColor = ColorHarmony.Card;
-                control3.Margin = new Padding(ControlDensityTools.Choose(7, 12, 16));
-				control3.Width = Math.Max(1, num2 / num3 - control3.Margin.Horizontal - 2);
-				FlowLayoutPanel flowLayoutPanel = control3.Tag as FlowLayoutPanel;
-				if (flowLayoutPanel == null)
-				{
-					continue;
-				}
-				foreach (Label item2 in control3.Controls.OfType<Label>())
-				{
-					int captionWidth = Math.Max(1, control3.Width - control3.Padding.Horizontal - item2.Padding.Horizontal);
-					int captionHeight = TextRenderer.MeasureText(item2.Text, item2.Font, new Size(captionWidth, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl).Height;
-					item2.Height = Math.Max((int)(ControlDensityTools.Choose(30, 40, 46) * num), captionHeight + 14);
-				}
-				int num4 = Math.Max(1, control3.Width - control3.Padding.Horizontal - 2);
-				foreach (Control control4 in flowLayoutPanel.Controls)
-				{
-					int num5 = Math.Max(1, num4 - control4.Margin.Horizontal);
-					if (control4 is Button)
-					{
-						control4.MaximumSize = new Size(num5, Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
-						control4.Size = new Size(Math.Min(Math.Max(ControlDensityTools.Choose(90, 116, 132), (int)((float)TextRenderer.MeasureText(control4.Text, control4.Font).Width + ControlDensityTools.Choose(36, 58, 66) * num)), num5), Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
-						continue;
-					}
-					control4.MaximumSize = new Size(num5, 0);
-					FlowLayoutPanel flowLayoutPanel2 = control4 as FlowLayoutPanel;
-					if (flowLayoutPanel2 != null)
-					{
-						flowLayoutPanel2.AutoSize = false;
-						flowLayoutPanel2.Width = num5;
-						Button button = flowLayoutPanel2.Controls.OfType<Button>().FirstOrDefault();
-						PictureBox pictureBox = flowLayoutPanel2.Controls.OfType<PictureBox>().FirstOrDefault();
-						if (pictureBox == null)
+                    if (collapsedRows.Contains(item)) continue;
+                    item.MaximumSize = Size.Empty;
+                    var row = item as FlowLayoutPanel;
+                    var text = item as Label;
+                    if (row != null)
+                    {
+                        row.MaximumSize = Size.Empty;
+                        row.AutoSize = false;
+                        row.WrapContents = true;
+                        row.Width = width;
+                        row.Padding = Padding.Empty;
+                        bool firstAction = true;
+                        foreach (Control child in row.Controls)
                         {
-                            foreach (Button item in flowLayoutPanel2.Controls.OfType<Button>())
-                            {
-                                item.MaximumSize = new Size(Math.Max(1, num5 - item.Margin.Horizontal), 0);
-                                item.Size = new Size(Math.Min(Math.Max(ControlDensityTools.Choose(90, 116, 132), TextRenderer.MeasureText(item.Text, item.Font).Width + (int)(ControlDensityTools.Choose(30, 40, 46) * num)), Math.Max(1, num5 - item.Margin.Horizontal)), Math.Max(item.Font.Height + ControlDensityTools.Choose(10, 16, 20), (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
-                            }
-                            flowLayoutPanel2.Height = flowLayoutPanel2.GetPreferredSize(new Size(num5, 0)).Height;
+                            var button = child as Button;
+                            if (button == null) continue;
+                            button.MaximumSize = Size.Empty;
+                            button.MinimumSize = Size.Empty;
+                            button.Size = new Size(Math.Min(width, Math.Max(95, TextRenderer.MeasureText(button.Text, button.Font).Width + 32)), Math.Max(36, button.Font.Height + 16));
+                            var action = button as FishBowlActionButton;
+                            if (action != null && row.AccessibleName == "Home card actions") action.PrimaryAction = firstAction;
+                            firstAction = false;
                         }
-						if (button != null && pictureBox != null)
-						{
-							button.AutoEllipsis = true;
-							int num6 = Math.Max(1, num5 - pictureBox.Width - pictureBox.Margin.Horizontal - button.Margin.Horizontal);
-							button.MinimumSize = new Size(Math.Min(ControlDensityTools.Choose(90, 116, 132), num6), Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
-							button.MaximumSize = new Size(num6, Math.Max(1, (int)(ControlDensityTools.Choose(30, 42, 48) * num)));
-							button.Width = Math.Min(num6, TextRenderer.MeasureText(button.Text, button.Font).Width + (int)(ControlDensityTools.Choose(36, 58, 66) * num));
-							flowLayoutPanel2.Height = Math.Max(pictureBox.Height + pictureBox.Margin.Vertical, button.Height + button.Margin.Vertical);
-						}
-					}
-				}
-				int headingHeight = control3.Controls.OfType<Label>().Sum(l => l.Height);
-				int val = flowLayoutPanel.Controls.Cast<Control>().Where(item => !collapsedRows.Contains(item)).Sum(item => ((item is Label) ? item.GetPreferredSize(new Size(Math.Max(1, num4 - item.Margin.Horizontal), 0)).Height : item.Height) + item.Margin.Vertical) + headingHeight + control3.Padding.Vertical + (int)(ControlDensityTools.Choose(10, 20, 26) * num);
-				control3.Height = Math.Max((int)(ControlDensityTools.Choose(100, Immersion.Ensure(library).Roomier ? 180 : 120, 210) * num), val);
-			}
-		}
+                        foreach (Label caption in row.Controls.OfType<Label>())
+                        {
+                            int reserved = row.Controls.Cast<Control>().Where(child => child != caption).Sum(child => child.Width + child.Margin.Horizontal);
+                            caption.Width = Math.Max(80, width - reserved - 18);
+                            caption.Height = Math.Max(40, caption.Font.Height * 2);
+                        }
+                        row.PerformLayout();
+                        row.Height = row.Controls.Cast<Control>().Select(child => child.Bottom + child.Margin.Bottom).DefaultIfEmpty(0).Max() + 6;
+                    }
+                    else if (text != null)
+                    {
+                        text.MaximumSize = new Size(width, 0);
+                        text.AutoSize = true;
+                        text.Width = width;
+                        text.Height = text.GetPreferredSize(new Size(width, 0)).Height;
+                    }
+                    else
+                    {
+                        item.Size = new Size(Math.Min(width, Math.Max(110, TextRenderer.MeasureText(item.Text, item.Font).Width + 32)), Math.Max(34, item.Font.Height + 16));
+                    }
+                    item.Margin = new Padding(0, 0, 0, 12);
+                    item.Location = new Point(0, y);
+                    y += item.Height + 12;
+                }
+                int top = title.Bottom + 22;
+                body.SetBounds(card.Padding.Left, top, width, Math.Max(1, y));
+                card.Height = Math.Max((int)(220 * scale), top + y + card.Padding.Bottom);
+            }
+        }
 
-		private Panel Card(string title)
+        private Panel Card(string title)
 		{
-			Panel panel = new ReferenceHomeCard();
+			Panel panel = new ModernHomeCard();
 			panel.Height = (Immersion.Ensure(library).Roomier ? 300 : (library.Experience.CompactHome ? 210 : 260));
 			panel.Width = 370;
 			panel.BackColor = FishBowlPalette.ThemeSurface;
@@ -23267,6 +23296,17 @@ namespace EmulatorHub
 		private void Add(Panel card, string text, string command, GameEntry game = null, EmulatorProfile emulator = null)
 		{
 			FlowLayoutPanel flowLayoutPanel = (FlowLayoutPanel)card.Tag;
+            if (emulator != null && game == null)
+            {
+                var row = new FlowLayoutPanel { AutoSize = false, WrapContents = false, Tag = emulator, AccessibleName = emulator.Name + " favorite emulator" };
+                row.Controls.Add(new Label { Text = emulator.Name, AutoEllipsis = true, Width = 180, Height = 38, TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent, ForeColor = FishBowlPalette.ThemeInk });
+                var open = ExperienceUi.Button("Open", delegate { action(command, null, emulator); });
+                open.PrimaryAction = true;
+                open.AccessibleName = "Open " + emulator.Name;
+                row.Controls.Add(open);
+                flowLayoutPanel.Controls.Add(row);
+                return;
+            }
 			// A card keeps its first action visible; secondary utilities use the same More menu as the toolbars.
 			if (game == null && emulator == null && flowLayoutPanel.Controls.OfType<Button>().Any())
 			{
@@ -23309,12 +23349,12 @@ namespace EmulatorHub
             int preview = content.Any(item => !(item is Label)) ? 3 : 1;
             var extras = content.Skip(preview).ToArray();
             if (extras.Length == 0) return;
-            var toggle = ExperienceUi.Button("All (" + content.Length + ")", delegate { });
+            var toggle = ExperienceUi.Button("View all", delegate { });
             toggle.AccessibleName = card.AccessibleName + " expand or collapse";
             Action apply = delegate {
                 bool expanded = expandedCards.Contains(card.AccessibleName);
                 foreach (var item in extras) { item.Visible = expanded; if (expanded) collapsedRows.Remove(item); else collapsedRows.Add(item); }
-                toggle.Text = expanded ? "Show less" : "All (" + content.Length + ")";
+                toggle.Text = expanded ? "Show less" : "View all";
                 LayoutCards();
             };
             toggle.Click += delegate {
@@ -23368,10 +23408,13 @@ namespace EmulatorHub
 				CosmeticRuntime.DecorateArtwork((Bitmap)art.Image);
 			}
 			flowLayoutPanel3.Controls.Add(art);
-			FishBowlActionButton fishBowlActionButton = ExperienceUi.Button(game.Title, delegate
+            flowLayoutPanel3.Controls.Add(new Label { Text = game.Title, AutoEllipsis = true, Width = 180, Height = 48,
+                TextAlign = ContentAlignment.MiddleLeft, ForeColor = FishBowlPalette.ThemeInk, BackColor = Color.Transparent });
+			FishBowlActionButton fishBowlActionButton = ExperienceUi.Button("Play", delegate
 			{
 				action("Game", game, null);
 			});
+            fishBowlActionButton.AccessibleName = "Play " + game.Title;
 			ContextMenuStrip context = new ContextMenuStrip();
             NavigationController.Register(context);
 			context.Items.Add("Game details", null, delegate
@@ -23379,6 +23422,7 @@ namespace EmulatorHub
 				action("Game details", game, null);
 			});
 			fishBowlActionButton.ContextMenuStrip = context;
+            flowLayoutPanel3.ContextMenuStrip = context;
 			fishBowlActionButton.Disposed += delegate
 			{
 				context.Dispose();
@@ -26869,18 +26913,18 @@ namespace EmulatorHub
 			base.StartPosition = FormStartPosition.CenterParent;
 			BackColor = FishBowlPalette.DeepSeaSurface;
 			ForeColor = FishBowlPalette.ThemeInk;
-            var heading = new Label
-            {
-                Text = title, AccessibleName = title, Dock = DockStyle.Top, AutoSize = true,
-                Padding = new Padding(16, 12, 12, 12), Font = new Font("Segoe UI", 14f, FontStyle.Bold),
-                BackColor = FishBowlPalette.ThemeBottom, ForeColor = FishBowlPalette.ThemeInk
-            };
+            var heading = ModernUi.Heading(title);
             TextChanged += delegate { heading.Text = Text; heading.AccessibleName = Text; };
             Body.BackColor = ColorHarmony.Card;
             Actions.Padding = new Padding(10, 4, 10, 4);
-            base.Controls.Add(Body);
-            base.Controls.Add(Actions);
-            base.Controls.Add(heading);
+            var frame = ModernUi.DialogFrame("ModernDialogRoot");
+            Actions.AutoSize = true;
+            Actions.Dock = DockStyle.Fill;
+            Actions.Margin = new Padding(0, 18, 0, 0);
+            frame.Controls.Add(heading, 0, 0);
+            frame.Controls.Add(Body, 0, 1);
+            frame.Controls.Add(Actions, 0, 2);
+            base.Controls.Add(frame);
 		}
 
         protected override void SetVisibleCore(bool value)
@@ -26903,7 +26947,7 @@ namespace EmulatorHub
 
 		public static TableLayoutPanel Fields(Control parent)
 		{
-			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
+			TableLayoutPanel tableLayoutPanel = new ModernFieldsPanel();
 			tableLayoutPanel.BackColor = Color.Transparent;
 			tableLayoutPanel.Dock = DockStyle.Top;
 			tableLayoutPanel.AutoSize = true;
@@ -33246,7 +33290,7 @@ namespace EmulatorHub
 			{
 				Dock = DockStyle.Top,
 				AutoSize = false,
-				Height = Math.Max(65, Font.Height * 3),
+				Height = Math.Max(86, Font.Height * 5),
 				ForeColor = FishBowlPalette.ThemeInk,
 				BackColor = FishBowlPalette.ThemeSurface,
 				Padding = new Padding(12)
@@ -34273,10 +34317,10 @@ namespace EmulatorHub
 	}
 	public static class AccentCatalog
 	{
-		public static readonly string[] Names = new string[] { "Ocean", "Sunset", "Amethyst", "Rose", "Lime", "Gold", "Ice", "Cobalt", "Indigo", "Violet", "Orchid", "Magenta", "Ruby", "Coral", "Tangerine", "Amber", "Lemon", "Emerald", "Mint", "Teal", "Turquoise", "Sapphire", "Lavender", "Peach", "Copper", "Silver", "Pearl", "Graphite", "Aquarium Mint", "Aquarium Blue", "Aquarium Coral" };
+		public static readonly string[] Names = new string[] { "Ocean", "Sunset", "Amethyst", "Rose", "Lime", "Gold", "Ice", "Cobalt", "Indigo", "Violet", "Orchid", "Magenta", "Ruby", "Coral", "Tangerine", "Amber", "Lemon", "Emerald", "Mint", "Teal", "Turquoise", "Sapphire", "Lavender", "Peach", "Copper", "Silver", "Pearl", "Graphite", "Aquarium Mint", "Aquarium Blue", "Aquarium Coral", "Gallery Violet" };
 		public static readonly string[] IconNames = new string[] { "Match accent" }.Concat(Names).ToArray();
-		private static readonly Color[] Primary = new Color[] { Color.FromArgb(89, 190, 255), Color.FromArgb(255, 158, 79), Color.FromArgb(177, 122, 255), Color.FromArgb(228, 100, 181), Color.FromArgb(155, 213, 98), Color.FromArgb(236, 178, 62), Color.FromArgb(103, 198, 232), Color.FromArgb(77, 127, 255), Color.FromArgb(129, 114, 237), Color.FromArgb(193, 86, 237), Color.FromArgb(225, 143, 234), Color.FromArgb(240, 92, 203), Color.FromArgb(240, 91, 112), Color.FromArgb(255, 130, 115), Color.FromArgb(255, 171, 50), Color.FromArgb(240, 196, 70), Color.FromArgb(230, 223, 103), Color.FromArgb(67, 200, 134), Color.FromArgb(131, 226, 188), Color.FromArgb(59, 197, 186), Color.FromArgb(64, 216, 228), Color.FromArgb(72, 158, 221), Color.FromArgb(193, 166, 235), Color.FromArgb(241, 177, 154), Color.FromArgb(207, 145, 101), Color.FromArgb(195, 203, 216), Color.FromArgb(245, 239, 228), Color.FromArgb(135, 149, 166), Color.FromArgb(103, 232, 211), Color.FromArgb(113, 190, 255), Color.FromArgb(255, 170, 150) };
-		private static readonly Color[] Secondary = new Color[] { Color.FromArgb(67, 220, 187), Color.FromArgb(240, 93, 91), Color.FromArgb(222, 109, 244), Color.FromArgb(255, 157, 101), Color.FromArgb(246, 210, 92), Color.FromArgb(255, 219, 122), Color.FromArgb(173, 235, 255), Color.FromArgb(122, 181, 255), Color.FromArgb(178, 158, 255), Color.FromArgb(140, 129, 255), Color.FromArgb(189, 161, 247), Color.FromArgb(247, 151, 222), Color.FromArgb(255, 152, 125), Color.FromArgb(255, 193, 160), Color.FromArgb(255, 221, 124), Color.FromArgb(232, 139, 64), Color.FromArgb(178, 220, 104), Color.FromArgb(146, 229, 176), Color.FromArgb(187, 245, 221), Color.FromArgb(118, 225, 218), Color.FromArgb(136, 241, 238), Color.FromArgb(117, 209, 237), Color.FromArgb(224, 201, 244), Color.FromArgb(255, 219, 192), Color.FromArgb(234, 187, 140), Color.FromArgb(237, 242, 249), Color.FromArgb(207, 197, 184), Color.FromArgb(188, 201, 215), Color.FromArgb(113, 190, 255), Color.FromArgb(157, 126, 247), Color.FromArgb(177, 122, 255) };
+		private static readonly Color[] Primary = new Color[] { Color.FromArgb(89, 190, 255), Color.FromArgb(255, 158, 79), Color.FromArgb(177, 122, 255), Color.FromArgb(228, 100, 181), Color.FromArgb(155, 213, 98), Color.FromArgb(236, 178, 62), Color.FromArgb(103, 198, 232), Color.FromArgb(77, 127, 255), Color.FromArgb(129, 114, 237), Color.FromArgb(193, 86, 237), Color.FromArgb(225, 143, 234), Color.FromArgb(240, 92, 203), Color.FromArgb(240, 91, 112), Color.FromArgb(255, 130, 115), Color.FromArgb(255, 171, 50), Color.FromArgb(240, 196, 70), Color.FromArgb(230, 223, 103), Color.FromArgb(67, 200, 134), Color.FromArgb(131, 226, 188), Color.FromArgb(59, 197, 186), Color.FromArgb(64, 216, 228), Color.FromArgb(72, 158, 221), Color.FromArgb(193, 166, 235), Color.FromArgb(241, 177, 154), Color.FromArgb(207, 145, 101), Color.FromArgb(195, 203, 216), Color.FromArgb(245, 239, 228), Color.FromArgb(135, 149, 166), Color.FromArgb(103, 232, 211), Color.FromArgb(113, 190, 255), Color.FromArgb(255, 170, 150), Color.FromArgb(145, 55, 238) };
+		private static readonly Color[] Secondary = new Color[] { Color.FromArgb(67, 220, 187), Color.FromArgb(240, 93, 91), Color.FromArgb(222, 109, 244), Color.FromArgb(255, 157, 101), Color.FromArgb(246, 210, 92), Color.FromArgb(255, 219, 122), Color.FromArgb(173, 235, 255), Color.FromArgb(122, 181, 255), Color.FromArgb(178, 158, 255), Color.FromArgb(140, 129, 255), Color.FromArgb(189, 161, 247), Color.FromArgb(247, 151, 222), Color.FromArgb(255, 152, 125), Color.FromArgb(255, 193, 160), Color.FromArgb(255, 221, 124), Color.FromArgb(232, 139, 64), Color.FromArgb(178, 220, 104), Color.FromArgb(146, 229, 176), Color.FromArgb(187, 245, 221), Color.FromArgb(118, 225, 218), Color.FromArgb(136, 241, 238), Color.FromArgb(117, 209, 237), Color.FromArgb(224, 201, 244), Color.FromArgb(255, 219, 192), Color.FromArgb(234, 187, 140), Color.FromArgb(237, 242, 249), Color.FromArgb(207, 197, 184), Color.FromArgb(188, 201, 215), Color.FromArgb(113, 190, 255), Color.FromArgb(157, 126, 247), Color.FromArgb(177, 122, 255), Color.FromArgb(210, 96, 235) };
 		public static bool TryGet(string name, out Color primary, out Color secondary)
 		{
 			int index = Array.FindIndex(Names, n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));

@@ -593,11 +593,13 @@ namespace EmulatorHub
             moreButton.Disposed += delegate { menu.Dispose(); };
             toolbar.Controls.AddRange(new Control[] { fullscreenButton, externalButton, retryButton, shareButton, moreButton });
             stage = new MixedStage { Dock = DockStyle.Fill, BackColor = FishBowlPalette.ThemeBottom };
-            empty = new Label { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(16), Text = "Your game will appear here. Launch a game from Library or an emulator from Emulators.", ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeBottom };
+            empty = new ModernBlankState("Your play space") { Text = "Launch a game from Library or an emulator from Emulators. Your running sessions will appear here.", ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeBottom };
             stage.Controls.Add(empty);
             stage.SizeChanged += delegate { empty.MaximumSize = new Size(Math.Max(1, stage.ClientSize.Width), 0); };
             status = new Label { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8), ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeSurface, Text = "Launch a game or emulator to show it here." };
-            Controls.Add(stage); Controls.Add(status); Controls.Add(toolbar);
+            var header = new ModernWorkspaceHeader("Play", choice, shareButton, new[] { fullscreenButton }, new[] { externalButton, retryButton, moreButton });
+            toolbar.Dispose();
+            Controls.Add(stage); Controls.Add(status); Controls.Add(header);
             choice.SelectedIndexChanged += delegate { ShowSelected(); };
             timer = new Timer { Interval = 1000 }; timer.Tick += Tick;
             RefreshStatus();

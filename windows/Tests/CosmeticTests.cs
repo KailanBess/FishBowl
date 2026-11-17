@@ -64,9 +64,8 @@ class CosmeticTests {
                 ((ComboBox)Field(dialog,"ArtworkFrame")).SelectedItem="Rounded";
                 ((CheckBox)Field(dialog,"ArtworkShadow")).Checked=true;
                 ((ComboBox)Field(dialog,"BadgeStyle")).SelectedItem="Pill";
-                ((CheckBox)Field(dialog,"ShowFooter")).Checked=false;
                 Check(FishBowlPalette.ThemeSurface==Color.FromArgb(32,48,69),"custom palette previews immediately");
-                Check(!CosmeticRuntime.Current.ShowFooter && CosmeticRuntime.Current.CornerRadius==12,"footer and corners preview immediately");
+                Check(CosmeticRuntime.Current.CornerRadius==12,"corners preview immediately");
                 for(int tab=0;tab<tabs.TabCount;tab++) {tabs.SelectedIndex=tab;Capture(dialog,"cosmetics-tab-"+tab+".png");}
                 Click(dialog,"Cancel");
             });
@@ -78,10 +77,9 @@ class CosmeticTests {
                 Check(data.Cosmetics.CornerRadius==13,"Revert uses last Apply");
                 ((ComboBox)Field(dialog,"IconStyle")).SelectedItem="Monochrome";
                 ((ComboBox)Field(dialog,"BackgroundStyle")).SelectedItem="Waves";
-                ((CheckBox)Field(dialog,"ShowFooter")).Checked=false;
                 Click(dialog,"Save and close");
             });
-            var saved=Store.Load();Check(saved.Cosmetics!=null && saved.Cosmetics.CornerRadius==13 && saved.Cosmetics.IconStyle=="Monochrome" && !saved.Cosmetics.ShowFooter,"cosmetic choices persist");
+            var saved=Store.Load();Check(saved.Cosmetics!=null && saved.Cosmetics.CornerRadius==13 && saved.Cosmetics.IconStyle=="Monochrome" && saved.Cosmetics.ShowFooter,"cosmetic choices and retained compatibility fields persist");
             using(var library=new GameLibraryDialog(data)) {library.ShowInTaskbar=false;library.StartPosition=FormStartPosition.Manual;library.Location=new Point(-4000,-4000);library.Show();Application.DoEvents();
                 var buttons=NextUi.Descendants(library).OfType<FishBowlActionButton>().Where(b=>b.Parent.Name=="FishBowlToolbar").ToList();
                 Check(buttons.All(b=>b.IconOnly && !string.IsNullOrWhiteSpace(b.AccessibleName)),"icon-only toolbar preserves accessible labels");
@@ -112,7 +110,8 @@ class CosmeticTests {
                 var picker=row.Controls.OfType<Button>().Single();
                 Check(picker.Height>=50 && picker.Bottom<=row.ClientSize.Height,"large text keeps color chooser visible");
                 Check(text.Right<=row.ClientSize.Width && picker.Right<=row.ClientSize.Width,"color inputs fit their row");
-                Check(NextUi.Descendants(dialog).OfType<FishBowlTabs>().Single().ItemSize.Width>=190,"large text tabs retain useful widths");
+                var sections=NextUi.Descendants(dialog).Single(c=>c.Name=="Modern section navigation");
+                Check(NextUi.Descendants(sections).OfType<Button>().Where(b=>b.Visible).All(b=>b.Width>=TextRenderer.MeasureText(b.Text,b.Font).Width+20),"large text section navigation retains useful widths");
                 Capture(dialog,"cosmetics-large-text.png");Click(dialog,"Cancel");
             });
             data.Enhancements.TextPercent=100;typeof(MainForm).GetMethod("ApplyAppearanceNow",flags).Invoke(main,null);

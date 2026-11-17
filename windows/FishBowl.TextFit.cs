@@ -63,6 +63,7 @@ namespace EmulatorHub
         private static void FitContainers(Control root)
         {
             foreach (Control child in root.Controls.Cast<Control>().ToArray()) FitContainers(child);
+            if (root is ModernCatalogCard || root is ModernWorkspaceHeader || root is ModernHomeCard || root is ModernDialogBody || root is ModernFieldsPanel || root is ModernTabDeck || root is ModernInputSurface) return;
             var flow = root as FlowLayoutPanel;
             if (flow != null) {
                 foreach (ButtonBase button in flow.Controls.OfType<ButtonBase>()) button.Width = Math.Max(button.Width, Need(button));

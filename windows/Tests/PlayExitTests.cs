@@ -10,6 +10,26 @@ using System.Windows.Forms;
 using EmulatorHub;
 
 class PlayExitTests {
+    static System.Collections.Generic.IEnumerable<ToolStripMenuItem> Actions(ToolStripItemCollection items)
+    {
+        foreach (ToolStripMenuItem item in items.OfType<ToolStripMenuItem>())
+        {
+            yield return item;
+            foreach (var child in Actions(item.DropDownItems)) yield return child;
+        }
+    }
+    static void ClickAction(Control root, string caption)
+    {
+        var button = NextUi.Descendants(root).OfType<Button>().FirstOrDefault(item => item.Visible && item.Text == caption);
+        if (button != null) { button.PerformClick(); return; }
+        var more = NextUi.Descendants(root).OfType<Button>().Single(item => item.AccessibleName == "Play actions");
+        Check(more.Enabled, "Play actions are available");
+        var menu = more.ContextMenuStrip;
+        menu.Show(more, new Point(0, more.Height)); Application.DoEvents();
+        var action = Actions(menu.Items).Single(item => item.Text == caption);
+        Check(action.Enabled, "Play action is available: " + caption);
+        action.PerformClick(); menu.Close();
+    }
  static int checks;
  static void Check(bool ok,string message) { checks++;if(!ok)throw new Exception(message); }
  static void Pump(int ms) { var watch=Stopwatch.StartNew();while(watch.ElapsedMilliseconds<ms){Application.DoEvents();Thread.Sleep(10);} }
@@ -97,7 +117,7 @@ class PlayExitTests {
      host.ConfigureView(new PlayViewSettings{Top=30,Bottom=20});Pump(100);
      Check(host.IsAttached&&GetMenu(window)==IntPtr.Zero,"returning to game-only view hides the original native menu safely");
      Check(play.OpenSelectedInWindow()&&Until(delegate{return IsWindowVisible(manager);}),"external mode restores the original sibling emulator frontend");
-     NextUi.Descendants(play).OfType<Button>().Single(b=>b.Text=="Show in Play").PerformClick();
+     ClickAction(play,"Show in Play");
      Check(Until(delegate{return host.IsAttached&&!IsWindowVisible(manager);}),"returning to Play selects the game and hides its frontend again");
           var tabs=(FishBowlTabs)Field(main,"workspaceNavigation");
      int placements=host.PlacementUpdates;

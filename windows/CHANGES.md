@@ -1,9 +1,11 @@
-# Windows 1.29.13
+# Windows 1.30.0
 
-- Match app dialogs, confirmations, toolbars and dropdown frames to the active shell palette.
-- Paint rounded action corners from their parent surface to remove rectangular patches.
-- Keep Web and Play status information in a compact bottom strip.
-- Preserve confirmation results, safe defaults, keyboard navigation and text scaling.
+- Rebuild every Windows workspace and app dialog around the gallery shell, with card catalogs, section navigation, stacked fields and consistent confirmations.
+- Replace the old menu strip, emulator sidebar duplication, utility panels, native list presentation and decorative footer.
+- Preserve game, emulator, save, browser, Play and settings actions through the new controls, including paging, selection, checkboxes, drag-and-drop and sorting.
+- Apply Gallery Night, Gallery Violet, Segoe UI and artwork view once when this Windows interface first opens; retain later appearance choices.
+- Match installer surfaces and buttons to the gallery palette. Windows-managed file pickers and system permission prompts keep their operating-system appearance.
+- Retain saved library fields and add an optional Windows interface migration marker. Linux layout is unchanged.
 
 # Windows 1.29.12
 
