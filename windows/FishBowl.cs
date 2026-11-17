@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.29.11.0")]
+[assembly: AssemblyFileVersion("1.29.12.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.29.11.0")]
+[assembly: AssemblyVersion("1.29.12.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.29.11";
+		private const string FishBowlVersion = "1.29.12";
 
-		private const string FishBowlTitleVersion = "1.29.11";
+		private const string FishBowlTitleVersion = "1.29.12";
 
 		private Icon ownedAppIcon;
 
@@ -320,7 +320,8 @@ namespace EmulatorHub
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
 			ApplyDefaultFishBowlWaterTheme();
 			ApplyThemeColors();
-			Text = "FishBowl 1.29.11";
+			Text = "Home";
+            AccessibleName = "FishBowl";
 			ownedAppIcon = LoadAppIcon();
 			base.Icon = ownedAppIcon;
 			base.StartPosition = FormStartPosition.CenterScreen;
@@ -406,11 +407,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.11" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.29.12" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.29.11";
+						library.Theme.LastSeenBuild = "1.29.12";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -495,48 +496,15 @@ namespace EmulatorHub
 			TableLayoutPanel tableLayoutPanel2 = tableLayoutPanel;
 			tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
-			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, library.Theme.ShowBanner ? 36 : 0));
+			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, 0f));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, 0f));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 			tableLayoutPanel2.RowStyles.Add(new RowStyle(SizeType.Absolute, library.Theme.ShowStatusBar ? 58 : 0));
 			base.Controls.Add(tableLayoutPanel2);
 			workspaceShell = tableLayoutPanel2;
 			tableLayoutPanel2.Controls.Add(BuildMenu(), 0, 0);
-			Panel panel = new Panel();
-			panel.Dock = DockStyle.Fill;
-			panel.BackColor = top;
-			panel.Padding = new Padding(12);
-			Panel panel2 = panel;
-			Image logo = LoadLogo();
-			PictureBox pictureBox = new PictureBox();
-			pictureBox.Image = logo;
-			pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
-			pictureBox.Size = new Size(60, 60);
-			pictureBox.Location = new Point(12, 8);
-			PictureBox pictureBox2 = pictureBox;
-			pictureBox2.Disposed += delegate
-			{
-				if (logo != null)
-				{
-					logo.Dispose();
-				}
-			};
-			panel2.Name = "FishBowlHeader";
-			panel2.Controls.Add(pictureBox2);
-            panel2.Controls.Add(new Label
-            {
-                Text = "FishBowl",
-                ForeColor = ink,
-                Font = new Font(DisplayFont, 11f, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(44, 8)
-            });
-            panel2.Paint += delegate(object sender, PaintEventArgs e)
-            {
-                using (var border = new Pen(FishBowlHighlights.Blend(panel2.BackColor, 28)))
-                    e.Graphics.DrawLine(border, 0, panel2.Height - 1, panel2.Width, panel2.Height - 1);
-            };
-			tableLayoutPanel2.Controls.Add(panel2, 0, 1);
+            var panel2 = new Panel { Name = "FishBowlHeader", Dock = DockStyle.Fill, Visible = false };
+            tableLayoutPanel2.Controls.Add(panel2, 0, 1);
 			primaryToolbar = BuildPrimaryActions();
 			int num = ((library.Theme.ListDensity == "Compact") ? 40 : ((library.Theme.ListDensity == "Comfortable") ? 56 : 48));
 			emulatorImages.ImageSize = new Size(num, num);
@@ -3410,7 +3378,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.11"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.29.12"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3418,7 +3386,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.11"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.29.12"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3426,7 +3394,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.11"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.29.12"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -4787,7 +4755,6 @@ namespace EmulatorHub
         private TableLayoutPanel dashboardCommands;
         private bool dashboardMenuOpen;
         private Button dashboardLibraryTools;
-        private Label dashboardBrand;
         private Panel dashboardRailSpacer;
         private ReferenceButton dashboardSearch;
         private ReferenceButton dashboardMenu;
@@ -4811,7 +4778,7 @@ namespace EmulatorHub
 
         private static void AddSettingsCard(FlowLayoutPanel grid, string title, string description, Action open)
         {
-            var card = new TableLayoutPanel
+            var card = new ReferenceSettingsCard
             {
                 Width = 236, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 Padding = new Padding(12), Margin = new Padding(6),
@@ -4837,13 +4804,6 @@ namespace EmulatorHub
                 WrapContents = false, AutoScroll = true, Padding = new Padding(8, 12, 8, 8),
                 AccessibleName = "FishBowl workspace rail", Tag = "FishBowl wrapped toolbar"
             };
-            dashboardBrand = new Label
-            {
-                Text = "◉  FishBowl", AccessibleName = "FishBowl",
-                Font = new Font(DisplayFont, 19f, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft,
-                Margin = new Padding(8, 0, 0, 24), Height = 52, AutoEllipsis = true
-            };
-            dashboardRail.Controls.Add(dashboardBrand);
             dashboardRailSpacer = new Panel { Size = new Size(1, 1), Margin = Padding.Empty, TabStop = false };
             string[] glyphs = { "⌂", "◇", "▦", "▷", "◎", "⚙" };
             foreach (TabPage page in workspaceNavigation.TabPages)
@@ -4872,7 +4832,7 @@ namespace EmulatorHub
             dashboardCommands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             dashboardCommands.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             dashboardCommands.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            dashboardSearch = new ReferenceButton("⌕   Search FishBowl") {
+            dashboardSearch = new ReferenceButton("⌕   Search library and tools") {
                 AccessibleName = "Search games, emulators and commands", LeftAligned = true,
                 Dock = DockStyle.Fill, Margin = new Padding(0, 0, 10, 0)
             };
@@ -4898,8 +4858,7 @@ namespace EmulatorHub
             dashboardRail.Visible = dashboardCommands.Visible = visible;
             workspaceShell.RowStyles[0].Height = visible && dashboardMenuOpen ? 28 : 0;
             dashboardRail.BackColor = referenceDark ? ReferencePalette.Rail : FishBowlPalette.ThemeBottom;
-            dashboardBrand.BackColor = dashboardRail.BackColor;
-            dashboardBrand.ForeColor = referenceDark ? Color.White : FishBowlPalette.ThemeInk;
+
             dashboardCommands.BackColor = referenceDark ? ReferencePalette.Canvas : FishBowlPalette.ThemeTop;
             dashboardSearch.BackColor = referenceDark ? ReferencePalette.Search : FishBowlPalette.ThemeSurface;
             dashboardSearch.ForeColor = referenceDark ? Color.FromArgb(209, 204, 219) : FishBowlPalette.ThemeInk;
@@ -4913,6 +4872,7 @@ namespace EmulatorHub
                 button.AccessibleDescription = active ? "Current workspace" : "";
                 button.Invalidate();
             }
+            Text = workspaceNavigation.SelectedTab == null ? "Home" : workspaceNavigation.SelectedTab.Text;
             FitDashboardRail();
         }
 
@@ -4928,14 +4888,13 @@ namespace EmulatorHub
             {
                 int width = Math.Max(170, buttons.Max(button => TextRenderer.MeasureText(button.Text, button.Font).Width + 30));
                 dashboardRail.Width = width + dashboardRail.Padding.Horizontal + 8;
-                dashboardBrand.Width = width - dashboardBrand.Margin.Horizontal;
-                dashboardBrand.Height = Math.Max(52, dashboardBrand.Font.Height + 10);
+
                 foreach (Button button in buttons)
                 {
                     button.MinimumSize = Size.Empty;
                     button.Size = new Size(width, Math.Max(44, button.Font.Height + 14));
                 }
-                int occupied = dashboardRail.Padding.Vertical + dashboardBrand.Height + dashboardBrand.Margin.Vertical +
+                int occupied = dashboardRail.Padding.Vertical +
                     buttons.Sum(button => button.Height + button.Margin.Vertical);
                 dashboardRailSpacer.Height = Math.Max(12, dashboardRail.ClientSize.Height - occupied - 6);
                 if (dashboardCommands != null)
@@ -5415,17 +5374,6 @@ namespace EmulatorHub
 			foreach (Form openForm in Application.OpenForms)
 			{
 				CosmeticRuntime.Apply(openForm);
-			}
-			foreach (PictureBox item3 in from p in NextUi.Descendants(this).OfType<PictureBox>()
-				where p.Parent != null && p.Parent.Controls.OfType<Label>().Any((Label l) => l.Text == "FishBowl")
-				select p)
-			{
-				Image image = item3.Image;
-				item3.Image = FishBowlBranding.CreateImage();
-				if (image != null)
-				{
-					image.Dispose();
-				}
 			}
 			SetStatus("Appearance applied. Use Revert or Cancel to restore the previous appearance.");
 		}
@@ -6608,24 +6556,11 @@ namespace EmulatorHub
 			return s.Ambient && focused && sessions == 0 && work == 0 && minutes >= (double)Math.Max(1, Math.Min(60, s.IdleMinutes));
 		}
 
-		private void UpdateFluidHeader()
-		{
-			if (workspaceShell == null)
-			{
-				return;
-			}
-			Control control = NextUi.Descendants(this).FirstOrDefault((Control c) => c.Name == "FishBowlHeader");
-			if (control != null)
-			{
-                Label title = control.Controls.OfType<Label>().First();
-                PictureBox mark = control.Controls.OfType<PictureBox>().First();
-                int height = Math.Max(36, title.Font.Height + 14);
-                mark.Size = new Size(24, 24);
-                mark.Location = new Point(10, (height - mark.Height) / 2);
-                title.Location = new Point(mark.Right + 8, (height - title.Height) / 2);
-                workspaceShell.RowStyles[1].Height = library.Theme.ShowBanner && !immersivePlayChrome ? height : 0;
-			}
-		}
+        private void UpdateFluidHeader()
+        {
+            if (workspaceShell != null) workspaceShell.RowStyles[1].Height = 0;
+        }
+
 	}
 	public class FishBowlDialog : Form
 	{
@@ -13148,7 +13083,7 @@ namespace EmulatorHub
 			density.SelectedItem = (string.IsNullOrWhiteSpace(originalTheme.ListDensity) ? "Standard" : originalTheme.ListDensity);
 			StyleCombo(density, 218, 474, 184);
 			base.Controls.Add(density);
-			AddVisualCheck(showBanner, "Show FishBowl banner", 418, 456, originalTheme.ShowBanner);
+			showBanner.Checked = originalTheme.ShowBanner;
 			AddVisualCheck(showStatusBar, "Show filter and status bar", 418, 482, originalTheme.ShowStatusBar);
 			AddVisualCheck(showInformation, "Show emulator information pane", 418, 508, originalTheme.ShowInformationPanel);
 			AddVisualCheck(showIcons, "Show emulator icons", 18, 522, originalTheme.ShowEmulatorIcons);
@@ -17353,7 +17288,7 @@ namespace EmulatorHub
 			Color color2 = ((base.Enabled && (pressed || (hovering && !FishBowlHighlights.ReducedMotion))) ? FishBowlHighlights.Blend(color, pressed ? 36 : 24) : color);
 			bool flag = color.GetBrightness() < 0.65f;
 			Color color3 = ((!base.Enabled) ? FishBowlPalette.DisabledBorder : ((base.Enabled && Focused) ? CosmeticRuntime.Focus(color2) : FishBowlHighlights.Blend(color, 22)));
-			using (GraphicsPath path = FishBowlVisuals.Round(box, 6f))
+			using (GraphicsPath path = FishBowlVisuals.Round(box, Math.Min(18f, Height / 2f)))
 			{
 				using (SolidBrush brush = new SolidBrush(color2))
 				{
@@ -23224,6 +23159,7 @@ namespace EmulatorHub
                     continue;
                 }
 				control3.Padding = new Padding(ControlDensityTools.Choose(12, 22, 28));
+                control3.BackColor = ColorHarmony.Card;
                 control3.Margin = new Padding(ControlDensityTools.Choose(7, 12, 16));
 				control3.Width = Math.Max(1, num2 / num3 - control3.Margin.Horizontal - 2);
 				FlowLayoutPanel flowLayoutPanel = control3.Tag as FlowLayoutPanel;
@@ -23283,7 +23219,7 @@ namespace EmulatorHub
 
 		private Panel Card(string title)
 		{
-			Panel panel = new Panel();
+			Panel panel = new ReferenceHomeCard();
 			panel.Height = (Immersion.Ensure(library).Roomier ? 300 : (library.Experience.CompactHome ? 210 : 260));
 			panel.Width = 370;
 			panel.BackColor = FishBowlPalette.ThemeSurface;
@@ -23478,6 +23414,7 @@ namespace EmulatorHub
 				int count = Math.Max(1, Math.Min(12, library.Experience.HomeTileCount));
 				foreach (string homeCard in UiPolishTools.ResolveHomeCards(library))
 				{
+                    if (useReferenceGallery && (homeCard == "Continue playing" || homeCard == "Quick actions")) continue;
 					Panel card = Card(homeCard);
 					switch (homeCard)
 					{
@@ -23569,7 +23506,7 @@ namespace EmulatorHub
 					case "Recent activity":
 						try
 						{
-							string[] array3 = (File.Exists(Store.LogFileName) ? LibraryJobs.LogTail(5) : new string[0]);
+							string[] array3 = (File.Exists(Store.LogFileName) ? LibraryJobs.ActivitySummary(5) : new string[0]);
 							string[] array = array3;
 							string[] array2 = array;
 							foreach (string text in array2)
@@ -25645,6 +25582,22 @@ namespace EmulatorHub
 	}
 	public static class LibraryJobs
 	{
+        public static string[] ActivitySummary(int count)
+        {
+            var rows = SummarizeActivity(LogTail(Math.Max(50, count * 10)), count);
+            return rows.Length > 0 ? rows : new[] { "Diagnostic details are available in Activity." };
+        }
+
+        public static string[] SummarizeActivity(IEnumerable<string> lines, int count)
+        {
+            return lines.Select(line => line.Trim())
+                .Where(line => line.Length > 0 && !line.StartsWith("at ", StringComparison.Ordinal) &&
+                    !line.StartsWith("---", StringComparison.Ordinal) && !line.Contains("StackTrace"))
+                .Select(line => Regex.IsMatch(line, @"\b(?:[A-Za-z_][A-Za-z0-9_]*\.)+[A-Za-z_]*Exception\b")
+                    ? "An operation reported an error. Open Activity for details." : line)
+                .Distinct().Take(Math.Max(0, count)).ToArray();
+        }
+
 		public static string[] LogTail(int lines)
 		{
 			if (!File.Exists(Store.LogFileName))
@@ -34247,7 +34200,7 @@ namespace EmulatorHub
 		{
 
 			new ThemeColors("FishBowl Water", Color.FromArgb(250, 247, 255), Color.FromArgb(5, 31, 78), Color.FromArgb(3, 13, 38), Color.FromArgb(12, 59, 122), Color.FromArgb(224, 217, 233)),
-			new ThemeColors("Gallery Night", Color.FromArgb(245, 240, 255), Color.FromArgb(38, 31, 55), Color.FromArgb(21, 19, 31), Color.FromArgb(33, 29, 47), Color.FromArgb(190, 179, 207)),
+			new ThemeColors("Gallery Night", Color.FromArgb(245, 240, 255), Color.FromArgb(62, 51, 53), Color.FromArgb(37, 36, 40), Color.FromArgb(46, 42, 53), Color.FromArgb(196, 187, 207)),
 			new ThemeColors("Library Graphite", Color.FromArgb(241, 241, 245), Color.FromArgb(45, 45, 48), Color.FromArgb(30, 30, 32), Color.FromArgb(34, 34, 36), Color.FromArgb(167, 167, 178)),
 			new ThemeColors("Aquarium Ocean", Color.FromArgb(241, 247, 255), Color.FromArgb(14, 26, 43), Color.FromArgb(9, 21, 29), Color.FromArgb(16, 36, 47), Color.FromArgb(160, 184, 195)),
 			new ThemeColors("Aquarium Midnight", Color.FromArgb(241, 247, 255), Color.FromArgb(20, 22, 37), Color.FromArgb(12, 14, 22), Color.FromArgb(22, 30, 43), Color.FromArgb(160, 184, 195)),
