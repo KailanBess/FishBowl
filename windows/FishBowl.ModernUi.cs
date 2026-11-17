@@ -21,6 +21,12 @@ namespace EmulatorHub
         private static readonly ConditionalWeakTable<ListView, ModernCatalog> catalogs = new ConditionalWeakTable<ListView, ModernCatalog>();
         private sealed class OwnedFont { internal Font Value; }
         private static readonly ConditionalWeakTable<Control, OwnedFont> fonts = new ConditionalWeakTable<Control, OwnedFont>();
+        private static readonly MethodInfo localVisibility = typeof(Control).GetMethod("GetState", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        internal static bool LocallyVisible(Control control)
+        {
+            return localVisibility == null ? control.Visible || control.Parent != null && !control.Parent.Visible : (bool)localVisibility.Invoke(control, new object[] { 2 });
+        }
 
         internal static void SetFont(Control control, float size, FontStyle style)
         {
@@ -520,10 +526,10 @@ namespace EmulatorHub
             page = Math.Min(page, Math.Max(0, (source.Items.Count - 1) / PageSize));
             var rows = source.Items.Cast<ListViewItem>().Skip(page * PageSize).Take(PageSize).ToArray();
             string state = source.Items.Count + "|" + source.View + "|" + source.Font.Name + "|" + source.Font.Size + "|" + page + "|" + FishBowlPalette.ThemeBottom.ToArgb() + "|" +
-                FishBowlPalette.ThemeSurface.ToArgb() + "|" + string.Join("\n", rows.Select(row => string.Join("\t", row.SubItems.Cast<ListViewItem.ListViewSubItem>().Select(cell => cell.Text))));
+                FishBowlPalette.ThemeSurface.ToArgb() + "|" + string.Join(",", rows.Select(row => RuntimeHelpers.GetHashCode(row).ToString()));
             if (state == signature)
             {
-                foreach (var card in visibleCards) card.RefreshArtwork(source);
+                foreach (var card in visibleCards) { card.RefreshContent(source); card.RefreshArtwork(source); }
                 UpdateSelection(); return;
             }
             signature = state;
@@ -862,6 +868,19 @@ namespace EmulatorHub
             if (included != null && included.Checked != Item.Checked) included.Checked = Item.Checked;
         }
 
+        internal void RefreshContent(ListView source)
+        {
+            if (title.Text != Item.Text)
+            {
+                title.Text = Item.Text; AccessibleName = Item.Text;
+                open.AccessibleName = open.Text + " " + Item.Text;
+                artworkIndex = -2;
+            }
+            string text = string.Join("\n", Item.SubItems.Cast<ListViewItem.ListViewSubItem>().Skip(1).Select((cell, index) =>
+                (index + 1 < source.Columns.Count ? source.Columns[index + 1].Text + " · " : "") + cell.Text));
+            if (detail.Text != text) detail.Text = text;
+        }
+
         internal void RefreshArtwork(ListView source)
         {
             var images = source.LargeImageList ?? source.SmallImageList;
@@ -927,7 +946,7 @@ namespace EmulatorHub
             {
                 int width = Math.Max(1, table.ClientSize.Width - table.Padding.Horizontal);
                 int y = table.Padding.Top;
-                foreach (var row in table.Controls.Cast<Control>().GroupBy(table.GetRow).OrderBy(group => group.Key))
+                foreach (var row in table.Controls.Cast<Control>().Where(ModernUi.LocallyVisible).GroupBy(table.GetRow).OrderBy(group => group.Key))
                 {
                     var controls = row.OrderBy(table.GetColumn).ToArray();
                     var label = controls.FirstOrDefault() as Label;
@@ -1025,7 +1044,7 @@ namespace EmulatorHub
             {
                 int width = Math.Max(1, ClientSize.Width - Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
                 int y = Padding.Top + AutoScrollPosition.Y;
-                var remaining = order.Where(control => control.Parent == this).ToList();
+                var remaining = order.Where(control => control.Parent == this && ModernUi.LocallyVisible(control)).ToList();
                 foreach (var control in remaining.ToArray())
                 {
                     if (!remaining.Contains(control)) continue;

@@ -14,7 +14,7 @@ class CompactTests {
         Application.EnableVisualStyles(); Application.ThreadException+=(s,e)=>{Console.WriteLine(e.Exception);Environment.Exit(1);};
         using(var main=new MainForm(true)) {
             main.ShowInTaskbar=false; main.StartPosition=FormStartPosition.Manual; main.Location=new Point(-4000,-4000); main.Show(); Application.DoEvents();
-            var strip=NextUi.Descendants(main).OfType<MenuStrip>().First(); var leaves=new System.Collections.Generic.List<string>(); Leaves(strip.Items,leaves); File.WriteAllLines(args[0],leaves.OrderBy(s=>s));
+            var strip=((Button)typeof(MainForm).GetField("dashboardMenu",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(main)).ContextMenuStrip; var leaves=new System.Collections.Generic.List<string>(); Leaves(strip.Items,leaves); File.WriteAllLines(args[0],leaves.OrderBy(s=>s));
             if(args.Length>1 && args[1]=="baseline") return 0;
             Check(strip.Items.Count==6,"six top-level menus");
             var library=strip.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="Library");
@@ -25,7 +25,7 @@ class CompactTests {
             var data=(LibraryData)field.GetValue(main);
             foreach(float scale in new [] {1f,1.5f,2f}) using(var ui=new GameLibraryDialog(data)) {
                 ui.ShowInTaskbar=false; ui.StartPosition=FormStartPosition.Manual; ui.Location=new Point(-4000,-4000); ui.Show();
-                ui.Scale(new SizeF(scale,scale)); Application.DoEvents();
+                ui.Scale(new SizeF(scale,scale)); Application.DoEvents(); NextUi.Descendants(ui).OfType<Button>().Single(b=>b.Text=="Filters").PerformClick();Application.DoEvents();
                 var bar=NextUi.Descendants(ui).OfType<FlowLayoutPanel>().Single(p=>p.Controls.OfType<Button>().Any(b=>b.Text=="Game actions ▾"));
                 Check(bar.Controls.OfType<Button>().Where(b=>b.Visible).Count()<=6,"compact toolbar at "+scale);
                 Check(bar.Controls.OfType<Button>().Where(b=>b.Visible).All(b=>b.Left>=0 && b.Top>=0 && b.Right<=bar.ClientSize.Width && b.Bottom<=bar.ClientSize.Height),"toolbar rows keep every action visible at "+scale);

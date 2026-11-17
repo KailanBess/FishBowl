@@ -44,6 +44,12 @@ class ModernUiTests
                 source.Items[0].Checked = false;
                 catalog.GetType().GetMethod("RefreshCards", hidden).Invoke(catalog, null);
                 Check(!included.Checked, "programmatic checked changes return to the visible control");
+                source.Items[0].Text = "Updated fixture"; source.Items[0].SubItems[1].Text = "Running";
+                catalog.GetType().GetMethod("RefreshCards", hidden).Invoke(catalog, null);
+                Check(!card.IsDisposed && All(card).OfType<Label>().Any(label => label.Text == "Updated fixture"), "status and title refresh preserve the card and focus");
+                typeof(Control).GetMethod("OnKeyDown", hidden).Invoke(card, new object[] { new KeyEventArgs(Keys.Space) });
+                Check(source.Items[0].Checked, "Space toggles the backing checked item");
+                Check(All(card).OfType<PictureBox>().Single().Image != null, "missing artwork has a generated fallback");
                 All(catalog).OfType<Button>().Single(b => b.Text == "Next").PerformClick(); Pump();
                 card = All(catalog).First(c => c.GetType().Name == "ModernCatalogCard");
                 All(card).OfType<Button>().Single().PerformClick();

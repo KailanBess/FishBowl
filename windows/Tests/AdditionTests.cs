@@ -14,7 +14,7 @@ class AdditionTests {
         using(var timer=new Timer {Interval=250}) {
             timer.Tick+=(s,e)=> {var dialog=Application.OpenForms.Cast<Form>().OfType<NextDialog>().LastOrDefault(); if(dialog==null) return;
                 timer.Stop(); Application.DoEvents();
-                var bars=NextUi.Descendants(dialog).OfType<FlowLayoutPanel>().ToList();
+                var bars=NextUi.Descendants(dialog).OfType<FlowLayoutPanel>().Where(bar=>!bar.AutoScroll).ToList();
                 Check(bars.All(b=>b.Controls.Cast<Control>().Where(c=>c.Visible).All(c=>c.Bottom<=b.ClientSize.Height)),file+" action buttons fit");
                 using(var bmp=new Bitmap(dialog.Width,dialog.Height)) {dialog.DrawToBitmap(bmp,new Rectangle(Point.Empty,bmp.Size)); bmp.Save(file+".png");}
                 dialog.Close();};
