@@ -184,14 +184,15 @@ namespace EmulatorHub
             seeAll.ForeColor = dark ? Color.FromArgb(197, 139, 255) : ink;
             foreach (Label heading in new[] { featured, play, tools }) { heading.BackColor = BackColor; heading.ForeColor = ink; }
             int y = PlaceHeading(featured, 0, 0);
-            int heroColumns = Width >= 650 ? 2 : 1;
+            int heroColumns = Width >= Math.Max(650, featured.Font.Height * 23) ? 2 : 1;
             int heroWidth = (Width - Gap * (heroColumns - 1)) / heroColumns;
             y = PlaceCards(heroes, y, heroColumns, Math.Max(245, Math.Min(420, (int)(heroWidth * .55f))), dark);
             int seeWidth = Math.Min(110, Width / 3);
             int shelfTop = y + 9;
             y = PlaceHeading(play, shelfTop, seeWidth);
             seeAll.SetBounds(Width - seeWidth, shelfTop, seeWidth, y - shelfTop - 5);
-            int columns = Width >= 930 ? 4 : Width >= 510 ? 2 : 1;
+            int columns = Width >= Math.Max(930, featured.Font.Height * 32) ? 4 :
+                Width >= Math.Max(510, featured.Font.Height * 15) ? 2 : 1;
             int cardHeight = Math.Max(112, Math.Min(150, Width / 10));
             y = PlaceCards(games, y, Math.Min(columns, games.Length), cardHeight, dark);
             y = PlaceHeading(tools, y + 9, 0);
