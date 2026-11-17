@@ -11,6 +11,9 @@ class ReferenceLayoutTests
     {
         try
         {
+            var rows = LibraryJobs.SummarizeActivity(new[] { "  at System.Windows.Forms.NativeWindow.Callback(IntPtr hwnd)", "System.IO.IOException: fixture", "Fixture import completed." }, 5);
+            if (rows.Any(row => row.Contains("NativeWindow") || row.Contains("IOException")) || !rows.Contains("Fixture import completed."))
+                throw new Exception("Home activity exposed a raw stack trace or lost an activity summary");
             Application.EnableVisualStyles(); string selected = null;
             using (var gallery = new ReferencePlatformGallery(new Dictionary<string, int> { { "Fixture Console A", 2 }, { "Fixture Console B", 1 } }, delegate(string name) { selected = name; }))
             {

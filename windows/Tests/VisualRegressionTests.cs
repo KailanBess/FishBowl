@@ -23,6 +23,8 @@ class VisualRegressionTests
         {
             Show(main);
             var tabs = (TabControl)typeof(MainForm).GetField("workspaceNavigation", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
+            Check(!Descendants(main).OfType<Label>().Any(label => label.Visible && label.Text == "FishBowl"), "The shell has no repeated FishBowl labels");
+            Check(main.Text == tabs.SelectedTab.Text, "The native caption names the active workspace");
             Check(tabs.TabPages.Cast<TabPage>().Select(page=>page.Text).SequenceEqual(new[]{"Home","Emulators","Library","Play","Web","Settings"}),"Six workspaces preserve page order and append Settings");
             var rail = (FlowLayoutPanel)typeof(MainForm).GetField("dashboardRail", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(main);
             Check(((FishBowlTabs)tabs).HideWorkspaceHeaders && tabs.TabPages.Cast<TabPage>().All(page => rail.Controls.OfType<Button>().Any(button => button.AccessibleName == page.Text && button.Width >= TextRenderer.MeasureText(page.Text, button.Font).Width)), "The dashboard rail exposes readable labels for all workspaces");
@@ -41,6 +43,7 @@ class VisualRegressionTests
             Check(libraryBanner.Visible && emulatorBanner.Visible && !libraryBanner.Parent.Bounds.IntersectsWith(emulatorBanner.Parent.Bounds), "Both featured cards are visible and separated");
             libraryBanner.PerformClick();
             Check(tabs.SelectedIndex == 2, "Featured library action opens the existing Library");
+            Check(main.Text == "Library", "The native caption follows navigation");
             tabs.SelectedIndex = 0;
             emulatorBanner.PerformClick();
             Check(tabs.SelectedIndex == 1, "Featured emulator action opens the existing Emulators workspace");

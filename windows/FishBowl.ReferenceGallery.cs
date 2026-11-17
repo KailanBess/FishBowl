@@ -15,10 +15,40 @@ namespace EmulatorHub
             return !string.Equals(theme, "High Contrast", StringComparison.OrdinalIgnoreCase) &&
                 FishBowlPalette.ThemeBottom.GetBrightness() < .38f;
         }
-        internal static readonly Color Canvas = Color.FromArgb(37, 36, 40);
-        internal static readonly Color Rail = Color.FromArgb(62, 51, 53);
-        internal static readonly Color Search = Color.FromArgb(19, 17, 29);
+        internal static Color Canvas { get { return FishBowlPalette.ThemeBottom; } }
+        internal static Color Rail { get { return FishBowlPalette.ThemeTop; } }
+        internal static Color Search { get { return ColorHarmony.Input; } }
         internal static readonly Color Violet = Color.FromArgb(145, 55, 238);
+    }
+
+    internal sealed class ReferenceHomeCard : Panel
+    {
+        internal ReferenceHomeCard() { DoubleBuffered = true; }
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            if (Width < 2 || Height < 2) return;
+            e.Graphics.Clear(Parent == null ? BackColor : Parent.BackColor);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            int radius = CosmeticRuntime.Current.CornerRadius == 6 ? 12 : CosmeticRuntime.Current.CornerRadius;
+            using (var outline = ReferenceButton.Round(new Rectangle(0, 0, Width - 1, Height - 1), radius))
+            using (var fill = new SolidBrush(ColorHarmony.Card))
+                e.Graphics.FillPath(fill, outline);
+        }
+    }
+
+    internal sealed class ReferenceSettingsCard : TableLayoutPanel
+    {
+        internal ReferenceSettingsCard() { DoubleBuffered = true; }
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            if (Width < 2 || Height < 2) return;
+            e.Graphics.Clear(Parent == null ? BackColor : Parent.BackColor);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            int radius = CosmeticRuntime.Current.CornerRadius == 6 ? 12 : CosmeticRuntime.Current.CornerRadius;
+            using (var outline = ReferenceButton.Round(new Rectangle(0, 0, Width - 1, Height - 1), radius))
+            using (var fill = new SolidBrush(ColorHarmony.Card))
+                e.Graphics.FillPath(fill, outline);
+        }
     }
 
     internal sealed class ReferenceButton : Button
@@ -114,6 +144,7 @@ namespace EmulatorHub
         private readonly GalleryCard[] games;
         private readonly GalleryCard[] actions;
         private readonly ReferenceButton seeAll = new ReferenceButton("See all");
+        private readonly ReferenceButton customize = new ReferenceButton("Customize");
         private readonly string theme;
 
         internal ReferenceGallery(LibraryData library, Action<string, GameEntry, EmulatorProfile> open)
@@ -136,8 +167,10 @@ namespace EmulatorHub
             games = entries.Select((item, i) =>
             {
                 var emulator = library.Emulators.FirstOrDefault(candidate => candidate.Id == item.EmulatorId);
-                var description = emulator == null ? "Game library" : emulator.Name;
-                var card = new GalleryCard(item.Title, description, "Play", "▷", i, false, () => open("Game", item, null));
+                bool available = File.Exists(item.Path);
+                var description = available ? (emulator == null ? "Game library" : emulator.Name) : "Game file missing";
+                var card = new GalleryCard(item.Title, description, available ? "Play" : "Find file", available ? "▷" : "⌕",
+                    i, false, () => open(available ? "Game" : "Missing games", item, null));
                 card.SetArtwork(UiPolishTools.Cover(item.ArtworkPath, item.Title, new Size(72, 72)));
                 var menu = new ContextMenuStrip();
                 NavigationController.Register(menu);
@@ -157,7 +190,9 @@ namespace EmulatorHub
             };
             seeAll.AccessibleName = "See all games in Library";
             seeAll.Click += delegate { open("Library", null, null); };
-            Controls.AddRange(new Control[] { featured, play, tools, seeAll });
+            customize.AccessibleName = "Customize Home";
+            customize.Click += delegate { open("Customize Home", null, null); };
+            Controls.AddRange(new Control[] { featured, play, tools, seeAll, customize });
             Controls.AddRange(heroes);
             Controls.AddRange(games);
             Controls.AddRange(actions);
@@ -182,6 +217,8 @@ namespace EmulatorHub
             Color ink = dark ? Color.WhiteSmoke : FishBowlPalette.ThemeInk;
             seeAll.BackColor = BackColor;
             seeAll.ForeColor = dark ? Color.FromArgb(197, 139, 255) : ink;
+            customize.BackColor = seeAll.BackColor;
+            customize.ForeColor = seeAll.ForeColor;
             foreach (Label heading in new[] { featured, play, tools }) { heading.BackColor = BackColor; heading.ForeColor = ink; }
             int y = PlaceHeading(featured, 0, 0);
             int heroColumns = Width >= Math.Max(650, featured.Font.Height * 23) ? 2 : 1;
@@ -195,7 +232,10 @@ namespace EmulatorHub
                 Width >= Math.Max(510, featured.Font.Height * 15) ? 2 : 1;
             int cardHeight = Math.Max(112, Math.Min(150, Width / 10));
             y = PlaceCards(games, y, Math.Min(columns, games.Length), cardHeight, dark);
-            y = PlaceHeading(tools, y + 9, 0);
+            int toolHeadingTop = y + 9;
+            int customizeWidth = Math.Min(150, Width / 3);
+            y = PlaceHeading(tools, toolHeadingTop, customizeWidth);
+            customize.SetBounds(Width - customizeWidth, toolHeadingTop, customizeWidth, y - toolHeadingTop - 5);
             Height = PlaceCards(actions, y, columns, cardHeight, dark);
         }
 
@@ -276,7 +316,7 @@ namespace EmulatorHub
         {
             this.dark = dark;
             SetBounds(x, y, width, height);
-            Color face = dark ? Color.FromArgb(30, 25, 51) : FishBowlPalette.ThemeSurface;
+            Color face = ColorHarmony.Card;
             BackColor = face;
             title.ForeColor = dark ? Color.White : FishBowlPalette.ThemeInk;
             description.ForeColor = dark ? Color.FromArgb(225, 221, 232) : FishBowlPalette.ThemeInk;

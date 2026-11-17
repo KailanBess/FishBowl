@@ -1,3 +1,11 @@
+# Windows 1.29.12
+
+- Remove repeated product labels from the main shell. The native title now identifies the active workspace.
+- Align utility cards, Settings and shared buttons with the Home reference styling.
+- Keep theme choices synchronized across the sidebar, content and dialogs.
+- Summarize Home activity while keeping full diagnostic details in Activity.
+- Offer file recovery from Home when a game path is unavailable.
+
 # Windows 1.29.11
 
 - Rebuild the shell and Home with a persistent sidebar, global search, featured banners, and library shelves.
