@@ -30,6 +30,7 @@ namespace EmulatorHub
         internal ReferenceButton(string title)
         {
             Text = title;
+            Font = new Font("Segoe UI", 11f);
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             UseVisualStyleBackColor = false;
@@ -42,21 +43,37 @@ namespace EmulatorHub
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.Clear(Parent == null ? BackColor : Parent.BackColor);
+            Color background = Parent == null ? BackColor : Parent.BackColor;
+            Color face = BackColor;
+            Color ink = ForeColor;
+            var destination = Tag as TabPage;
+            var tabs = destination == null ? null : destination.Parent as TabControl;
+            if (tabs != null && background == ReferencePalette.Rail)
+            {
+                bool selected = tabs.SelectedTab == destination;
+                face = selected ? ReferencePalette.Violet : background;
+                ink = selected ? Color.White : Color.FromArgb(222, 214, 218);
+            }
+            else if (Parent is TableLayoutPanel && background == ReferencePalette.Canvas)
+            {
+                face = LeftAligned ? ReferencePalette.Search : background;
+                ink = Color.FromArgb(228, 221, 236);
+            }
+            e.Graphics.Clear(background);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var rect = new Rectangle(0, 0, Width - 1, Height - 1);
             if (rect.Width < 2 || rect.Height < 2) return;
             using (var outline = Round(rect, Radius))
-            using (var fill = new SolidBrush(hovered ? ControlPaint.Light(BackColor, .10f) : BackColor))
+            using (var fill = new SolidBrush(hovered ? ControlPaint.Light(face, .10f) : face))
             {
                 e.Graphics.FillPath(fill, outline);
                 if (Focused && ShowFocusCues)
-                    using (var stroke = new Pen(ForeColor)) e.Graphics.DrawPath(stroke, outline);
+                    using (var stroke = new Pen(ink)) e.Graphics.DrawPath(stroke, outline);
             }
             int inset = Math.Min(15, Width / 5);
             rect.Inflate(-inset, 0);
             var align = LeftAligned ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter;
-            TextRenderer.DrawText(e.Graphics, Text, Font, rect, ForeColor,
+            TextRenderer.DrawText(e.Graphics, Text, Font, rect, ink,
                 align | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
 
