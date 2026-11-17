@@ -50,6 +50,8 @@ Merged/closed branches should be deleted after checking their pull request and a
 
 ## Log
 
+- **2026-11-17 (desktop):** prepare 1.29.11 from the Windows shell redesign in #57. Version the Windows installer and Linux artifacts together. Linux keeps its existing layout.
+
 - **2026-11-17 (Windows):** rebuild the desktop navigation, search header and Home around the supplied two-banner reference. Retain the six workspace instances, existing Home actions, app data, game launch routing and native Play/Web surfaces. Check normal and compact overflow, keyboard navigation and the dashboard screenshots before any release.
 
 - **2026-11-17 (both platforms):** prepare 1.29.10. The Windows release includes the per-game linked-save backup option. Linux receives the shared data compatibility and matching build version.

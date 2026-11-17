@@ -1,3 +1,9 @@
+# Windows 1.29.11
+
+- Rebuild the shell and Home with a persistent sidebar, global search, featured banners, and library shelves.
+- Preserve the existing emulator, game, Play, Web, and Settings workflows.
+- Stack featured banners when a narrow window or enlarged text needs more space.
+
 # Windows 1.29.10
 
 - Add optional snapshots of linked saves before starting a game.
