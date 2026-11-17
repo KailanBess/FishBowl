@@ -83,8 +83,12 @@ namespace EmulatorHub
             int inset = Math.Min(15, Width / 5);
             rect.Inflate(-inset, 0);
             var align = LeftAligned ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter;
-            TextRenderer.DrawText(e.Graphics, Text, Font, rect, ink,
-                align | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            var flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+            string caption = Text;
+            if (destination != null && TextRenderer.MeasureText(caption, Font, Size.Empty, flags).Width > rect.Width)
+                caption = destination.Text;
+            TextRenderer.DrawText(e.Graphics, caption, Font, rect, ink,
+                align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | flags);
         }
 
         internal static GraphicsPath Round(Rectangle rect, int radius)
@@ -235,7 +239,7 @@ namespace EmulatorHub
             this.variant = variant;
             this.glyph = glyph;
             DoubleBuffered = true;
-            title = new Label { Text = name, AutoEllipsis = true, BackColor = Color.Transparent,
+            title = new Label { Text = name, AutoEllipsis = !hero, BackColor = Color.Transparent,
                 Font = new Font(hero ? "Bahnschrift" : "Segoe UI", hero ? 27f : 11f, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
             description = new Label { Text = detail, AutoEllipsis = true, BackColor = Color.Transparent, Font = new Font("Segoe UI", hero ? 12f : 9f) };
             badge = new PictureBox { BackColor = Color.Transparent, SizeMode = PictureBoxSizeMode.Zoom };
@@ -256,7 +260,15 @@ namespace EmulatorHub
             int contentWidth = Math.Max(1, width - (hero ? 48 : 98));
             int detailHeight = TextRenderer.MeasureText(description.Text, description.Font, new Size(contentWidth, 1000),
                 TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
-            return Math.Max(minHeight, title.Font.Height + detailHeight + run.Font.Height + (hero ? 86 : 43));
+            return Math.Max(minHeight, TitleHeight(width) + detailHeight + run.Font.Height + (hero ? 86 : 43));
+        }
+
+        private int TitleHeight(int width)
+        {
+            if (!hero) return Math.Max(24, title.Font.Height + 4);
+            int titleWidth = Math.Max(1, width - (width >= 260 ? 122 : 48));
+            return Math.Max(62, TextRenderer.MeasureText(title.Text, title.Font, new Size(titleWidth, 1000),
+                TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + 5);
         }
 
         internal void Arrange(int x, int y, int width, int height, bool dark)
@@ -275,7 +287,7 @@ namespace EmulatorHub
             bool useBadge = width >= (hero ? 260 : 165);
             badge.Visible = useBadge;
             if (!useBadge) titleX = inset;
-            int titleHeight = Math.Max(hero ? icon : 24, title.Font.Height + 4);
+            int titleHeight = TitleHeight(width);
             if (useBadge) badge.SetBounds(inset, inset, icon, icon);
             title.SetBounds(titleX, inset, Math.Max(1, width - titleX - inset), titleHeight);
             int bodyX = hero ? inset : titleX;
