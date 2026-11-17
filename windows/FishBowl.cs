@@ -4703,7 +4703,7 @@ namespace EmulatorHub
             playSurface = new PlaySurface(library, ToggleFullScreen) { Dock = DockStyle.Fill };
             playPage.Controls.Add(playSurface);
             playSurface.SessionStateChanged += delegate { var frame = workspaceNavigation.Parent as AquariumFrame; if (frame != null) { frame.PauseForPlay = playSurface.HasSessions; frame.ApplyState(); } };
-			homeSurface = new HomeSurface(library, HomeAction);
+			homeSurface = new HomeSurface(library, HomeAction, true);
 			tabPage2.Controls.Add(homeSurface);
 			TableLayoutPanel tableLayoutPanel = new TableLayoutPanel();
 			tableLayoutPanel.Dock = DockStyle.Fill;
@@ -4784,10 +4784,13 @@ namespace EmulatorHub
 		}
 
         private FlowLayoutPanel dashboardRail;
-        private FlowLayoutPanel dashboardCommands;
+        private TableLayoutPanel dashboardCommands;
         private bool dashboardMenuOpen;
         private Button dashboardLibraryTools;
-        private Label dashboardSectionTitle;
+        private Label dashboardBrand;
+        private Panel dashboardRailSpacer;
+        private ReferenceButton dashboardSearch;
+        private ReferenceButton dashboardMenu;
         private Control BuildSettingsDashboard()
         {
             var grid = new FlowLayoutPanel
@@ -4830,98 +4833,115 @@ namespace EmulatorHub
         {
             dashboardRail = new FlowLayoutPanel
             {
-                Dock = DockStyle.Left, Width = 94, FlowDirection = FlowDirection.TopDown,
-                WrapContents = false, AutoScroll = true, Padding = new Padding(4, 8, 4, 8),
+                Dock = DockStyle.Left, Width = 210, FlowDirection = FlowDirection.TopDown,
+                WrapContents = false, AutoScroll = true, Padding = new Padding(8, 12, 8, 8),
                 AccessibleName = "FishBowl workspace rail", Tag = "FishBowl wrapped toolbar"
             };
+            dashboardBrand = new Label
+            {
+                Text = "◉  FishBowl", AccessibleName = "FishBowl",
+                Font = new Font(DisplayFont, 19f, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(8, 0, 0, 24), Height = 52, AutoEllipsis = true
+            };
+            dashboardRail.Controls.Add(dashboardBrand);
+            dashboardRailSpacer = new Panel { Size = new Size(1, 1), Margin = Padding.Empty, TabStop = false };
             string[] glyphs = { "⌂", "◇", "▦", "▷", "◎", "⚙" };
             foreach (TabPage page in workspaceNavigation.TabPages)
             {
                 TabPage destination = page;
                 int index = workspaceNavigation.TabPages.IndexOf(page);
-                AddDashboardDestination(glyphs[index], page.Text, delegate
+                if (index == 5) dashboardRail.Controls.Add(dashboardRailSpacer);
+                var button = new ReferenceButton(glyphs[index] + "   " + page.Text)
+                {
+                    AccessibleName = page.Text, Tag = destination, LeftAligned = true,
+                    Size = new Size(180, 44), Margin = new Padding(0, 0, 0, 4), CausesValidation = false
+                };
+                button.Click += delegate
                 {
                     workspaceNavigation.SelectedIndex = workspaceNavigation.TabPages.IndexOf(destination);
-                }).Tag = destination;
+                };
+                dashboardRail.Controls.Add(button);
             }
+            dashboardRail.Resize += delegate { FitDashboardRail(); };
 
-            AddDashboardDestination("⌕", "Search", OpenCommandSearch);
-            AddDashboardDestination("⋯", "Menu", delegate
+            dashboardCommands = new TableLayoutPanel
             {
-                dashboardMenuOpen = !dashboardMenuOpen;
-                ApplyDashboardShell();
-            });
-
-            dashboardCommands = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                WrapContents = true, Padding = new Padding(12, 4, 8, 4),
-                AccessibleName = "FishBowl workspace commands", Tag = "FishBowl wrapped toolbar"
+                Dock = DockStyle.Top, Height = 61, ColumnCount = 2, RowCount = 1,
+                Padding = new Padding(16, 9, 16, 9), AccessibleName = "FishBowl workspace commands"
             };
-            dashboardSectionTitle = new Label
-            {
-                AutoSize = true, Font = new Font(DisplayFont, 15f, FontStyle.Bold),
-                Margin = new Padding(6, 8, 4, 8)
+            dashboardCommands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            dashboardCommands.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            dashboardCommands.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            dashboardSearch = new ReferenceButton("⌕   Search FishBowl") {
+                AccessibleName = "Search games, emulators and commands", LeftAligned = true,
+                Dock = DockStyle.Fill, Margin = new Padding(0, 0, 10, 0)
             };
-            dashboardCommands.Controls.Add(dashboardSectionTitle);
+            dashboardSearch.Click += delegate { OpenCommandSearch(); };
+            dashboardMenu = new ReferenceButton("Menu") {
+                AccessibleName = "Toggle application menu", Width = 84, Dock = DockStyle.Fill,
+                Margin = Padding.Empty
+            };
+            dashboardMenu.Click += delegate { dashboardMenuOpen = !dashboardMenuOpen; ApplyDashboardShell(); };
+            dashboardCommands.Controls.Add(dashboardSearch, 0, 0);
+            dashboardCommands.Controls.Add(dashboardMenu, 1, 0);
             dashboardLibraryTools = embeddedLibrary.BuildDashboardHeader();
             workspace.Controls.Add(dashboardCommands);
             workspace.Controls.Add(dashboardRail);
-        }
-
-        private Button AddDashboardDestination(string glyph, string label, Action action)
-        {
-            var button = new Button
-            {
-                Text = glyph + "\n" + label, AccessibleName = label, Size = new Size(80, 61),
-                Margin = new Padding(0, 0, 0, 3), FlatStyle = FlatStyle.Flat,
-                CausesValidation = false, UseVisualStyleBackColor = false
-            };
-            button.Click += delegate { action(); };
-            dashboardRail.Controls.Add(button);
-            return button;
         }
 
         private void ApplyDashboardShell()
         {
             if (dashboardRail == null || workspaceShell == null) return;
             bool visible = !fullScreen || (workspaceNavigation.SelectedIndex != 3 && workspaceNavigation.SelectedIndex != 4);
+            bool referenceDark = ReferencePalette.Dark(library.Theme.Name);
             ((FishBowlTabs)workspaceNavigation).HideWorkspaceHeaders = true;
-            dashboardRail.Visible = visible;
-            dashboardCommands.Visible = visible && workspaceNavigation.SelectedIndex != 2;
-            dashboardSectionTitle.Text = workspaceNavigation.SelectedTab == null ? "" : workspaceNavigation.SelectedTab.Text;
-            dashboardSectionTitle.ForeColor = FishBowlPalette.ThemeInk;
+            dashboardRail.Visible = dashboardCommands.Visible = visible;
             workspaceShell.RowStyles[0].Height = visible && dashboardMenuOpen ? 28 : 0;
-            dashboardRail.BackColor = FishBowlPalette.ThemeBottom;
-            dashboardCommands.BackColor = FishBowlPalette.ThemeTop;
+            dashboardRail.BackColor = referenceDark ? ReferencePalette.Rail : FishBowlPalette.ThemeBottom;
+            dashboardBrand.BackColor = dashboardRail.BackColor;
+            dashboardBrand.ForeColor = referenceDark ? Color.White : FishBowlPalette.ThemeInk;
+            dashboardCommands.BackColor = referenceDark ? ReferencePalette.Canvas : FishBowlPalette.ThemeTop;
+            dashboardSearch.BackColor = referenceDark ? ReferencePalette.Search : FishBowlPalette.ThemeSurface;
+            dashboardSearch.ForeColor = referenceDark ? Color.FromArgb(209, 204, 219) : FishBowlPalette.ThemeInk;
+            dashboardMenu.BackColor = dashboardCommands.BackColor;
+            dashboardMenu.ForeColor = referenceDark ? Color.WhiteSmoke : FishBowlPalette.ThemeInk;
             foreach (Button button in dashboardRail.Controls.OfType<Button>())
             {
                 bool active = button.Tag == workspaceNavigation.SelectedTab;
-
-                button.BackColor = active ? CosmeticRuntime.Selection : FishBowlPalette.ThemeBottom;
-                button.ForeColor = FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, button.BackColor);
-                button.FlatAppearance.BorderSize = active ? 1 : 0;
-                button.FlatAppearance.BorderColor = CosmeticRuntime.Focus(button.BackColor);
+                button.BackColor = active ? (referenceDark ? ReferencePalette.Violet : CosmeticRuntime.Selection) : dashboardRail.BackColor;
+                button.ForeColor = FishBowlPalette.EnsureReadable(referenceDark ? Color.WhiteSmoke : FishBowlPalette.ThemeInk, button.BackColor);
                 button.AccessibleDescription = active ? "Current workspace" : "";
+                button.Invalidate();
             }
+            FitDashboardRail();
         }
+
+        private bool fittingDashboardRail;
         private void FitDashboardRail()
         {
-            if (dashboardRail == null) return;
+            if (dashboardRail == null || dashboardRailSpacer == null || fittingDashboardRail) return;
             var buttons = dashboardRail.Controls.OfType<Button>().ToArray();
-            int width = buttons.Max(button => Math.Max(80,
-                TextRenderer.MeasureText(button.AccessibleName, button.Font).Width + 18));
+            if (buttons.Length == 0) return;
+            fittingDashboardRail = true;
             dashboardRail.SuspendLayout();
             try
             {
-                dashboardRail.Width = width + dashboardRail.Padding.Horizontal + SystemInformation.VerticalScrollBarWidth + 8;
+                int width = Math.Max(170, buttons.Max(button => TextRenderer.MeasureText(button.Text, button.Font).Width + 30));
+                dashboardRail.Width = width + dashboardRail.Padding.Horizontal + 8;
+                dashboardBrand.Width = width - dashboardBrand.Margin.Horizontal;
+                dashboardBrand.Height = Math.Max(52, dashboardBrand.Font.Height + 10);
                 foreach (Button button in buttons)
                 {
                     button.MinimumSize = Size.Empty;
-                    button.Size = new Size(width, Math.Max(61, button.Font.Height * 2 + 10));
+                    button.Size = new Size(width, Math.Max(44, button.Font.Height + 14));
                 }
+                int occupied = dashboardRail.Padding.Vertical + dashboardBrand.Height + dashboardBrand.Margin.Vertical +
+                    buttons.Sum(button => button.Height + button.Margin.Vertical);
+                dashboardRailSpacer.Height = Math.Max(12, dashboardRail.ClientSize.Height - occupied - 6);
+                if (dashboardCommands != null)
+                    dashboardCommands.Height = Math.Max(58, dashboardSearch.Font.Height + dashboardCommands.Padding.Vertical + 15);
             }
-            finally { dashboardRail.ResumeLayout(true); }
+            finally { dashboardRail.ResumeLayout(true); fittingDashboardRail = false; }
         }
         internal void OpenWeb(string url)
         {
@@ -5929,7 +5949,7 @@ namespace EmulatorHub
 			FishBowlHighlights.ReducedMotion = library.Enhancements.ReducedMotion;
 			FluidStyle.Configure(library);
             ControlDensityTools.Apply(this);
-            FitDashboardRail();
+            ApplyDashboardShell();
 			UpdateFluidHeader();
             if (embeddedLibrary != null) embeddedLibrary.FitEmbeddedViewport();
 			if (homeSurface != null)
@@ -23052,6 +23072,8 @@ namespace EmulatorHub
 		};
 
 		private int homeStamp;
+		private readonly bool useReferenceGallery;
+		private ReferenceGallery referenceGallery;
 
 		private DateTime homeBuilt;
 
@@ -23084,9 +23106,10 @@ namespace EmulatorHub
 			return (num * 31 + Json.Serialize(library.Experience).GetHashCode()) * 31 + Json.Serialize(library.Theme).GetHashCode();
 		}
 
-		public HomeSurface(LibraryData library, Action<string, GameEntry, EmulatorProfile> action)
+		public HomeSurface(LibraryData library, Action<string, GameEntry, EmulatorProfile> action, bool referenceGallery = false)
 		{
 			this.library = library;
+			useReferenceGallery = referenceGallery;
             ControlDensityTools.Configure(library);
 			this.action = action;
             foreach (string card in library.Theme.ExpandedHomeCards ?? new List<string>()) expandedCards.Add(card);
@@ -23172,8 +23195,8 @@ namespace EmulatorHub
 		private void LayoutCardsCore()
 		{
 			float num = Math.Max(0.5f, visualScale * Math.Min(1.5f, Math.Max(1f, (float)NextUi.TextPercent / 100f)));
-            bool showSideSummary = ClientSize.Width >= 960;
-            summary.Dock = showSideSummary ? DockStyle.Right : DockStyle.Top;
+            bool showSideSummary = !useReferenceGallery && ClientSize.Width >= 960;
+            summary.Dock = showSideSummary ? DockStyle.Right : useReferenceGallery ? DockStyle.Bottom : DockStyle.Top;
             summary.AutoSize = !showSideSummary;
             summary.FlowDirection = showSideSummary ? FlowDirection.TopDown : FlowDirection.LeftToRight;
             summary.WrapContents = !showSideSummary;
@@ -23194,6 +23217,12 @@ namespace EmulatorHub
 			int num3 = Math.Max(1, Math.Min(3, num2 / (int)(ControlDensityTools.Choose(240, 265, 310) * num)));
 			foreach (Control control3 in cards.Controls)
 			{
+                if (control3 == referenceGallery)
+                {
+                    referenceGallery.Fit(num2);
+                    if (ReferencePalette.Dark(library.Theme.Name)) cards.BackColor = ReferencePalette.Canvas;
+                    continue;
+                }
 				control3.Padding = new Padding(ControlDensityTools.Choose(12, 22, 28));
                 control3.Margin = new Padding(ControlDensityTools.Choose(7, 12, 16));
 				control3.Width = Math.Max(1, num2 / num3 - control3.Margin.Horizontal - 2);
@@ -23571,6 +23600,13 @@ namespace EmulatorHub
 					}
 				}
 				foreach (Panel card in cards.Controls.OfType<Panel>()) SimplifyCard(card);
+                if (useReferenceGallery)
+                {
+                    referenceGallery = new ReferenceGallery(library, action);
+                    cards.Controls.Add(referenceGallery);
+                    cards.Controls.SetChildIndex(referenceGallery, 0);
+                    cards.SetFlowBreak(referenceGallery, true);
+                }
 				if (Math.Abs(visualScale - 1f) > 0.01f)
 				{
 					foreach (Control control3 in cards.Controls)
