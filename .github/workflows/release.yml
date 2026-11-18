@@ -29,9 +29,9 @@ jobs:
       - name: Package matching app, installer and source
         shell: pwsh
         env:
-          WINDOWS_SIGNING_PFX_BASE64: ${{ (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch') && secrets.WINDOWS_SIGNING_PFX_BASE64 || '' }}
-          WINDOWS_SIGNING_PASSWORD: ${{ (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch') && secrets.WINDOWS_SIGNING_PASSWORD || '' }}
-          WINDOWS_TIMESTAMP_URL: ${{ (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch') && vars.WINDOWS_TIMESTAMP_URL || '' }}
+          WINDOWS_SIGNING_PFX_BASE64: ${{ (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') && secrets.WINDOWS_SIGNING_PFX_BASE64 || '' }}
+          WINDOWS_SIGNING_PASSWORD: ${{ (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') && secrets.WINDOWS_SIGNING_PASSWORD || '' }}
+          WINDOWS_TIMESTAMP_URL: ${{ (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') && vars.WINDOWS_TIMESTAMP_URL || '' }}
           REQUESTED_VERSION: ${{ inputs.version || '1.32.0' }}
         run: |
           $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { $env:REQUESTED_VERSION }
@@ -71,7 +71,7 @@ jobs:
             artifacts/*.AppImage
             artifacts/SHA256SUMS-linux.txt
   publish:
-    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
