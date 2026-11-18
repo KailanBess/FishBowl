@@ -48,6 +48,7 @@ export function createService(config, options = {}) {
       if (req.headers.origin) { res.setHeader('Access-Control-Allow-Origin', req.headers.origin); res.setHeader('Vary', 'Origin'); }
       if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST'); return send(res, 204, ''); }
       if (req.method === 'GET') {
+        if (req.url === '/api/health') return send(res, 200, { service: 'FishBowl remote play', protocol: 1 });
         const paths = { '/': 'client/index.html', '/client.js': 'client/client.js', '/controls.js': 'client/controls.js', '/style.css': 'client/style.css', '/livekit.js': 'client/livekit.js' };
         if (!paths[req.url]) return send(res, 404, { error: 'Page not found.' });
         const bytes = await readFile(new URL(paths[req.url], import.meta.url));

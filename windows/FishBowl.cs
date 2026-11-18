@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.31.0.0")]
+[assembly: AssemblyFileVersion("1.32.0.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.31.0.0")]
+[assembly: AssemblyVersion("1.32.0.0")]
 namespace EmulatorHub
 {
-	public class MainForm : Form
+	public partial class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.31.0";
+		private const string FishBowlVersion = "1.32.0";
 
-		private const string FishBowlTitleVersion = "1.31.0";
+		private const string FishBowlTitleVersion = "1.32.0";
 
 		private Icon ownedAppIcon;
 
@@ -412,11 +412,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.31.0" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.32.0" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.31.0";
+						library.Theme.LastSeenBuild = "1.32.0";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -3385,7 +3385,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.31.0"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.32.0"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3393,7 +3393,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.31.0"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.32.0"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3401,7 +3401,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.31.0"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.32.0"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}
@@ -4469,7 +4469,8 @@ namespace EmulatorHub
 				return;
 			}
 			saveNotificationIcon.Visible = true;
-			if (pendingSaveBalloon && !ExperienceData.Quiet(library.Experience, DateTime.Now))
+			if (pendingSaveBalloon && !ExperienceData.Quiet(library.Experience, DateTime.Now) &&
+                (saveMonitorErrors.Count > 0 || !AquariumFamily.SuiteNoticePolicy.IsQuiet("FishBowl", DateTime.Now)))
 			{
 				saveNotificationIcon.ShowBalloonTip(8000, "Copy your in-game saves to FishBowl?", library.SaveReviews.Count + " changed save group(s). Click to copy, skip, or review later.", ToolTipIcon.Info);
 				pendingSaveBalloon = false;
@@ -4819,6 +4820,7 @@ namespace EmulatorHub
             AddSettingsCard(grid, "Appearance", "Themes, colors, window styling and layout", ShowAppearanceHub);
             AddSettingsCard(grid, "Accessibility", "Text size, contrast and motion", ShowLiveAppearanceCore);
             AddSettingsCard(grid, "Controllers", "Input, navigation and controller profiles", ShowControllerCenter);
+            AddSettingsCard(grid, "Readiness", "Compatibility, missing paths and recovery", ShowReliabilityCenter);
             return grid;
         }
 
@@ -6519,7 +6521,8 @@ namespace EmulatorHub
 									Store.Save(library);
 									SetStatus("Emulator releases available. Open Library extensions → Versions, updates and rollback.");
 									releaseWatchIcon.Visible = true;
-									releaseWatchIcon.ShowBalloonTip(8000, "Emulator releases available", string.Join("\n", list.Take(5)), ToolTipIcon.Info);
+                                    if (!AquariumFamily.SuiteNoticePolicy.IsQuiet("FishBowl", DateTime.Now))
+                                        releaseWatchIcon.ShowBalloonTip(8000, "Emulator releases available", string.Join("\n", list.Take(5)), ToolTipIcon.Info);
 								}
 							}
 							else
@@ -17631,7 +17634,8 @@ namespace EmulatorHub
 			};
 			try
 			{
-				Application.Run(new MainForm());
+                using (var profileLease = WindowsProfileLease.Open(Store.DataDirectory))
+                    Application.Run(new MainForm());
 			}
 			catch (Exception ex)
 			{

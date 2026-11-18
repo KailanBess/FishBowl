@@ -4,6 +4,7 @@ $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $changes = & git -C $repository status --porcelain
 if ($LASTEXITCODE -ne 0 -or $changes) { throw 'Commit source changes before packaging so the app and source archive match.' }
 & (Join-Path $PSScriptRoot 'Build.ps1')
+$signed = & (Join-Path $PSScriptRoot 'Sign-Optional.ps1') -Files @((Join-Path $PSScriptRoot 'FishBowl.exe'), (Join-Path $PSScriptRoot 'FishBowl Setup.exe'))
 $app = Join-Path $PSScriptRoot 'FishBowl.exe'
 $setup = Join-Path $PSScriptRoot 'FishBowl Setup.exe'
 $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($app).ProductVersion
@@ -42,7 +43,7 @@ Remote couch play includes a browser media client and host-approved keyboard con
 "@ | Set-Content -LiteralPath (Join-Path $bundle 'README.md') -Encoding UTF8
 $commit = & git -C $repository rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the packaged source commit.' }
-@{ version=$version; sourceCommit=$commit; appFile='FishBowl.exe'; installerFile='FishBowl Setup.exe'; appFiles=$expectedNames; sourceOnly=$false } |
+@{ version=$version; sourceCommit=$commit; appFile='FishBowl.exe'; installerFile='FishBowl Setup.exe'; appFiles=$expectedNames; sourceOnly=$false; signed=[bool]$signed } |
  ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output 'BUILD-INFO.json') -Encoding UTF8
 @"
 # FishBowl $version
@@ -51,7 +52,7 @@ Download **FishBowl-$version.zip** for the Windows app. Extract it, keep the six
 
 **FishBowl-$version-Source.zip** contains source code for contributors. Build instructions are in its README; it does not include compiled executables. The Linux archive is a separate executable build.
 
-Play now supports moving the emulator within its viewport using Move window and a draggable title bar, with Fit to Play to restore the full viewport. The embedded Web workspace and browser settings have been removed. Web links use the system default browser; existing browser data is retained. The gallery interface retains Home, Emulators, Library, Play and Settings. Fullscreen game hosting, graceful game shutdown and saved game-only view adjustments remain available.
+Windows adds Settings → Readiness for missing paths, private compatibility reports and save recovery. Remote couch play can test the token-service health protocol without creating a session. Optional Aquarium quiet hours defer informational notices, and a profile lease prevents conflicting editors. Existing movable Play windows, gallery workspaces and external web links remain. Linux behavior is unchanged. BUILD-INFO.json records the actual publisher-signature state; missing signing configuration leaves an unsigned build. Physical emulator/controller, two-device streaming and independent security acceptance remain external checks.
 "@ | Set-Content -LiteralPath (Join-Path $output 'RELEASE-NOTES.md') -Encoding UTF8
 $zip = Join-Path $output ('FishBowl-' + $version + '.zip')
 Compress-Archive -LiteralPath $bundle -DestinationPath $zip -Force

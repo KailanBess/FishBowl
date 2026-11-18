@@ -34,6 +34,29 @@ namespace EmulatorHub
             if (!Uri.TryCreate(value, UriKind.Absolute, out uri) || !string.IsNullOrEmpty(uri.UserInfo) || !(uri.Scheme == "https" || uri.Scheme == "http" && uri.IsLoopback)) throw new IOException("Use an HTTPS token service, or localhost for development.");
             return uri.GetLeftPart(UriPartial.Authority);
         }
+        public static string CheckService(string value)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(Service(value) + "/api/health");
+            request.Method = "GET"; request.AllowAutoRedirect = false; request.Timeout = 5000; request.ReadWriteTimeout = 5000;
+            request.UserAgent = "FishBowl-readiness";
+            using (var response = (HttpWebResponse)request.GetResponse())
+            {
+                if (response.StatusCode != HttpStatusCode.OK || response.ContentLength > 4096) throw new IOException("The service did not return a supported health response.");
+                using (var reader = new StreamReader(response.GetResponseStream()))
+                {
+                    var buffer = new char[4097]; int count = 0, read;
+                    while (count < buffer.Length && (read = reader.Read(buffer, count, buffer.Length - count)) > 0) count += read;
+                    if (count > 4096) throw new IOException("The service response is too large.");
+                    var serializer = new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = 4096 };
+                    var health = serializer.Deserialize<Dictionary<string, object>>(new string(buffer, 0, count));
+                    if (health == null || !health.ContainsKey("service") || !health.ContainsKey("protocol") ||
+                        Convert.ToString(health["service"], CultureInfo.InvariantCulture) != "FishBowl remote play" ||
+                        Convert.ToString(health["protocol"], CultureInfo.InvariantCulture) != "1")
+                        throw new IOException("The address is reachable but does not report the FishBowl remote-play protocol. Update the private service if needed.");
+                }
+            }
+            return "Token service reachable; protocol 1 confirmed. This does not verify LiveKit credentials, shared audio/video or guest controls. Complete a two-device session test before relying on remote play.";
+        }
     }
     public sealed class RemotePlayDialog : NextDialog
     {
@@ -44,6 +67,7 @@ namespace EmulatorHub
         RemotePlayBridge bridge;
         readonly RemoteWindow preferred;
         readonly LibraryData library;
+        bool testingService;
         public RemotePlayDialog(LibraryData library, EmulatorProfile emulator) : this(library, emulator, null) { }
         public RemotePlayDialog(LibraryData library, EmulatorProfile emulator, RemoteWindow preferredWindow) : base("Remote couch play", 780, 520)
         {
@@ -57,6 +81,7 @@ namespace EmulatorHub
             Field(fields, "Session", note, 120);
             Field(fields, "Status", status, 70);
             Action("Refresh windows", RefreshTargets);
+            Action("Test service", TestService);
             Action("Open client", OpenClient);
             Action("Stop sharing", StopBridge);
             Action("Close", Close);
@@ -101,6 +126,21 @@ namespace EmulatorHub
                 SystemWebLinks.Open(bridge.Address);
                 status.Text = "Client opened. Keep this session open. Stop sharing releases all guest controls.";
             } catch (Exception ex) { StopBridge(); status.Text = ex.Message; }
+        }
+        async void TestService()
+        {
+            if (testingService) return;
+            testingService = true;
+            service.Enabled = false;
+            string address = service.Text;
+            status.Text = "Checking the token service without creating a room or saving settings…";
+            try
+            {
+                string result = await System.Threading.Tasks.Task.Run(delegate { return RemotePlayTools.CheckService(address); });
+                if (!IsDisposed) status.Text = result;
+            }
+            catch (Exception ex) { if (!IsDisposed) status.Text = "Service check failed: " + ex.Message + " Check the HTTPS certificate, proxy /api/ routes and service version. No certificate checks were disabled."; }
+            finally { testingService = false; if (!IsDisposed) service.Enabled = true; }
         }
         void StopBridge() { if (bridge != null) { bridge.Dispose(); bridge = null; } status.Text = "Session stopped. Guest controls released."; }
     }
