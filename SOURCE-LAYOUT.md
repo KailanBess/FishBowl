@@ -9,7 +9,8 @@ The Windows application is built from:
 - `windows/FishBowl.cs`, `windows/FishBowl.InputPainting.cs` and `windows/FishBowl.TextFit.cs`: the WinForms application
 - `FishBowl.Model.cs` and `FishBowl.GameRecognition.cs` (repository root): the shared data model and game identification
 - `windows/FishBowl.Navigation.cs`, `windows/FishBowl.Sessions.cs` and `windows/FishBowl.RemotePlay.cs`: unified appearance/controller navigation, session UI tracking and the local browser/input bridge
-- `windows/FishBowl.Browser.cs`: installed Firefox/Edge/Chrome discovery, dedicated profiles, Web navigation and exact-owned browser window lifetime
+- `windows/Play.WindowFrame.cs`: movable in-Play session frames, drag/keyboard positioning, bounds and fullscreen restoration
+- `windows/FishBowl.ExternalLinks.cs`: validated http/https links opened through the system default browser
 - `windows/Play.cs`: exact-process native child/owned-window hosting, persistent Play sessions and safe detach/restore
 - `remote-play/client/`: embedded browser media client and the pinned LiveKit SDK, including its license
 
