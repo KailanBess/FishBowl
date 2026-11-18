@@ -1,3 +1,10 @@
+# Windows 1.30.1
+
+- Remove the Web workspace, embedded browser, browser settings and browser lifecycle code.
+- Open help, saved website links and remote-play clients in the system default browser.
+- Keep Home, Emulators, Library, Play and Settings in order, including correct fullscreen navigation.
+- Retain optional legacy browser preferences and existing browser data for compatibility; no browsing data is deleted.
+
 # Windows 1.30.0
 
 - Rebuild every Windows workspace and app dialog around the gallery shell, with card catalogs, section navigation, stacked fields and consistent confirmations.

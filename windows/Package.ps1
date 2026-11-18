@@ -36,9 +36,7 @@ Source and platform build instructions are in the accompanying Source archive an
 
 Play opens compatible emulator windows inside FishBowl. Switching Home, Library or Emulators leaves sessions running. Full screen expands Play; Exit full screen returns to the normal window. Open in window restores the emulator window. Closing FishBowl asks before closing running games. Close games and exit requests normal emulator shutdown; Cancel keeps playing and Keep games running restores their windows. Save/exit prompts are honored without force termination. Game view settings in More hides standard menus and lets you save toolbar/status edge sizes per emulator. Some elevated or renderer-managed windows require external mode. Share session selects the running game, opens its own window for sharing and returns it to Play when sharing closes. More opens session details and recovery guidance.
 
-Web uses an installed browser: Firefox by default, with Microsoft Edge or Google Chrome available in Browser settings. No browser engine executable is bundled. Enter an address or search and press Go in Web. A separate FishBowl browser profile holds cookies and logins; personal browser windows are not attached or closed. See docs/BROWSER.md in the Source archive for navigation and compatibility details.
-
-Session checkpoints recover observed playtime after restart and follow verified launcher descendants with confirmed graceful game shutdown on app close. Appearance and accessibility settings share one hub, with separate General preferences. Controller navigation covers current menus, overflow actions, dialogs and controls.
+The Web workspace and browser settings have been removed. Documentation, saved website links and remote-play clients open in the system default browser. Existing browser data and optional saved preferences are retained without being used or deleted.
 
 Remote couch play includes a browser media client and host-approved keyboard controls. It requires a LiveKit deployment and the private token service described in remote-play/README.md in the Source archive. This package does not deploy the service or include credentials. Live streaming and emulator key mappings require a two-device test; Linux can join as a browser guest.
 "@ | Set-Content -LiteralPath (Join-Path $bundle 'README.md') -Encoding UTF8
@@ -53,19 +51,7 @@ Download **FishBowl-$version.zip** for the Windows app. Extract it, keep the six
 
 **FishBowl-$version-Source.zip** contains source code for contributors. Build instructions are in its README; it does not include compiled executables. The Linux archive is a separate executable build.
 
-This release includes an optional Aquarium family appearance preset while retaining personal customization. It includes the Web workspace using installed Firefox by default, selectable Edge/Chrome adapters and separate browser profiles. It adds running-game exit confirmation and graceful shutdown, plus saved game-only view adjustments. The existing UI style remains in place. Browser and renderer compatibility vary; external-window fallback is available.
-
-Before upgrading, use Library > Backup and transfer > Export FishBowl settings and retain the previous app folder. Close FishBowl, extract the new app into a separate folder, and keep your existing data location. For portable mode, copy portable.flag and FishBowlData while FishBowl is closed. The installer updates the app without intentionally replacing library data. Emulator programs and game files remain separate.
-
-To roll back, close FishBowl and reopen the previous app version. If data recovery is required, use the exported settings or Library restore points and review the restore preview. Do not overwrite an active portable data folder.
-
-Physical controllers, audio and two-device remote streaming require live tests. Renderer and monitor compatibility vary; use Open in window when needed. See docs/PLAY-VALIDATION.md in the Source archive.
-
-## Linux
-
-Download **FishBowl-$version-x86_64.AppImage**, make it executable with chmod +x (or Properties > Allow executing as program), and run it. **FishBowl-$version-linux-x64.tar.gz** contains the same self-contained application as a plain folder. SHA256SUMS-linux.txt covers both packages. No game, firmware or emulator binaries are included.
-
-Source commit: $commit. BUILD-INFO.json records the matching version and source commit. SHA256SUMS.txt covers both Windows archives and the release metadata.
+The embedded Web workspace and browser settings have been removed. Web links use the system default browser; existing browser data is retained. The gallery interface retains Home, Emulators, Library, Play and Settings. Fullscreen game hosting, graceful game shutdown and saved game-only view adjustments remain available.
 "@ | Set-Content -LiteralPath (Join-Path $output 'RELEASE-NOTES.md') -Encoding UTF8
 $zip = Join-Path $output ('FishBowl-' + $version + '.zip')
 Compress-Archive -LiteralPath $bundle -DestinationPath $zip -Force

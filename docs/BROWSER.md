@@ -1,18 +1,6 @@
-# Web, game view and closing FishBowl
+# External links, game view and closing FishBowl
 
-## Browser setup
-
-Windows Web displays an actual installed browser window inside its viewport using borderless owned-window hosting. Its original rendering context and DPI are preserved instead of reparenting its GPU window or starting desktop kiosk mode. Firefox is the default; Browser settings can select Microsoft Edge or Google Chrome and an optional executable path. This is native-window integration, not a bundled Gecko/WebView2 control. Install your chosen browser separately and keep it updated. FishBowl does not download a browser automatically.
-
-Open Web or Tools > Web browser. Enter an http/https address or search words and press Go. Nothing loads automatically on FishBowl startup. Browser settings is available in Web, Tools and General settings. A changed browser choice applies after closing the current Web session.
-
-Firefox starts in a normal window with a separate profile using Mozilla's [profile, new-instance and new-window command-line options](https://firefox-source-docs.mozilla.org/browser/CommandLineParameters.html). Edge/Chrome use a separate user-data directory and a normal browser window so address-bar navigation remains available. Subsequent Go actions focus the exact owned browser window and submit the address through its address bar; they do not start a second process or replace the session. If Windows cannot grant keyboard focus, FishBowl reports the problem and leaves the current session intact. Release held shortcut keys and retry from Web. Back, Forward and Reload send native browser commands to the verified window. The address box shows the last submitted address/search, not a synchronized current-page address. Browser permissions, downloads and page dialogs remain browser-managed.
-
-Browsing data is stored under FishBowl's data directory in BrowserProfiles, separately from personal browser profiles. Copying a portable FishBowlData folder also copies those browser cookies and logins. Close Web before transferring or changing browser profile files.
-
-Switching Home, Emulators, Library, Play and Web keeps the browser running. Full screen has a visible exit button. Open in window restores the browser window and changes to Return to Web. Press that same button to reattach the browser; Show in app also retries the same verified process. Personal browser instances are never selected by executable name or closed. If a renderer cannot be hosted, use external mode. Native Firefox window integration is not an officially supported desktop embedding API, so rendering, permission dialogs and monitor compatibility require live testing.
-
-Closing FishBowl requests normal closure of its Web browser. If it is still closing or requires confirmation, FishBowl offers staying open or explicitly leaving that browser in its own window. It does not force-terminate the browser. An orphaned dedicated profile may remain locked until its browser is closed.
+Windows 1.30.1 removes the embedded Web workspace and its browser settings. Documentation, compatibility pages, saved links and remote-play clients open in the system default browser. FishBowl does not select, host, close or create a separate profile for that browser. Existing browser preferences and BrowserProfiles data from older releases are retained for compatibility and are no longer used.
 
 ## Game-only view
 
@@ -26,6 +14,4 @@ FishBowl asks before closing games it launched or explicitly adopted into Play. 
 
 No process is force-terminated during normal app closure. Process/window ownership is checked by PID and process creation time before close requests. Unrelated emulator or personal browser processes are unaffected. Windows shutdown or task-manager closure does not show the interactive game confirmation.
 
-Linux retains its existing external-launch UI and preserves the optional browser/view settings for round trips. See [Play validation](PLAY-VALIDATION.md) for game/controller/monitor checks. Also verify Web on the selected browser: page rendering, Go/Back/Forward/Reload, form input, permission/download dialogs, navigation away and back, fullscreen, external restoration and shutdown with multiple tabs.
-
-Windows 1.29.4 automatically matches the browser's native bounds to the Web viewport, including app movement, resizing and fullscreen. It corrects native browser moves/resizes or maximization while hosted. Open in window initially fits the external browser over the same viewport and then respects user adjustments. Return to Web resumes fitting. Unsupported attachment gets an initial fitted external fallback. Native browser minimum sizes, mixed-DPI monitors and live address-bar navigation still require compatibility checks.
+Linux keeps its existing external-launch interface. See [Play validation](PLAY-VALIDATION.md) for game/controller/monitor checks.
