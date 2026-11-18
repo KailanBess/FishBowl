@@ -2,20 +2,20 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-11-18, Windows Web removal and movable Play windows._
+_Last updated: 2026-11-18, Windows suite reliability and recovery._
 
 ## Current state
 
 | Area | State |
 | --- | --- |
-| Windows | **1.31.0** adds movable in-Play game frames and removes embedded Web and its browser controls from released 1.30.0. External links use the default system browser. |
-| Linux | Round 1 (#28–#30) and round 2 integrations/QA (#37) merged; round 2 profiles in PR #38 (see Linux work). |
+| Windows | **1.32.0** prepares compatibility/recovery readiness, private report export, remote token-service health checks, shared informational quiet hours and profile leases. Movable Play remains; embedded Web remains removed. |
+| Linux | Existing Linux UI and behavior are unchanged. Package metadata matches 1.32.0; shared/library compatibility checks remain required. Older parity notes below are historical. |
 | Shared | C# 5 game, library, session, save and living-room helpers. Optional Browser/PlayView fields survive Linux saves; Linux browsing remains external. |
 | Issues | [Issue #34](https://github.com/KailanBess/FishBowl/issues/34) tracks automatic browser fitting. Issues #23/#27/#31/#32 are implemented through merged PR #25. |
 
 ## Open pull requests
 
-- Windows Web removal is being prepared on `remove/web-workspace` against released 1.30.0. All checks must pass before merge and publication.
+- Suite reliability work is on `feature/suite-reliability` against released 1.31.0. All required checks must pass before merge/publication. PR #63 is merged and released. The separate iOS proposal remains excluded.
 - #50 is the separate iOS proposal and is out of scope.
 
 ## Linux work
@@ -47,6 +47,7 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+- **2026-11-18 (Windows reliability):** prepare 1.32.0 with a Settings readiness report, existing moved-path/save-recovery actions, bounded read-only remote token-service health testing, Aquarium informational quiet-hour policy and a process-lifetime default/portable profile lease. Add public non-secret `/api/health` to the reference token service. Optional release signing verifies genuine publisher signatures and timestamps; missing credentials leave an explicitly unsigned build. Remove obsolete release-only branch publication conditions. Linux receives matching package metadata only; saved fields and Linux UI/behavior are unchanged. Windows builds and targeted privacy/health/quiet-hour, remote service and media-independent checks pass locally. Full Windows regression, both text-audit modes and shared/Linux CI remain release gates. Physical emulators/controllers/monitors, live streaming, genuine signed install interruption recovery and independent security review remain external acceptance work.
 
 - **2026-11-18 (Windows Play):** add a FishBowl-owned draggable frame per running session. Move window reduces the viewport and exposes its title grip; dragging and focused arrow keys reposition it within the stage. Fit restores the full viewport. Keep the same native host/renderer handles, retain position across workspace changes, clamp on resize, and temporarily fit/restore around fullscreen. No emulator files or settings are modified, and positions are session-only. Verify native drag geometry, bounds, focus, fullscreen, detach/return, shutdown and scaled layouts before publication.
 

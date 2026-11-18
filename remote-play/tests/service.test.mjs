@@ -16,6 +16,10 @@ test('room lifecycle, actual signed grants, approval boundary and expiry', async
   service.server.listen(0,'127.0.0.1'); await new Promise(resolve=>service.server.once('listening',resolve));
   t.after(()=>service.server.close()); const origin='http://127.0.0.1:'+service.server.address().port;
   const post=async(path,body,auth='',extra={})=>fetch(origin+path,{method:'POST',headers:{'Content-Type':'application/json',...(auth?{Authorization:auth}:{}),...extra},body:JSON.stringify(body)});
+  const health = await fetch(origin + '/api/health');
+  assert.equal(health.status, 200);
+  assert.deepEqual(await health.json(), { service: 'FishBowl remote play', protocol: 1 });
+  assert.equal((await fetch(origin + '/api/health', { headers: { Origin: 'https://attacker.invalid' } })).status, 403);
   assert.equal((await post('/api/rooms',{})).status,401);
   assert.equal((await post('/api/rooms',{},'Bearer '+config.hostKey,{Origin:'https://attacker.invalid'})).status,403);
   const created=await post('/api/rooms',{room_name:'attacker',identity:'admin'},'Bearer '+config.hostKey,{Origin:'http://127.0.0.1:1234'});

@@ -6,10 +6,10 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 
 | Platform | Version | Status |
 | --- | --- | --- |
-| Windows | 1.31.0 | Windows app ZIP with installer |
-| Linux | 1.31.0 | Linux AppImage; testing on more Linux desktops is welcome |
+| Windows | 1.32.0 | Windows app ZIP with installer |
+| Linux | 1.32.0 | Linux AppImage; testing on more Linux desktops is welcome |
 
-**What's new in 1.31.0:** Windows adds movable game windows inside Play and removes the embedded Web workspace and browser settings. Documentation, saved links and remote-play clients open in your system default browser. The gallery interface, game hosting and shared library compatibility remain.
+**What's new in 1.32.0:** Windows adds Settings → Readiness for compatibility/path/save recovery review and private report export, a bounded remote-play service check, shared Aquarium quiet hours for informational notices, and protection against simultaneous profile editors. Play windows remain movable; embedded Web remains removed. Linux behavior is unchanged, with matching release metadata.
 
 Included features:
 - **Windows:** gallery workspaces for Home, Emulators, Library, Play and Settings. Play keeps compatible games inside FishBowl and asks before closing running games. Documentation and other web links open in your system default browser. See [External links and game view](docs/BROWSER.md) and [Play validation](docs/PLAY-VALIDATION.md).
@@ -251,3 +251,15 @@ Shared files must stay compatible with C# 5, because the Windows build uses the 
 - **Bugs:** report them with the [bug report form](../../issues/new/choose).
 - **Changes:** make them on a branch and open a pull request into `main`. The checks must pass before merging.
 - **Ground rules:** [DESIGN.md](DESIGN.md) covers how the Windows and Linux versions are developed together: shared files, the C# 5 requirement, library compatibility and the release process.
+
+## Suite recovery and release trust
+
+Settings → Readiness reports missing game/emulator files and links to existing moved-folder repair and save history. It does not certify rendering, audio or input compatibility. Play → More → Input and session details shows the active renderer and focus/controller evidence. Review reports before sharing; the readiness report includes emulator names/counts but omits game titles, local paths, accounts and credentials.
+
+Remote couch play offers **Test service**. It reads the configured service's `/api/health` endpoint with a bounded request, requires the FishBowl protocol response and refuses redirects. Update the private reference service if it lacks this route. Reachability does not establish LiveKit authorization, audio/video or guest input; complete the documented two-device test.
+
+Aquarium Recovery can encrypt a backup of the library and window-layout records. Referenced game/save/artwork files and portable profiles are not copied by that feature; use FishBowl save/emulator backups for payloads. Close FishBowl before restoring records. Supporting Aquarium settings can review and apply a family palette to the closed default profile while preserving unrelated settings. Shared quiet hours defer informational save-review/release balloons while review items remain available; errors retain their normal handling.
+
+Windows takes a process-lifetime `profile.lock` lease in its data directory. Another editor or supporting recovery operation must finish before the same profile opens. Windows releases the lease after a crash; do not delete a live lock to bypass it.
+
+Release packaging optionally signs the Windows app and installer using genuine publisher credentials from GitHub secrets `WINDOWS_SIGNING_PFX_BASE64` and `WINDOWS_SIGNING_PASSWORD`, plus `WINDOWS_TIMESTAMP_URL` with the certificate provider's HTTPS RFC 3161 endpoint. The signer verifies publisher trust and a timestamp before packaging. Missing configuration leaves the package explicitly unsigned; partial configuration or failed verification stops packaging. `BUILD-INFO.json` records the actual state. Checksums are not independent publisher authentication, and signing is not a security audit. No credentials are committed.

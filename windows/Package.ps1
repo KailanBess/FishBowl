@@ -4,6 +4,7 @@ $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $changes = & git -C $repository status --porcelain
 if ($LASTEXITCODE -ne 0 -or $changes) { throw 'Commit source changes before packaging so the app and source archive match.' }
 & (Join-Path $PSScriptRoot 'Build.ps1')
+$signed = & (Join-Path $PSScriptRoot 'Sign-Optional.ps1') -Files @((Join-Path $PSScriptRoot 'FishBowl.exe'), (Join-Path $PSScriptRoot 'FishBowl Setup.exe'))
 $app = Join-Path $PSScriptRoot 'FishBowl.exe'
 $setup = Join-Path $PSScriptRoot 'FishBowl Setup.exe'
 $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($app).ProductVersion
@@ -42,7 +43,7 @@ Remote couch play includes a browser media client and host-approved keyboard con
 "@ | Set-Content -LiteralPath (Join-Path $bundle 'README.md') -Encoding UTF8
 $commit = & git -C $repository rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the packaged source commit.' }
-@{ version=$version; sourceCommit=$commit; appFile='FishBowl.exe'; installerFile='FishBowl Setup.exe'; appFiles=$expectedNames; sourceOnly=$false } |
+@{ version=$version; sourceCommit=$commit; appFile='FishBowl.exe'; installerFile='FishBowl Setup.exe'; appFiles=$expectedNames; sourceOnly=$false; signed=[bool]$signed } |
  ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $output 'BUILD-INFO.json') -Encoding UTF8
 @"
 # FishBowl $version
