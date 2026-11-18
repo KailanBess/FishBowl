@@ -1,6 +1,10 @@
 # External links, game view and closing FishBowl
 
-Windows 1.30.1 removes the embedded Web workspace and its browser settings. Documentation, compatibility pages, saved links and remote-play clients open in the system default browser. FishBowl does not select, host, close or create a separate profile for that browser. Existing browser preferences and BrowserProfiles data from older releases are retained for compatibility and are no longer used.
+Windows 1.31.0 removes the embedded Web workspace and its browser settings. Documentation, compatibility pages, saved links and remote-play clients open in the system default browser. FishBowl does not select, host, close or create a separate profile for that browser. Existing browser preferences and BrowserProfiles data from older releases are retained for compatibility and are no longer used.
+
+## Moving the emulator inside Play
+
+Select the running game, choose **Move window**, then drag its title bar to reposition it within Play. The game remains attached to the same emulator process. With the title bar focused, arrow keys move ten pixels and Shift+arrow moves one pixel. **Fit to Play**, double-clicking the title bar, or Enter/Escape on the title bar restores the full viewport. Switching workspaces keeps the position for that running session. Resizing keeps the frame within Play; fullscreen temporarily fits the game and restores the moved position when it ends. The game itself continues receiving normal input when focused.
 
 ## Game-only view
 

@@ -6,10 +6,10 @@ FishBowl is a hub for your emulators and games. It keeps your installed emulator
 
 | Platform | Version | Status |
 | --- | --- | --- |
-| Windows | 1.30.1 | Windows app ZIP with installer |
-| Linux | 1.30.1 | Linux AppImage; testing on more Linux desktops is welcome |
+| Windows | 1.31.0 | Windows app ZIP with installer |
+| Linux | 1.31.0 | Linux AppImage; testing on more Linux desktops is welcome |
 
-**What's new in 1.30.1:** Windows removes the embedded Web workspace and browser settings. Documentation, saved links and remote-play clients open in your system default browser. The gallery interface, game hosting and shared library compatibility remain.
+**What's new in 1.31.0:** Windows adds movable game windows inside Play and removes the embedded Web workspace and browser settings. Documentation, saved links and remote-play clients open in your system default browser. The gallery interface, game hosting and shared library compatibility remain.
 
 Included features:
 - **Windows:** gallery workspaces for Home, Emulators, Library, Play and Settings. Play keeps compatible games inside FishBowl and asks before closing running games. Documentation and other web links open in your system default browser. See [External links and game view](docs/BROWSER.md) and [Play validation](docs/PLAY-VALIDATION.md).
@@ -34,7 +34,7 @@ These are from the Linux version, with made-up example games. The Windows versio
 ### Windows
 
 - **Home, Emulators, Library, Play and Settings** sections, with a continue-playing dashboard, pinned games and quick actions.
-- **Play:** compatible Windows emulator windows appear inside FishBowl, using child hosting or a borderless window aligned to Play for per-monitor renderers. Sessions remain open when switching sections; Full screen expands the player, and Open in window restores the emulator’s own window. Closing FishBowl asks before requesting normal emulator shutdown; Cancel keeps the app open, and Keep games running restores external windows. Save and exit prompts are honored. Elevated, incompatible or renderer-managed windows may require Open in window. Remote hosting keeps the game in Play. Open in window changes to Return to Play for reattaching the same session.
+- **Play:** use **Move window** to reveal a draggable title bar and reposition the emulator inside Play. Arrow keys move the focused title bar; **Fit to Play** restores the full viewport. Positions stay with their running sessions, and fullscreen temporarily fits the game before restoring its moved position. Compatible Windows emulator windows appear inside FishBowl, using child hosting or a borderless window aligned to Play for per-monitor renderers. Sessions remain open when switching sections; Full screen expands the player, and Open in window restores the emulator’s own window. Closing FishBowl asks before requesting normal emulator shutdown; Cancel keeps the app open, and Keep games running restores external windows. Save and exit prompts are honored. Elevated, incompatible or renderer-managed windows may require Open in window. Remote hosting keeps the game in Play. Open in window changes to Return to Play for reattaching the same session.
 - **Game library** with cover artwork, game identification, collections (including nested collections), smart lists, a play queue, favorites, ratings, progress and custom metadata. Already installed games can be launched directly.
 - **Emulator management:**
   - presets for more than 40 emulators, plus custom emulators

@@ -27,21 +27,21 @@ using System.Windows.Forms;
 using System.Xml;
 using Microsoft.Win32;
 
-[assembly: AssemblyFileVersion("1.30.1.0")]
+[assembly: AssemblyFileVersion("1.31.0.0")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
 [assembly: AssemblyTitle("FishBowl")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
-[assembly: AssemblyVersion("1.30.1.0")]
+[assembly: AssemblyVersion("1.31.0.0")]
 namespace EmulatorHub
 {
 	public class MainForm : Form
 	{
 		private const string CommunityDiscordUrl = "https://discord.gg/nFHaGeM6AG";
 
-		private const string FishBowlVersion = "1.30.1";
+		private const string FishBowlVersion = "1.31.0";
 
-		private const string FishBowlTitleVersion = "1.30.1";
+		private const string FishBowlTitleVersion = "1.31.0";
 
 		private Icon ownedAppIcon;
 
@@ -412,11 +412,11 @@ namespace EmulatorHub
 						{
 							mainForm.OfferStartupRecovery();
 						}
-						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.30.1" && !isolatedPreview)
+						if (!string.IsNullOrWhiteSpace(library.Theme.LastSeenBuild) && library.Theme.LastSeenBuild != "1.31.0" && !isolatedPreview)
 						{
 							ShowWhatsNew();
 						}
-						library.Theme.LastSeenBuild = "1.30.1";
+						library.Theme.LastSeenBuild = "1.31.0";
 						Store.Save(library);
 						if (!isolatedPreview && library.Theme.ShowStartupAssistant)
 						{
@@ -3385,7 +3385,7 @@ namespace EmulatorHub
 
 		private void ShowAbout()
 		{
-			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.30.1"))
+			using (AboutFishBowlDialog aboutFishBowlDialog = new AboutFishBowlDialog("1.31.0"))
 			{
 				aboutFishBowlDialog.ShowDialog(this);
 			}
@@ -3393,7 +3393,7 @@ namespace EmulatorHub
 
 		private void ShowWhatsNew()
 		{
-			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.30.1"))
+			using (WhatsNewDialog whatsNewDialog = new WhatsNewDialog("1.31.0"))
 			{
 				whatsNewDialog.ShowDialog(this);
 			}
@@ -3401,7 +3401,7 @@ namespace EmulatorHub
 
 		private void ShowFeedback()
 		{
-			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.30.1"))
+			using (FeedbackDialog feedbackDialog = new FeedbackDialog(library, "1.31.0"))
 			{
 				feedbackDialog.ShowDialog(this);
 			}

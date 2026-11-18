@@ -2,13 +2,13 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-11-18, Windows Web workspace removal._
+_Last updated: 2026-11-18, Windows Web removal and movable Play windows._
 
 ## Current state
 
 | Area | State |
 | --- | --- |
-| Windows | **1.30.1** removes embedded Web and its browser controls from released 1.30.0. External links use the default system browser. |
+| Windows | **1.31.0** adds movable in-Play game frames and removes embedded Web and its browser controls from released 1.30.0. External links use the default system browser. |
 | Linux | Round 1 (#28–#30) and round 2 integrations/QA (#37) merged; round 2 profiles in PR #38 (see Linux work). |
 | Shared | C# 5 game, library, session, save and living-room helpers. Optional Browser/PlayView fields survive Linux saves; Linux browsing remains external. |
 | Issues | [Issue #34](https://github.com/KailanBess/FishBowl/issues/34) tracks automatic browser fitting. Issues #23/#27/#31/#32 are implemented through merged PR #25. |
@@ -47,6 +47,8 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+
+- **2026-11-18 (Windows Play):** add a FishBowl-owned draggable frame per running session. Move window reduces the viewport and exposes its title grip; dragging and focused arrow keys reposition it within the stage. Fit restores the full viewport. Keep the same native host/renderer handles, retain position across workspace changes, clamp on resize, and temporarily fit/restore around fullscreen. No emulator files or settings are modified, and positions are session-only. Verify native drag geometry, bounds, focus, fullscreen, detach/return, shutdown and scaled layouts before publication.
 
 - **2026-11-18 (Windows):** remove Web from navigation, menus, Settings and General preferences. Remove browser hosting, profile creation and browser shutdown/fullscreen handling. Keep documentation, saved links and remote-play clients through validated http/https links in the default system browser. Retain the optional shared Browser field and existing browser data without using or deleting them. Settings moves to the fifth workspace and remains navigable in fullscreen. Linux receives matching release metadata only; iOS is excluded. Verify Web removal, native Play ownership, all regression suites, normal/compact overflow and shared/Linux checks.
 

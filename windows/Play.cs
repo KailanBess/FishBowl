@@ -528,6 +528,7 @@ namespace EmulatorHub
             internal readonly Dictionary<string, Process> Handles = new Dictionary<string, Process>();
             internal HashSet<string> Before;
             internal PlayWindowHost Host;
+            internal PlaySessionFrame Frame;
             internal RemotePlayDialog Sharing;
             internal bool External;
             internal DateTime Added = DateTime.UtcNow;
@@ -541,13 +542,14 @@ namespace EmulatorHub
                     Frontends.Remove(item);
                 }return true;
             }
-            public void Dispose() { if(Sharing!=null)Sharing.Close();RestoreFrontends();Host.Dispose(); foreach (Process process in Handles.Values) process.Dispose(); }
+            public void Dispose() { if(Sharing!=null)Sharing.Close();RestoreFrontends();if(Frame!=null)Frame.Dispose();else Host.Dispose(); foreach (Process process in Handles.Values) process.Dispose(); }
         }
         readonly LibraryData library;
         readonly Action fullscreen;
         readonly ComboBox choice;
         readonly Label status, empty;
         readonly Button fullscreenButton, externalButton, retryButton, shareButton, moreButton;
+        readonly Button moveButton, fitButton;
         bool fullScreenActive;
         readonly Panel stage;
         readonly Timer timer;
@@ -567,6 +569,8 @@ namespace EmulatorHub
             choice = NextDialog.Choice(new string[0], null); choice.Width = 220; choice.AccessibleName = "Running games";
             toolbar.Controls.Add(choice);
             fullscreenButton = ExperienceUi.Button("Full screen", delegate { if (fullscreen != null) fullscreen(); });
+            moveButton = ExperienceUi.Button("Move window", delegate { MoveSelectedWindow(); });
+            fitButton = ExperienceUi.Button("Fit to Play", delegate { FitSelectedWindow(); });
             externalButton = ExperienceUi.Button("Open in window", delegate { var selected=Selected();if(selected!=null&&selected.External)RetrySelected();else OpenSelectedInWindow(); });
             retryButton = ExperienceUi.Button("Show in Play", RetrySelected);
             shareButton = ExperienceUi.Button("Share session", ShareSelected);
@@ -597,7 +601,7 @@ namespace EmulatorHub
             stage.Controls.Add(empty);
             stage.SizeChanged += delegate { empty.MaximumSize = new Size(Math.Max(1, stage.ClientSize.Width), 0); };
             status = new Label { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(8), ForeColor = FishBowlPalette.ThemeSubtle, BackColor = FishBowlPalette.ThemeSurface, Text = "Launch a game or emulator to show it here." };
-            var header = new ModernWorkspaceHeader("Play", choice, shareButton, new[] { fullscreenButton }, new[] { externalButton, retryButton, moreButton });
+            var header = new ModernWorkspaceHeader("Play", choice, shareButton, new[] { fullscreenButton, moveButton, fitButton }, new[] { externalButton, retryButton, moreButton });
             toolbar.Dispose();
             Controls.Add(stage); Controls.Add(status); Controls.Add(header);
             choice.SelectedIndexChanged += delegate { ShowSelected(); };
@@ -605,7 +609,17 @@ namespace EmulatorHub
             RefreshStatus();
         }
         Session Selected() { return choice.SelectedItem as Session; }
-        public void SetFullscreen(bool active) { fullScreenActive = active; RefreshStatus(); }
+        public bool MoveSelectedWindow()
+        {
+            var selected = Selected(); if (selected == null || selected.External || !selected.Host.IsAttached) return false;
+            selected.Frame.EnableMovement(); RefreshStatus(); return selected.Frame.Movable;
+        }
+        public bool FitSelectedWindow()
+        {
+            var selected = Selected(); if (selected == null || selected.External) return false;
+            selected.Frame.Fit(); RefreshStatus(); return true;
+        }
+        public void SetFullscreen(bool active) { fullScreenActive = active; foreach (var session in sessions) session.Frame.SetFullscreen(active); RefreshStatus(); }
         protected override void OnLayout(LayoutEventArgs e) {
             WorkspaceInspector.Fit(status, ClientSize.Width, fullScreenActive);
             if (empty != null) empty.MaximumSize = new Size(Math.Max(1, stage.ClientSize.Width), 0);
@@ -743,7 +757,9 @@ namespace EmulatorHub
                     session.Handles.Add(identity.Key, owned);
                 }
                 catch (ArgumentException) { if (process.HasExited) identity.EndedUtcTicks = process.ExitTime.ToUniversalTime().Ticks; }
-                stage.Controls.Add(session.Host); session.Host.Visible = false;
+                session.Frame = new PlaySessionFrame(session.Host, session.Title);
+                session.Frame.ModeChanged += delegate { RefreshStatus(); };
+                stage.Controls.Add(session.Frame); session.Frame.Visible = false;
                 sessions.Add(session); choice.Items.Add(session); choice.SelectedItem = session;
                 ShowSelected();
                 IntPtr initial=PlayNative.Find(session.Known,session.Title);
@@ -816,8 +832,8 @@ namespace EmulatorHub
         }
         void ShowSelected()
         {
-            var selected = Selected(); foreach (var session in sessions) session.Host.Visible = session == selected;
-            if (selected != null && stage.Controls.GetChildIndex(selected.Host) != 0) selected.Host.BringToFront(); RefreshStatus();
+            var selected = Selected(); foreach (var session in sessions) session.Frame.Visible = session == selected && !session.External;
+            if (selected != null && stage.Controls.GetChildIndex(selected.Frame) != 0) selected.Frame.BringToFront(); RefreshStatus();
         }
         void RefreshStatus()
         {
@@ -835,11 +851,16 @@ namespace EmulatorHub
             retryButton.Enabled = selected != null && (selected.External || !selected.Host.IsAttached);
             shareButton.Enabled = selected != null;
             moreButton.Enabled = selected != null;
+            bool embedded = selected != null && !selected.External && selected.Host.IsAttached;
+            if (selected != null) selected.Frame.Visible = !selected.External;
+            moveButton.Enabled = embedded && (!selected.Frame.Movable || selected.Frame.FullscreenFit);
+            fitButton.Enabled = embedded && selected.Frame.Movable;
             empty.Visible = selected == null;
             if (selected == null) status.Text = "Launch a game or emulator to show it here.";
             else if (!string.IsNullOrEmpty(selected.Notice)) status.Text = selected.Title + ": " + selected.Notice;
             else if (selected.External) status.Text = selected.Title + " is open in its own window. Return to Play brings the same game back.";
-            else if (selected.Host.IsAttached) status.Text = selected.Title + " is running in Play. Click the game or use More → Focus game for input.";
+            else if (selected.Host.IsAttached) status.Text = selected.Title + " is running in Play. " +
+                (selected.Frame.Movable && !selected.Frame.FullscreenFit ? "Drag its title bar to move it; Fit to Play restores the full viewport." : "Move window lets you reposition it within Play.") + " Click the game for input.";
             else if ((DateTime.UtcNow - selected.Added).TotalSeconds > 20) status.Text = selected.Title + ": " + (selected.Host.LastError ?? "No compatible game window is available yet. Finish any emulator startup dialog, then choose Show in Play; Open in window keeps the session available.");
             else status.Text = "Waiting for " + selected.Title + " to open its game window...";
         }

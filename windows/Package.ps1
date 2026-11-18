@@ -34,7 +34,7 @@ Game titles and artwork are stored in the library without renaming game files. R
 
 Source and platform build instructions are in the accompanying Source archive and the repository README.
 
-Play opens compatible emulator windows inside FishBowl. Switching Home, Library or Emulators leaves sessions running. Full screen expands Play; Exit full screen returns to the normal window. Open in window restores the emulator window. Closing FishBowl asks before closing running games. Close games and exit requests normal emulator shutdown; Cancel keeps playing and Keep games running restores their windows. Save/exit prompts are honored without force termination. Game view settings in More hides standard menus and lets you save toolbar/status edge sizes per emulator. Some elevated or renderer-managed windows require external mode. Share session selects the running game, opens its own window for sharing and returns it to Play when sharing closes. More opens session details and recovery guidance.
+Play opens compatible emulator windows inside FishBowl. Move window reveals a draggable title bar within Play; Fit to Play restores the full viewport. Positions are retained for each running session, stay within Play when resizing, and return after fullscreen. Switching Home, Library or Emulators leaves sessions running. Full screen expands Play; Exit full screen returns to the normal window. Open in window restores the emulator window. Closing FishBowl asks before closing running games. Close games and exit requests normal emulator shutdown; Cancel keeps playing and Keep games running restores their windows. Save/exit prompts are honored without force termination. Game view settings in More hides standard menus and lets you save toolbar/status edge sizes per emulator. Some elevated or renderer-managed windows require external mode. Share session selects the running game, opens its own window for sharing and returns it to Play when sharing closes. More opens session details and recovery guidance.
 
 The Web workspace and browser settings have been removed. Documentation, saved website links and remote-play clients open in the system default browser. Existing browser data and optional saved preferences are retained without being used or deleted.
 
@@ -51,7 +51,7 @@ Download **FishBowl-$version.zip** for the Windows app. Extract it, keep the six
 
 **FishBowl-$version-Source.zip** contains source code for contributors. Build instructions are in its README; it does not include compiled executables. The Linux archive is a separate executable build.
 
-The embedded Web workspace and browser settings have been removed. Web links use the system default browser; existing browser data is retained. The gallery interface retains Home, Emulators, Library, Play and Settings. Fullscreen game hosting, graceful game shutdown and saved game-only view adjustments remain available.
+Play now supports moving the emulator within its viewport using Move window and a draggable title bar, with Fit to Play to restore the full viewport. The embedded Web workspace and browser settings have been removed. Web links use the system default browser; existing browser data is retained. The gallery interface retains Home, Emulators, Library, Play and Settings. Fullscreen game hosting, graceful game shutdown and saved game-only view adjustments remain available.
 "@ | Set-Content -LiteralPath (Join-Path $output 'RELEASE-NOTES.md') -Encoding UTF8
 $zip = Join-Path $output ('FishBowl-' + $version + '.zip')
 Compress-Archive -LiteralPath $bundle -DestinationPath $zip -Force

@@ -1,4 +1,7 @@
-# Windows 1.30.1
+# Windows 1.31.0
+
+- Add Move window in Play. Drag its title bar within the Play area, or use the arrow keys while the title bar is focused. Fit to Play restores the full viewport.
+- Retain each running session's position across workspace changes, clamp it inside Play when resizing, and restore its moved position after fullscreen.
 
 - Remove the Web workspace, embedded browser, browser settings and browser lifecycle code.
 - Open help, saved website links and remote-play clients in the system default browser.
