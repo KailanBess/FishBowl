@@ -9,14 +9,14 @@ namespace EmulatorHub
         sealed class MoveGrip : Control
         {
             readonly PlaySessionFrame frame;
-            bool dragging;
+            bool dragging, resizing;
             Point dragStart;
             Rectangle initial;
             internal MoveGrip(PlaySessionFrame owner, string title)
             {
                 frame = owner; Text = title + "  ·  Drag to move";
                 AccessibleName = "Move " + title + " within Play";
-                AccessibleDescription = "Drag to move. Arrow keys move ten pixels; Shift and an arrow moves one pixel. Double-click or press Enter to fit to Play.";
+                AccessibleDescription = "Drag the title to move or its right handle to resize. Arrow keys move; Ctrl and an arrow resizes. Shift adjusts by one pixel. Press Enter to fit to Play.";
                 AccessibleRole = AccessibleRole.Grip; Cursor = Cursors.SizeAll; TabStop = true;
                 Dock = DockStyle.Top; DoubleBuffered = true;
                 SetStyle(ControlStyles.Selectable, true);
@@ -27,28 +27,41 @@ namespace EmulatorHub
                 var code = key & Keys.KeyCode;
                 return code == Keys.Left || code == Keys.Right || code == Keys.Up || code == Keys.Down || base.IsInputKey(key);
             }
+            Rectangle ResizeHandle { get { return new Rectangle(Math.Max(0, Width - Height), 0, Height, Height); } }
             protected override void OnMouseDown(MouseEventArgs e)
             {
                 base.OnMouseDown(e);
                 if (e.Button != MouseButtons.Left || !frame.Movable) return;
-                Focus(); dragging = true; dragStart = PointToScreen(e.Location); initial = frame.Bounds; Capture = true;
+                Focus();
+                resizing = ResizeHandle.Contains(e.Location);
+                dragging = true; dragStart = PointToScreen(e.Location); initial = frame.Bounds; Capture = true;
             }
             protected override void OnMouseMove(MouseEventArgs e)
             {
                 base.OnMouseMove(e);
+                Cursor = (dragging ? resizing : ResizeHandle.Contains(e.Location)) ? Cursors.SizeNESW : Cursors.SizeAll;
                 if (!dragging || !Capture) return;
                 Point current = PointToScreen(e.Location);
-                frame.MoveTo(new Point(initial.Left + current.X - dragStart.X, initial.Top + current.Y - dragStart.Y));
+                int dx = current.X - dragStart.X, dy = current.Y - dragStart.Y;
+                if (resizing)
+                    frame.ResizeFromTopRight(initial, dx, dy);
+                else
+                    frame.MoveTo(new Point(initial.Left + dx, initial.Top + dy));
             }
             protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == MouseButtons.Left) EndDrag(); }
             protected override void OnMouseCaptureChanged(EventArgs e) { base.OnMouseCaptureChanged(e); if (!Capture) dragging = false; }
-            protected override void OnMouseDoubleClick(MouseEventArgs e) { base.OnMouseDoubleClick(e); if (e.Button == MouseButtons.Left) frame.Fit(); }
+            protected override void OnMouseDoubleClick(MouseEventArgs e) { base.OnMouseDoubleClick(e); if (e.Button == MouseButtons.Left && !ResizeHandle.Contains(e.Location)) frame.Fit(); }
             protected override void OnKeyDown(KeyEventArgs e)
             {
                 int step = e.Shift ? 1 : 10;
                 int x = e.KeyCode == Keys.Left ? -step : e.KeyCode == Keys.Right ? step : 0;
                 int y = e.KeyCode == Keys.Up ? -step : e.KeyCode == Keys.Down ? step : 0;
-                if (x != 0 || y != 0) { frame.MoveTo(new Point(frame.Left + x, frame.Top + y)); e.Handled = e.SuppressKeyPress = true; }
+                if (x != 0 || y != 0)
+                {
+                    if (e.Control) frame.ResizeFromTopRight(frame.Bounds, x, y);
+                    else frame.MoveTo(new Point(frame.Left + x, frame.Top + y));
+                    e.Handled = e.SuppressKeyPress = true;
+                }
                 else if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Escape) { frame.Fit(); e.Handled = e.SuppressKeyPress = true; }
                 base.OnKeyDown(e);
             }
@@ -56,8 +69,16 @@ namespace EmulatorHub
             protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(ColorHarmony.Card); }
             protected override void OnPaint(PaintEventArgs e)
             {
-                FishBowlText.DrawText(e.Graphics, Text, Font, new Rectangle(12, 0, Math.Max(1, Width - 24), Height),
+                FishBowlText.DrawText(e.Graphics, Text, Font, new Rectangle(12, 0, Math.Max(1, Width - Height - 16), Height),
                     FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, ColorHarmony.Card), TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                Rectangle handle = ResizeHandle;
+                using (var pen = new Pen(FishBowlPalette.EnsureReadable(FishBowlPalette.ThemeInk, ColorHarmony.Card), 1.5f))
+                {
+                    int x = handle.Left + handle.Width / 2, y = Height / 2;
+                    e.Graphics.DrawLine(pen, x - 5, y + 5, x + 5, y - 5);
+                    e.Graphics.DrawLines(pen, new[] { new Point(x, y - 5), new Point(x + 5, y - 5), new Point(x + 5, y) });
+                    e.Graphics.DrawLines(pen, new[] { new Point(x, y + 5), new Point(x - 5, y + 5), new Point(x - 5, y) });
+                }
                 if (Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -3, -3), FishBowlPalette.ThemeInk, ColorHarmony.Card);
             }
         }
@@ -111,6 +132,16 @@ namespace EmulatorHub
             }
             finally { constraining = false; }
             RefreshRenderer();
+        }
+        internal void ResizeFromTopRight(Rectangle initial, int dx, int dy)
+        {
+            if (!Movable || FullscreenFit || stage == null) return;
+            int maxWidth = stage.ClientSize.Width - initial.Left;
+            int bottom = Math.Min(initial.Bottom, stage.ClientSize.Height);
+            if (maxWidth < 1 || bottom < 1) return;
+            int width = Math.Min(maxWidth, Math.Max(240, initial.Width + dx));
+            int height = Math.Min(bottom, Math.Max(grip.Height + 80, initial.Height - dy));
+            Bounds = new Rectangle(initial.Left, bottom - height, width, height);
         }
         internal void Fit()
         {

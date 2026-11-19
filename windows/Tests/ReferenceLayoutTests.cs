@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 using EmulatorHub;
 
@@ -26,7 +28,41 @@ class ReferenceLayoutTests
             }
             using (var empty = new ReferencePlatformGallery(new Dictionary<string, int>(), delegate { }))
                 if (All(empty).OfType<ReferencePlatformTile>().Any()) throw new Exception("Empty library fabricated platforms");
-            Console.WriteLine("PASS: platform grouping, search, selection routing and honest empty-library state."); return 0;
+            using (var main = new MainForm(true))
+            {
+                main.ShowInTaskbar = false;
+                main.StartPosition = FormStartPosition.Manual;
+                main.Location = new Point(-3000, -3000);
+                main.Show();
+                var navigation = (TabControl)typeof(MainForm).GetField("workspaceNavigation", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(main);
+                navigation.SelectedIndex = 1;
+                main.WindowState = FormWindowState.Normal;
+                main.ClientSize = new Size(920, 680);
+                Application.DoEvents();
+                var toolbar = (FlowLayoutPanel)typeof(MainForm).GetField("primaryToolbar", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(main);
+                var search = toolbar.Controls.OfType<TextBox>().Single();
+                if (!search.Visible || !toolbar.Controls.Cast<Control>().Where(c => c.Visible).All(c => toolbar.ClientRectangle.Contains(c.Bounds)))
+                    throw new Exception("Emulator toolbar clipped an action or filter at a narrow window width");
+            }
+            using (var stage = new Panel { Size = new Size(800, 600) })
+            {
+                var frameType = typeof(PlayWindowHost).Assembly.GetType("EmulatorHub.PlaySessionFrame", true);
+                var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                var host = new PlayWindowHost();
+                var frame = (Control)Activator.CreateInstance(frameType, flags, null, new object[] { host, "Fixture" }, null);
+                stage.Controls.Add(frame);
+                frameType.GetMethod("EnableMovement", flags).Invoke(frame, null);
+                var start = frame.Bounds;
+                var client = host.ClientSize;
+                frameType.GetMethod("ResizeFromTopRight", flags).Invoke(frame, new object[] { start, 100, -100 });
+                stage.PerformLayout();
+                if (host.Width <= client.Width || host.Height <= client.Height || !stage.ClientRectangle.Contains(frame.Bounds))
+                    throw new Exception("Resizing the frame failed to enlarge the renderer viewport within Play");
+                frameType.GetMethod("Fit", flags).Invoke(frame, null);
+                if (frame.Bounds != stage.ClientRectangle)
+                    throw new Exception("Fit to Play failed to restore the full viewport after resizing");
+            }
+            Console.WriteLine("PASS: platform layout, narrow emulator toolbar, and movable Play viewport sizing."); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }

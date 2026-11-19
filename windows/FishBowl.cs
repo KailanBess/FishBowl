@@ -1530,9 +1530,10 @@ namespace EmulatorHub
 			FlowLayoutPanel flowLayoutPanel = new FlowLayoutPanel();
 			flowLayoutPanel.Dock = DockStyle.Fill;
 			flowLayoutPanel.Name = "FishBowlToolbar";
+			flowLayoutPanel.Tag = "FishBowl wrapped toolbar";
 			flowLayoutPanel.BackColor = top;
 			flowLayoutPanel.Padding = new Padding(8, 5, 8, 5);
-			flowLayoutPanel.WrapContents = false;
+			flowLayoutPanel.WrapContents = true;
 			FlowLayoutPanel flowLayoutPanel2 = flowLayoutPanel;
 			FishBowlActionButton fishBowlActionButton = new FishBowlActionButton();
 			ConfigureButton(fishBowlActionButton, "Add emulator", AddEmulator, surface);
@@ -4693,7 +4694,6 @@ namespace EmulatorHub
 			primaryToolbar.Dock = DockStyle.Fill;
 			emulatorPanel.Dock = DockStyle.Fill;
             tableLayoutPanel2.Controls.Add(primaryToolbar, 0, 0);
-            primaryToolbar.Layout += delegate { FitPrimaryToolbar(); };
 			tableLayoutPanel2.Controls.Add(emulatorPanel, 0, 1);
 			tabPage4.Controls.Add(tableLayoutPanel2);
 			embeddedLibrary = new GameLibraryDialog(library)
@@ -5036,18 +5036,6 @@ namespace EmulatorHub
 			ConfigureSaveNotifications();
 		}
 
-        private bool fittingPrimaryToolbar;
-        private void FitPrimaryToolbar()
-        {
-            if (fittingPrimaryToolbar || primaryToolbar == null) return;
-            var parent = primaryToolbar.Parent as TableLayoutPanel;
-            if (parent == null || parent.RowStyles.Count == 0 || parent.RowStyles[0].SizeType != SizeType.Absolute) return;
-            int need = primaryToolbar.Controls.Cast<Control>().Where(c => c.Visible || !primaryToolbar.Visible).Select(c => c.Bottom + c.Margin.Bottom).DefaultIfEmpty(0).Max() + primaryToolbar.Padding.Bottom + primaryToolbar.Margin.Vertical;
-            if (need <= 0 || parent.RowStyles[0].Height <= need + 2) return;
-            fittingPrimaryToolbar = true;
-            try { parent.RowStyles[0].Height = need; parent.PerformLayout(); }
-            finally { fittingPrimaryToolbar = false; }
-        }
         private void UpdateWorkspaceChrome()
 		{
 			if (workspaceNavigation != null)
