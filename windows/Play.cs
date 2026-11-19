@@ -703,6 +703,13 @@ namespace EmulatorHub
                     foreach(var session in sessions.Where(s=>s==selected || selected.ViewProfile!=null && s.ViewProfile==selected.ViewProfile)) { session.View=value;session.Host.ConfigureView(value);if(value.ShowControls)session.RestoreFrontends(); }
                     dialog.Close();
                 });
+                if (selected.ViewProfile != null && selected.ViewProfile.Name.IndexOf("DeSmuME", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    NextDialog.Field(fields, "DeSmuME display size", ExperienceUi.Label(
+                        "A fixed window size in DeSmuME can override resizing in Play. Open the emulator window and drag one of its borders to leave fixed-size mode, then use Return to Play.", 80), 90);
+                    if (!selected.External)
+                        dialog.Action("Open in window", delegate { dialog.Close(); OpenSelectedInWindow(); });
+                }
                 dialog.Action("Reset",delegate { controls.Checked=false;top.Value=bottom.Value=left.Value=right.Value=0; });
                 dialog.Action("Cancel",dialog.Close);dialog.ShowDialog(FindForm());
             }
@@ -860,7 +867,7 @@ namespace EmulatorHub
             else if (!string.IsNullOrEmpty(selected.Notice)) status.Text = selected.Title + ": " + selected.Notice;
             else if (selected.External) status.Text = selected.Title + " is open in its own window. Return to Play brings the same game back.";
             else if (selected.Host.IsAttached) status.Text = selected.Title + " is running in Play. " +
-                (selected.Frame.Movable && !selected.Frame.FullscreenFit ? "Drag its title bar to move it; Fit to Play restores the full viewport." : "Move window lets you reposition it within Play.") + " Click the game for input.";
+                (selected.Frame.Movable && !selected.Frame.FullscreenFit ? "Drag the title to move or its top-right handle to resize. Fit to Play fills the viewport." : "Move window lets you reposition it within Play.") + " Click the game for input.";
             else if ((DateTime.UtcNow - selected.Added).TotalSeconds > 20) status.Text = selected.Title + ": " + (selected.Host.LastError ?? "No compatible game window is available yet. Finish any emulator startup dialog, then choose Show in Play; Open in window keeps the session available.");
             else status.Text = "Waiting for " + selected.Title + " to open its game window...";
         }

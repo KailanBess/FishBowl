@@ -2,7 +2,7 @@
 
 Current development state for both maintainers. Update this file with every change; older implementation notes are in [Development history](docs/DEVELOPMENT-HISTORY.md).
 
-_Last updated: 2026-11-18, Windows suite reliability and recovery._
+_Last updated: 2026-11-19, Windows emulator toolbar and Play resizing._
 
 ## Current state
 
@@ -47,6 +47,8 @@ Source, scripts, tests, artwork and documentation belong in Git. Generated execu
 Merged/closed branches should be deleted after checking their pull request and ancestry. Preserve active `fishbowl-browser-auto-fit` work; merged parity branch refs have been removed on GitHub. The owner can enable **Settings → General → Pull Requests → Automatically delete head branches** to prevent future clutter.
 
 ## Log
+- **2026-11-19 (Windows):** wrap the Emulators toolbar to keep actions, filters and search visible at narrower widths. Add a resize handle and Ctrl+arrow resizing to movable Play windows. Document the native DeSmuME fixed-size recovery path in Game view settings. Live DeSmuME rendering remains a compatibility check.
+
 - **2026-11-18 (Windows reliability):** prepare 1.32.0 with a Settings readiness report, existing moved-path/save-recovery actions, bounded read-only remote token-service health testing, Aquarium informational quiet-hour policy and a process-lifetime default/portable profile lease. Add public non-secret `/api/health` to the reference token service. Optional release signing verifies genuine publisher signatures and timestamps; missing credentials leave an explicitly unsigned build. Keep publication gated on passing reviewed main-source checks. Linux receives matching package metadata only; saved fields and Linux UI/behavior are unchanged. Windows builds and targeted privacy/health/quiet-hour, remote service and media-independent checks pass locally. Full Windows regression, both text-audit modes and shared/Linux CI remain release gates. Physical emulators/controllers/monitors, live streaming, genuine signed install interruption recovery and independent security review remain external acceptance work.
 
 - **2026-11-18 (Windows Play):** add a FishBowl-owned draggable frame per running session. Move window reduces the viewport and exposes its title grip; dragging and focused arrow keys reposition it within the stage. Fit restores the full viewport. Keep the same native host/renderer handles, retain position across workspace changes, clamp on resize, and temporarily fit/restore around fullscreen. No emulator files or settings are modified, and positions are session-only. Verify native drag geometry, bounds, focus, fullscreen, detach/return, shutdown and scaled layouts before publication.
