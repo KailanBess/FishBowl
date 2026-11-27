@@ -591,6 +591,10 @@ namespace EmulatorHub
                 focusGame.Enabled = selected != null && !selected.External && selected.Host.IsAttached;
             };
             menu.Items.Add("Input and session details", null, delegate { SessionDetails(); });
+            menu.Items.Add("Performance and battery", null, delegate {
+                var selected = Selected(); if (selected == null) return;
+                SessionPerformance.Show(FindForm(), delegate { return selected.Known.Where(p => p.EndedUtcTicks == 0).ToArray(); });
+            });
             menu.Items.Add("Game view settings", null, delegate { GameViewSettings(); });
             moreButton.ContextMenuStrip = menu;
             moreButton.Click += delegate { menu.Show(moreButton, new Point(0, moreButton.Height)); };

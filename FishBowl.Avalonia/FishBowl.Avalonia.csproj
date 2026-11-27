@@ -7,7 +7,7 @@
     <RootNamespace>EmulatorHub</RootNamespace>
     <Nullable>disable</Nullable>
     <ApplicationIcon>../FishBowl.ico</ApplicationIcon>
-    <Version>1.32.0</Version>
+    <Version>1.33.0</Version>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <!-- Windows-only calls in the shared files are guarded at run time; HttpWebRequest keeps parity with the csc.exe build. -->
     <NoWarn>$(NoWarn);CA1416;SYSLIB0014;CS0618</NoWarn>
@@ -26,6 +26,7 @@
     <Compile Include="../FishBowl.Integrations.cs" Link="Shared/FishBowl.Integrations.cs" />
       <Compile Include="../FishBowl.SaveTools.cs" Link="Shared/FishBowl.SaveTools.cs" />
       <Compile Include="../FishBowl.Sessions.cs" Link="Shared/FishBowl.Sessions.cs" />
+    <Compile Include="../FishBowl.Performance.cs" Link="Shared/FishBowl.Performance.cs" />
       <Compile Include="../FishBowl.LivingRoom.cs" Link="Shared/FishBowl.LivingRoom.cs" />
     <Compile Include="../FishBowl.Profiles.cs" Link="Shared/FishBowl.Profiles.cs" />
   </ItemGroup>

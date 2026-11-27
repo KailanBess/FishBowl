@@ -12,10 +12,10 @@ using Microsoft.Win32;
 
 [assembly: AssemblyDescription("Emulators, games and saves, organized together")]
 [assembly: RuntimeCompatibility(WrapNonExceptionThrows = true)]
-[assembly: AssemblyFileVersion("1.32.0.0")]
+[assembly: AssemblyFileVersion("1.33.0.0")]
 [assembly: CompilationRelaxations(8)]
 [assembly: AssemblyTitle("FishBowl")]
-[assembly: AssemblyVersion("1.32.0.0")]
+[assembly: AssemblyVersion("1.33.0.0")]
 namespace FishBowlSetup
 {
 	internal static class Program
@@ -285,7 +285,7 @@ namespace FishBowlSetup
 			};
 			Label value2 = new Label
 			{
-				Text = "FishBowl Setup 1.32.0",
+				Text = "FishBowl Setup 1.33.0",
 				Font = new Font("Segoe UI", 10f),
 				ForeColor = Color.FromArgb(193, 187, 200),
 				AutoSize = true,
@@ -520,7 +520,7 @@ namespace FishBowlSetup
 			using (RegistryKey registryKey = Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FishBowl"))
 			{
 				registryKey.SetValue("DisplayName", "FishBowl");
-				registryKey.SetValue("DisplayVersion", "1.32.0");
+				registryKey.SetValue("DisplayVersion", "1.33.0");
 				registryKey.SetValue("Publisher", "FishBowl");
 				registryKey.SetValue("DisplayIcon", value);
 				registryKey.SetValue("UninstallString", "\"" + Path.Combine(installOptions.Destination, "Uninstall FishBowl.bat") + "\"");

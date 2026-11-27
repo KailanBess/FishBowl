@@ -43,6 +43,7 @@ These are from the Linux version, with made-up example games. The Windows versio
 - **Saves and backups:** archive and restore emulator configuration, in-game saves and save states; snapshots of linked saves, with restore previews and optional scheduled captures.
 - **Profiles:** separate favorites, progress, play time and appearance for each person, plus a temporary guest mode.
 - **Living-room mode and controller navigation** for full-screen, couch-friendly browsing.
+- **Session resources:** Play → More → Performance and battery samples the selected Windows session's verified process identities. CPU needs consecutive complete samples; process working sets can include shared pages. Missing readings stay unknown, and battery values are Windows estimates. This read-only window does not change power plans or emulator settings. FPS, frame times, GPU usage, temperatures and power consumption are not supplied by this sampler.
 - **Appearance:**
   - 40 themes, 28 accents and custom palettes
   - compact controls with Standard/Roomy spacing options, harmonized theme colors and Original color blending
