@@ -4,6 +4,7 @@ static class T {
   static int fails;
   static void Check(string what, bool ok) { Console.WriteLine((ok ? "PASS " : "FAIL ") + what); if (!ok) fails++; }
   static int Main() {
+    PerformanceCoreTests.Run();
     var root = Path.Combine(Path.GetTempPath(), "fbtest-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
     // Preset recognition
     Func<string,string> rec = f => EmulatorDiscovery.Recognize(f).Name;

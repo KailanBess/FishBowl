@@ -26,6 +26,7 @@
     <Compile Include="../FishBowl.Integrations.cs" Link="Shared/FishBowl.Integrations.cs" />
       <Compile Include="../FishBowl.SaveTools.cs" Link="Shared/FishBowl.SaveTools.cs" />
       <Compile Include="../FishBowl.Sessions.cs" Link="Shared/FishBowl.Sessions.cs" />
+    <Compile Include="../FishBowl.Performance.cs" Link="Shared/FishBowl.Performance.cs" />
       <Compile Include="../FishBowl.LivingRoom.cs" Link="Shared/FishBowl.LivingRoom.cs" />
     <Compile Include="../FishBowl.Profiles.cs" Link="Shared/FishBowl.Profiles.cs" />
   </ItemGroup>
