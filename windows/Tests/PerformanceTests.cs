@@ -22,6 +22,10 @@ class PerformanceTests
         Check(!reset.CpuPercent.HasValue, "Reset CPU counter produced negative usage");
         var empty = sampler.Sample(new SessionProcessMetric[0], 0, 6000, 1000, 4);
         Check(!empty.CpuPercent.HasValue, "Empty session reported zero CPU");
+        sampler.Sample(new[] { Metric("one", 1, 100), Metric("two", 1, 100) }, 0, 7000, 1000, 4);
+        Check(!sampler.Sample(new[] { Metric("one", 2, 100) }, 0, 8000, 1000, 4).CpuPercent.HasValue, "Disappeared process produced a complete rate");
+        sampler.Sample(new[] { Metric("one", 3, 100) }, 1, 9000, 1000, 4);
+        Check(!sampler.Sample(new[] { Metric("one", 4, 100) }, 0, 10000, 1000, 4).CpuPercent.HasValue, "Previous incomplete sample produced a complete rate");
         using (var process = Process.GetCurrentProcess())
         {
             var identity = new SessionProcess { Pid = process.Id, StartedUtcTicks = process.StartTime.ToUniversalTime().Ticks };

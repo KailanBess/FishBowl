@@ -12,6 +12,11 @@ static class PerformanceCoreTests
         sample.ProcessorTicks = TimeSpan.TicksPerSecond;
         var next = sampler.Sample(new[] { sample }, 0, 2000, 1000, 2);
         if (!next.CpuPercent.HasValue || Math.Abs(next.CpuPercent.Value - 50) > .001) throw new Exception("Portable CPU calculation failed");
+        sampler.Sample(new[] { sample }, 1, 3000, 1000, 2);
+        if (sampler.Sample(new[] { sample }, 0, 4000, 1000, 2).CpuPercent.HasValue) throw new Exception("Incomplete previous process sample produced a CPU rate");
+        var second = new SessionProcessMetric { Identity = "second", ProcessorTicks = 0, WorkingSetBytes = 1 };
+        sampler.Sample(new[] { sample, second }, 0, 5000, 1000, 2);
+        if (sampler.Sample(new[] { sample }, 0, 6000, 1000, 2).CpuPercent.HasValue) throw new Exception("Disappeared process produced a CPU rate");
         using (var process = Process.GetCurrentProcess())
         {
             var metric = SessionPerformanceMetrics.ReadProcess(new SessionProcess { Pid = process.Id, StartedUtcTicks = process.StartTime.ToUniversalTime().Ticks });
